@@ -46,6 +46,7 @@ function buildHtml(opts: {
   inlinePhotos?: string[];
   photoUrls?: string[];      // fallback clickable links if inline fails
   inlineQrDataUrl?: string;
+  qrApiUrl?: string;        // external QR image URL (Gmail-compatible)
   payNowAmount?: number;
   payNowRef?: string;
 }): string {
@@ -116,12 +117,14 @@ function buildHtml(opts: {
   if (opts.receiptDetails?.length) bodyHtml += sectionTable(opts.inlineQrDataUrl ? 'Invoice' : 'Receipt', opts.receiptDetails, '🧾');
 
   // QR code inline — always at the very end
-  if (opts.inlineQrDataUrl) {
+  if (opts.inlineQrDataUrl || opts.qrApiUrl) {
+    // Use external QR API URL if available (Gmail-compatible), fall back to base64
+    const qrImgSrc = opts.qrApiUrl || opts.inlineQrDataUrl;
     bodyHtml += `<div style="margin:20px 0 0;text-align:center;padding:20px;background:${cream};border-radius:10px;border:1px solid ${line};">` +
       `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;margin-bottom:8px;">💳 PayNow QR Code</div>` +
       (opts.payNowAmount ? `<div style="font-size:15px;font-weight:700;color:${ink};margin-bottom:4px;">Amount due: $${opts.payNowAmount}</div>` : '') +
       (opts.payNowRef ? `<div style="font-size:12px;color:${soft};margin-bottom:12px;font-family:sans-serif;">Reference: ${opts.payNowRef}</div>` : '') +
-      `<img src="${opts.inlineQrDataUrl}" width="200" height="200" style="width:200px;height:200px;display:block;margin:0 auto;border-radius:8px;" alt="PayNow QR">` +
+      `<img src="${qrImgSrc}" width="200" height="200" style="width:200px;height:200px;display:block;margin:0 auto;border-radius:8px;" alt="PayNow QR">` +
       `<div style="font-size:12px;color:${soft};margin-top:8px;font-family:sans-serif;">Scan with your banking app to pay</div></div>`;
   }
 
@@ -199,14 +202,16 @@ export async function dispatchNotification(
     } catch { /* silent */ }
   }
 
-  // PayNow QR inline
-  let inlineQrDataUrl: string | undefined;
+  // PayNow QR — use QR code API for Gmail-compatible external image URL
+  // (Gmail blocks base64 inline images but loads external https:// URLs fine)
+  let qrApiUrl: string | undefined;
   let payNowRef = '';
   let payNowAmount = 0;
   if (payNowQr) {
     try {
-      const QRCode = (await import('qrcode')).default;
-      inlineQrDataUrl = await QRCode.toDataURL(payNowQr.payload, { margin: 2, width: 200, errorCorrectionLevel: 'M' });
+      // api.qrserver.com is a free, reliable QR generation service
+      const encoded = encodeURIComponent(payNowQr.payload);
+      qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encoded}&margin=10`;
       payNowRef = payNowQr.ref;
       payNowAmount = payNowQr.amount;
     } catch { /* silent */ }
@@ -243,7 +248,7 @@ export async function dispatchNotification(
     setupDetails: setupForClient.length ? setupForClient : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
     inlinePhotos: photoUrls.length ? photoUrls : undefined,
-    inlineQrDataUrl,
+    qrApiUrl,
     payNowAmount: payNowAmount || undefined,
     payNowRef: payNowRef || undefined,
   });
@@ -257,7 +262,7 @@ export async function dispatchNotification(
     clientDetails: clientInfoRows.length ? clientInfoRows : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
     inlinePhotos: photoUrls.length ? photoUrls : undefined,
-    inlineQrDataUrl,
+    qrApiUrl,
     payNowAmount: payNowAmount || undefined,
     payNowRef: payNowRef || undefined,
   });
