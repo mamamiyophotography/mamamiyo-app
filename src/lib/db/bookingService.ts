@@ -27,9 +27,11 @@ import {
   REMINDER_THRESHOLDS,
   bundleActivatedNotification,
   invoiceNotification,
+  newBookingRequestNotification,
   NotifyBooking,
 } from '../notifications';
-import { dispatchNotification } from '../notify';
+import { dispatchNotification, Receipt } from '../notify';
+import { sendEmail } from '../email';
 import { generateIcs, icsToBase64 } from '../ics';
 
 const PHOTOGRAPHER_EMAIL_ENV = 'PHOTOGRAPHER_EMAIL';
@@ -185,6 +187,25 @@ export async function createBooking(db: any, input: CreateBookingInput) {
 
     return booking;
   });
+
+  // Notify photographer immediately — client sees the PayNow QR on screen already
+  const photographer = photographerContacts();
+  const notifyBooking = {
+    ref: result.ref, sessionTypeId: result.sessionTypeId, sessionLabel: result.sessionLabel,
+    location: result.location, date: result.date, startTime: result.startTime,
+    clientName: result.clientName, bundleSessionNumber: result.bundleSessionNumber,
+    clientEmail: result.clientEmail, clientPhone: result.clientPhone,
+    address: result.address, notes: result.notes,
+  };
+  const newRequestPair = newBookingRequestNotification(notifyBooking, 'Mamamiyo Photography');
+  // Only send to photographer — client gets nothing until deposit is confirmed
+  await sendEmail(
+    photographer.email,
+    newRequestPair.photographer.emailSubject,
+    newRequestPair.photographer.emailBody,
+  ).catch(() => {}); // Don't block the booking if this fails
+
+  return result;
 }
 
 function toNotifyBooking(b: { ref: string; sessionTypeId: string; sessionLabel: string; location: string; date: string; startTime: string; clientName: string; bundleSessionNumber: number | null }): NotifyBooking {
@@ -219,7 +240,26 @@ export async function confirmDepositAndNotify(db: any, bookingId: string) {
     organizerName: settings.businessName,
     organizerEmail: process.env.RESEND_FROM_EMAIL || 'hello@mamamiyo-photography.com',
   };
-  await dispatchNotification(pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone, calendarEvent);
+  const addOnsRecord = (booking.addOns || {}) as Record<string, number>;
+  const { ADDONS } = await import('../constants');
+  const receipt: Receipt = {
+    sessionLabel: booking.sessionLabel,
+    date: booking.date,
+    startTime: booking.startTime,
+    location: booking.location,
+    address: booking.address,
+    isWeekend: booking.isWeekend,
+    weekendSurcharge: settings.weekendSurcharge,
+    addOns: Object.entries(addOnsRecord)
+      .filter(([, qty]) => qty > 0)
+      .map(([id, qty]) => ({ name: ADDONS[id]?.name || id, qty, price: ADDONS[id]?.price || 0 })),
+    discountCode: booking.discountCode,
+    discountAmount: booking.discountAmount,
+    total: booking.total,
+    depositAmount: booking.depositAmount,
+    balanceDue: booking.balanceDue,
+  };
+  await dispatchNotification(pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone, calendarEvent, receipt);
   return booking;
 }
 

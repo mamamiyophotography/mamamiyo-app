@@ -104,6 +104,7 @@ export interface Db {
     create(args: { data: unknown }): Promise<Booking>;
     update(args: { where: { id: string }; data: Partial<Booking> }): Promise<Booking>;
     updateMany(args: { where: unknown; data: Partial<Booking> }): Promise<{ count: number }>;
+    delete(args: { where: { id: string } }): Promise<Booking | void>;
     count(args: { where: unknown }): Promise<number>;
   };
   bundle: {

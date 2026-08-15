@@ -1,7 +1,58 @@
-import { sendEmail } from './email';
+import { sendEmail, buildEmailHtml } from './email';
 import { sendWhatsApp } from './whatsapp';
 import { NotificationPair } from './notifications';
 import { generateIcs, icsToBase64, IcsEvent } from './ics';
+import { STUDIO_INFO } from './constants';
+
+export type Receipt = {
+  sessionLabel: string;
+  date: string;
+  startTime: string;
+  location: string;
+  address?: string;
+  isWeekend: boolean;
+  weekendSurcharge: number;
+  addOns: { name: string; qty: number; price: number }[];
+  discountCode?: string | null;
+  discountAmount: number;
+  total: number;
+  depositAmount: number;
+  balanceDue: number;
+};
+
+function fmtReceipt(r: Receipt): string {
+  const lines: string[] = [
+    `Session: ${r.sessionLabel}`,
+    `Date: ${r.date} at ${r.startTime}`,
+    `Location: ${r.location === 'home' ? `Your home — ${r.address || 'address on file'}` : 'Studio'}`,
+  ];
+  if (r.isWeekend) lines.push(`Weekend / PH surcharge: +$${r.weekendSurcharge}`);
+  r.addOns.filter(a => a.qty > 0).forEach(a => lines.push(`${a.name} ×${a.qty}: +$${a.price * a.qty}`));
+  if (r.discountCode && r.discountAmount > 0) lines.push(`Discount (${r.discountCode}): -$${r.discountAmount}`);
+  lines.push(`Total: $${r.total}`);
+  lines.push(`Deposit paid: $${r.depositAmount}`);
+  lines.push(`Balance due after session: $${r.balanceDue}`);
+  return lines.join('\n');
+}
+
+function receiptDetails(r: Receipt): { label: string; value: string }[] {
+  const rows: { label: string; value: string }[] = [
+    { label: 'Session', value: r.sessionLabel },
+    { label: 'Location', value: r.location === 'home'
+      ? `Your home\n${r.address || 'address on file'}`
+      : `${STUDIO_INFO.name}\n${STUDIO_INFO.addressLines.join('\n')}\n${STUDIO_INFO.access}\n${STUDIO_INFO.parkingOk}` },
+  ];
+  if (r.isWeekend) rows.push({ label: 'Weekend surcharge', value: `+$${r.weekendSurcharge}` });
+  r.addOns.filter(a => a.qty > 0).forEach(a =>
+    rows.push({ label: `${a.name} ×${a.qty}`, value: `+$${a.price * a.qty}` })
+  );
+  if (r.discountCode && r.discountAmount > 0)
+    rows.push({ label: `Discount (${r.discountCode})`, value: `-$${r.discountAmount}` });
+  rows.push({ label: 'Total', value: `$${r.total}` });
+  rows.push({ label: 'Deposit paid', value: `$${r.depositAmount}` });
+  rows.push({ label: 'Balance due after session', value: `$${r.balanceDue}` });
+  return rows;
+}
 
 export async function dispatchNotification(
   pair: NotificationPair,
@@ -9,33 +60,49 @@ export async function dispatchNotification(
   clientPhoneE164: string,
   photographerEmail: string,
   photographerPhoneE164: string,
-  calendarEvent?: IcsEvent
+  calendarEvent?: IcsEvent,
+  receipt?: Receipt,
 ): Promise<void> {
-  // Build ICS attachment and Google Calendar link when a calendar event is provided
   let icsAttachment: { filename: string; content: string } | undefined;
-  let gcalLink = '';
+  let gcalUrl = '';
 
   if (calendarEvent) {
-    const icsContent = generateIcs(calendarEvent);
-    icsAttachment = { filename: 'booking.ics', content: icsToBase64(icsContent) };
-
+    icsAttachment = { filename: 'booking.ics', content: icsToBase64(generateIcs(calendarEvent)) };
     const gcalDate = calendarEvent.dateISO.replace(/-/g, '');
     const startT = calendarEvent.startTime.replace(':', '') + '00';
     const endT = calendarEvent.endTime.replace(':', '') + '00';
-    gcalLink = `\n\nAdd to Google Calendar: https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(calendarEvent.summary)}&dates=${gcalDate}T${startT}/${gcalDate}T${endT}&location=${encodeURIComponent(calendarEvent.location)}&details=${encodeURIComponent(calendarEvent.description)}`;
+    gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(calendarEvent.summary)}&dates=${gcalDate}T${startT}/${gcalDate}T${endT}&location=${encodeURIComponent(calendarEvent.location)}&details=${encodeURIComponent(calendarEvent.description)}`;
   }
 
-  // Append the calendar link to both client and photographer email bodies
-  const clientBody = pair.client.emailBody + gcalLink;
-  const photographerBody = pair.photographer.emailBody + gcalLink;
-
-  // Both client and photographer get the .ics attachment
   const attachments = icsAttachment ? [icsAttachment] : undefined;
 
+  // Build HTML for client email
+  const clientParagraphs = pair.client.emailBody.split('\n\n').filter(Boolean);
+  if (receipt) {
+    clientParagraphs.push(`Your itemised receipt:\n${fmtReceipt(receipt)}`);
+  }
+  const clientHtml = buildEmailHtml({
+    title: pair.client.emailSubject,
+    paragraphs: clientParagraphs,
+    details: receipt ? receiptDetails(receipt) : undefined,
+    calendarUrl: gcalUrl || undefined,
+    businessName: 'Mamamiyo Photography',
+  });
+
+  // Build HTML for photographer email
+  const photographerParagraphs = pair.photographer.emailBody.split('\n\n').filter(Boolean);
+  const photographerHtml = buildEmailHtml({
+    title: pair.photographer.emailSubject,
+    paragraphs: photographerParagraphs,
+    details: receipt ? receiptDetails(receipt) : undefined,
+    calendarUrl: gcalUrl || undefined,
+    businessName: 'Mamamiyo Photography',
+  });
+
   const results = await Promise.allSettled([
-    sendEmail(clientEmail, pair.client.emailSubject, clientBody, attachments),
+    sendEmail(clientEmail, pair.client.emailSubject, pair.client.emailBody, attachments, clientHtml),
     sendWhatsApp(clientPhoneE164, pair.client.whatsappBody),
-    sendEmail(photographerEmail, pair.photographer.emailSubject, photographerBody, attachments),
+    sendEmail(photographerEmail, pair.photographer.emailSubject, pair.photographer.emailBody, attachments, photographerHtml),
     sendWhatsApp(photographerPhoneE164, pair.photographer.whatsappBody),
   ]);
 

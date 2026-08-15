@@ -189,9 +189,10 @@ export default function AdminBookingsPage() {
                   {b.status === 'confirmed' && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Mark session done</button>
                   )}
-                  {(b.status === 'pending' || b.status === 'confirmed') && (
+                  {b.status !== 'cancelled' && (
                     <button className="btn btn-ghost" disabled={isBusy} onClick={() => { if (confirm('Cancel this booking?')) runAction(b.id, 'cancel'); }}>Cancel</button>
                   )}
+                  <button className="btn btn-ghost" style={{ color: 'var(--rust)' }} disabled={isBusy} onClick={() => { if (confirm('Permanently DELETE this booking? This cannot be undone.')) runAction(b.id, 'delete'); }}>Delete</button>
                 </div>
               </div>
             )}

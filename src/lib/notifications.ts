@@ -246,3 +246,42 @@ export function bundleContextAfterBalance(bundleSessionNumber: number | null | u
   const nextNum = bundleSessionNumber + 1;
   return nextNum <= 3 ? { nextSessionNumber: nextNum } : { completed: true };
 }
+
+/** Sent to photographer immediately when a new booking request comes in
+ *  (before deposit is confirmed). Client gets nothing yet — they already
+ *  see the PayNow QR on screen. */
+export function newBookingRequestNotification(
+  b: NotifyBooking & { clientEmail: string; clientPhone: string; address?: string; notes?: string },
+  businessName: string
+): NotificationPair {
+  const whenStr = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
+  const locationLine = b.location === 'home'
+    ? `Location: Client's home — ${b.address || 'see booking'}`
+    : `Location: Studio`;
+  const notesLine = b.notes ? `Notes: ${b.notes}` : '';
+
+  const body = [
+    `New booking request — awaiting deposit.`,
+    `Client: ${b.clientName}`,
+    `Email: ${b.clientEmail}`,
+    `Phone: ${b.clientPhone}`,
+    `Session: ${b.sessionLabel}`,
+    `When: ${whenStr}`,
+    locationLine,
+    notesLine,
+    `Ref: ${b.ref}`,
+  ].filter(Boolean).join('\n');
+
+  return {
+    client: {
+      emailSubject: '',
+      emailBody: '',
+      whatsappBody: '',
+    },
+    photographer: {
+      emailSubject: `New booking request — ${b.sessionLabel} on ${fmtDatePretty(b.date)}`,
+      emailBody: body,
+      whatsappBody: body,
+    },
+  };
+}
