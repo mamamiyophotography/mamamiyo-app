@@ -28,11 +28,26 @@ export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedPhotos, setExpandedPhotos] = useState<string[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [lineDesc, setLineDesc] = useState('');
   const [lineAmount, setLineAmount] = useState('');
   const [invoiceQr, setInvoiceQr] = useState<{ bookingId: string; dataUrl: string; due: number } | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
+
+  async function expandBooking(id: string) {
+    if (expandedId === id) {
+      setExpandedId(null);
+      setExpandedPhotos([]);
+      return;
+    }
+    setExpandedId(id);
+    setExpandedPhotos([]);
+    // Fetch full booking detail including photos
+    const res = await fetch(`/api/admin/bookings/${id}`);
+    const data = await res.json();
+    setExpandedPhotos(data.booking?.referencePhotoUrls || []);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,7 +128,7 @@ export default function AdminBookingsPage() {
                   ${b.total} · dep ${b.depositAmount} {b.depositStatus} · bal ${b.balanceDue + b.extraLineItems.reduce((s, i) => s + i.amount, 0)} {b.balanceStatus}
                 </div>
               </div>
-              <button className="btn btn-ghost" onClick={() => setExpandedId(isOpen ? null : b.id)}>{isOpen ? 'Hide' : 'Details'}</button>
+              <button className="btn btn-ghost" onClick={() => expandBooking(b.id)}>{isOpen ? 'Hide' : 'Details'}</button>
             </div>
 
             {isOpen && (
@@ -128,11 +143,11 @@ export default function AdminBookingsPage() {
                 {b.discountCode && <div className="ticket-row"><span>Discount</span><b>−${b.discountAmount} ({b.discountCode})</b></div>}
                 <div className="ticket-row"><span>Notes</span><b>{b.notes || '—'}</b></div>
 
-                {b.referencePhotoUrls.length > 0 && (
+                {expandedPhotos.length > 0 && (
                   <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', marginBottom: 6 }}>Reference photos ({b.referencePhotoUrls.length})</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', marginBottom: 6 }}>Reference photos ({expandedPhotos.length})</div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {b.referencePhotoUrls.map((url) => (
+                      {expandedPhotos.map((url: string) => (
                         <a key={url} href={url} target="_blank" rel="noopener" style={{ display: 'block', width: 56, height: 56, borderRadius: 8, overflow: 'hidden', border: '1.5px solid var(--line)' }}>
                           <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </a>
