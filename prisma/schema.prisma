@@ -1,0 +1,115 @@
+// Mamamiyo Photography — database schema
+// Ported directly from the confirmed prototype data model
+// (see photoshoot-booking-app-requirements.md section 6).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Single-row settings table — the photographer's editable configuration.
+model Settings {
+  id                 Int    @id @default(1)
+  businessName       String @default("Mamamiyo Photography")
+  paynowMobile       String @default("")
+  depositAmount      Int    @default(100)
+  weekendSurcharge   Int    @default(50)
+  bufferStudioMin    Int    @default(60)
+  bufferHomeMin      Int    @default(120)
+  minNoticeHours     Int    @default(24)
+  maxBookingMonths   Int    @default(6)
+  holdWindowMinutes  Int    @default(45)
+}
+
+model PublicHoliday {
+  id    String @id @default(cuid())
+  date  String // YYYY-MM-DD
+  label String
+}
+
+model AvailabilityBlock {
+  id        String @id @default(cuid())
+  date      String // YYYY-MM-DD
+  startTime String // HH:MM
+  endTime   String // HH:MM
+  location  String // 'studio' | 'home'
+}
+
+model DiscountCode {
+  id          String @id @default(cuid())
+  code        String @unique
+  description String @default("")
+  amount      Int
+}
+
+model Bundle {
+  id            String    @id @default(cuid())
+  ref           String    @unique
+  clientName    String
+  clientEmail   String
+  clientPhone   String
+  depositAmount Int
+  depositStatus String    @default("pending")
+  creditsTotal  Int       @default(3)
+  activated     Boolean   @default(false)
+  activatedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  bookings      Booking[]
+}
+
+model Booking {
+  id                  String    @id @default(cuid())
+  ref                 String    @unique
+  sessionTypeId       String
+  sessionLabel        String
+  location            String
+  date                String
+  startTime           String
+  endTime             String
+  isWeekend           Boolean   @default(false)
+  addOns              Json      @default("{}")
+  notes               String    @default("")
+  referencePhotoUrls  Json      @default("[]")
+  address             String    @default("")
+  discountCode        String?
+  discountAmount      Int       @default(0)
+  clientName          String
+  clientEmail         String
+  clientPhone         String
+  subtotal            Int
+  total               Int
+  depositAmount       Int
+  balanceDue          Int
+  extraLineItems      Json      @default("[]")
+  invoiceRef          String?
+  invoiceGeneratedAt  DateTime?
+  status              String    @default("pending")
+  holdExpiresAt       DateTime?
+  depositRef          String?
+  depositStatus       String    @default("pending")
+  balanceStatus       String    @default("pending")
+  bundleParentId      String?
+  bundle              Bundle?   @relation(fields: [bundleParentId], references: [id])
+  bundleSessionNumber Int?
+  remindersSent       Json      @default("[]")
+  createdAt           DateTime  @default(now())
+
+  @@index([status])
+  @@index([date])
+  @@index([clientPhone])
+}
+
+model NotificationLog {
+  id        String   @id @default(cuid())
+  bookingId String?
+  bundleId  String?
+  channel   String
+  message   String
+  status    String   @default("sent")
+  sentAt    DateTime @default(now())
+}
