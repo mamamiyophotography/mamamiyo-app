@@ -68,7 +68,9 @@ export async function getAvailableSlots(db: any, sessionTypeId: string): Promise
   if (!st) throw new Error(`Unknown session type: ${sessionTypeId}`);
   const settings = await getSettings(db);
   const [blocks, bookings, holidays] = await Promise.all([
-    db.availabilityBlock.findMany({ where: { location: st.location } }),
+    // No location filter — one set of availability blocks covers all session
+    // types. The photographer manages one calendar, not one per location.
+    db.availabilityBlock.findMany(),
     db.booking.findMany({
       where: { status: { not: 'cancelled' } },
       select: { date: true, startTime: true, endTime: true, status: true, holdExpiresAt: true },

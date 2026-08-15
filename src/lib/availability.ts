@@ -76,7 +76,6 @@ export function generateCandidateSlots(
 
   const out: CandidateSlot[] = [];
   availability
-    .filter((b) => b.location === sessionType.location)
     .forEach((block) => {
       const blockDay = new Date(block.date + 'T00:00:00');
       if (blockDay > maxDate) return;

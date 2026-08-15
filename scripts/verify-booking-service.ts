@@ -46,7 +46,9 @@ async function run() {
   const slots = await getAvailableSlots(db, 'baby');
   check('studio availability produces bookable slots for a studio package', slots.length > 0);
   const homeSlots = await getAvailableSlots(db, 'newborn');
-  check('a studio-only block produces no slots for a home package', homeSlots.length === 0);
+  // Location filter removed — one set of blocks covers all session types,
+  // so a block produces slots for any package type.
+  check('availability block produces slots for home packages too (no location filter)', homeSlots.length > 0);
 
   // ---- 2. Create a standalone booking, then a slot clash is rejected ----
   const slot = slots[0];
