@@ -63,14 +63,15 @@ async function fetchInlinePhotos(urls: string[]): Promise<string[]> {
 }
 
 function buildHtml(opts: {
-  subject: string;        // may contain \n to split into two header lines
+  subject: string;
   paragraphs: string[];
-  calendarUrl?: string;   // button injected right after paragraph that mentions calendar
-  studioDetails?: { label: string; value: string }[];  // only for studio sessions
-  setupDetails?: { label: string; value: string }[];   // notes + photo count for client
-  clientDetails?: { label: string; value: string }[];  // full client info for photographer
+  calendarUrl?: string;
+  studioDetails?: { label: string; value: string }[];
+  setupDetails?: { label: string; value: string }[];
+  clientDetails?: { label: string; value: string }[];
   receiptDetails?: { label: string; value: string }[];
-  inlinePhotos?: string[];  // base64 data URIs
+  inlinePhotos?: string[];
+  inlineQrDataUrl?: string;   // QR shown inline at end of email
   payNowNote?: string;
 }): string {
   const gold = '#b08d57';
@@ -119,12 +120,35 @@ function buildHtml(opts: {
     bodyHtml += `<p style="margin:14px 0;color:${ink};font-size:15px;line-height:1.6;">${opts.payNowNote.replace(/\n/g, '<br>')}</p>`;
   }
 
-  // Sections in order: studio → client/setup → receipt → photos
+  // Sections in order: studio → client/setup (with photos inside) → receipt → QR
   if (opts.studioDetails?.length) bodyHtml += sectionTable('Studio Details', opts.studioDetails, '📍');
   if (opts.clientDetails?.length) bodyHtml += sectionTable('Client Details', opts.clientDetails, '👤');
-  if (opts.setupDetails?.length) bodyHtml += sectionTable('Setup Choices', opts.setupDetails, '🎨');
+
+  // Setup Choices: photos first, then notes — all inside the same section
+  if (opts.setupDetails?.length || opts.inlinePhotos?.length) {
+    const rowsHtml = (opts.setupDetails || []).map(d =>
+      `<tr><td style="padding:6px 0;color:${soft};font-size:13px;width:150px;vertical-align:top;border-bottom:1px solid ${line};">${d.label}</td>` +
+      `<td style="padding:6px 0;color:${ink};font-size:13px;font-weight:600;vertical-align:top;border-bottom:1px solid ${line};">${d.value.replace(/\n/g, '<br>')}</td></tr>`
+    ).join('');
+    const photoHtml = opts.inlinePhotos?.length
+      ? `<div style="padding:10px 0;border-bottom:1px solid ${line};"><div style="font-size:12px;color:${soft};margin-bottom:6px;">Reference photos</div><table cellpadding="0" cellspacing="0"><tbody><tr>${
+          opts.inlinePhotos.map(src =>
+            `<td style="padding:0 6px 0 0;"><img src="${src}" style="width:100px;height:100px;object-fit:cover;border-radius:6px;border:1.5px solid ${line};display:block;" alt="Reference photo"></td>`
+          ).join('')
+        }</tr></tbody></table></div>`
+      : '';
+    bodyHtml += `<div style="margin:20px 0 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">🎨 Setup Choices</div>${photoHtml}<table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tbody>${rowsHtml}</tbody></table></div>`;
+  }
+
   if (opts.receiptDetails?.length) bodyHtml += sectionTable('Receipt', opts.receiptDetails, '🧾');
-  if (opts.inlinePhotos?.length) bodyHtml += photoGrid(opts.inlinePhotos);
+
+  // QR code inline at end of email (not as attachment)
+  if (opts.inlineQrDataUrl) {
+    bodyHtml += `<div style="margin:20px 0 0;text-align:center;padding:20px;background:${cream};border-radius:10px;border:1px solid ${line};">` +
+      `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;margin-bottom:12px;">💳 PayNow QR Code</div>` +
+      `<img src="${opts.inlineQrDataUrl}" style="width:200px;height:200px;border-radius:8px;" alt="PayNow QR">` +
+      `<div style="font-size:12px;color:${soft};margin-top:8px;font-family:sans-serif;">Scan with your banking app to pay</div></div>`;
+  }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#f5f0e8;font-family:Georgia,serif;">
@@ -199,15 +223,14 @@ export async function dispatchNotification(
     } catch { /* silent */ }
   }
 
-  // PayNow QR attachment
-  let qrAttachment: { filename: string; content: string } | undefined;
+  // PayNow QR — generate as inline data URL for embedding in email, not as attachment
+  let inlineQrDataUrl: string | undefined;
   let payNowNote = '';
   if (payNowQr) {
     try {
       const QRCode = (await import('qrcode')).default;
-      const qrDataUrl = await QRCode.toDataURL(payNowQr.payload, { margin: 1, width: 280 });
-      qrAttachment = { filename: 'paynow-qr.png', content: qrDataUrl.replace(/^data:image\/png;base64,/, '') };
-      payNowNote = `Balance due: $${payNowQr.amount} (ref: ${payNowQr.ref})\nA PayNow QR code is attached — scan it with your banking app to pay.`;
+      inlineQrDataUrl = await QRCode.toDataURL(payNowQr.payload, { margin: 1, width: 280 });
+      payNowNote = `Balance due: $${payNowQr.amount}\nReference: ${payNowQr.ref}\nPlease scan the QR code below with your banking app to pay via PayNow.`;
     } catch { /* silent */ }
   }
 
@@ -217,11 +240,8 @@ export async function dispatchNotification(
     inlinePhotos = await fetchInlinePhotos(referencePhotoUrls.slice(0, 5));
   }
 
-  const attachments = [
-    ...(icsAttachment ? [icsAttachment] : []),
-    ...(qrAttachment ? [qrAttachment] : []),
-  ];
-  const att = attachments.length ? attachments : undefined;
+  const attachments = icsAttachment ? [icsAttachment] : undefined;
+  const att = attachments?.length ? attachments : undefined;
 
   // Studio details (only for studio sessions)
   const studio = receipt?.location === 'studio' ? studioRows() : undefined;
@@ -251,6 +271,7 @@ export async function dispatchNotification(
     setupDetails: setupForClient.length ? setupForClient : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
     inlinePhotos,
+    inlineQrDataUrl,
     payNowNote: payNowNote || undefined,
   });
 
@@ -264,6 +285,7 @@ export async function dispatchNotification(
     clientDetails: clientInfoRows.length ? clientInfoRows : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
     inlinePhotos,
+    inlineQrDataUrl,
     payNowNote: payNowNote || undefined,
   });
 

@@ -4,7 +4,7 @@ import { getSettings } from '@/lib/db/bookingService';
 import { buildPayNowPayload } from '@/lib/paynow';
 import { currentBalanceDue } from '@/lib/pricing';
 import { invoiceNotification } from '@/lib/notifications';
-import { dispatchNotification, PayNowQr } from '@/lib/notify';
+import { dispatchNotification, PayNowQr, Receipt } from '@/lib/notify';
 
 function photographerContacts() {
   return {
@@ -60,9 +60,26 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         due, invoiceRef, items
       );
       const photographer = photographerContacts();
+      // Build a simplified receipt showing the balance calculation
+      const invoiceReceipt: Receipt = {
+        sessionLabel: updated.sessionLabel,
+        date: updated.date,
+        startTime: updated.startTime,
+        location: updated.location,
+        address: updated.address || '',
+        isWeekend: updated.isWeekend,
+        weekendSurcharge: 50,
+        addOns: [],
+        discountCode: null,
+        discountAmount: 0,
+        total: updated.total + items.reduce((s: number, i: { amount: number }) => s + i.amount, 0),
+        depositAmount: updated.depositAmount,
+        balanceDue: due,
+      };
       await dispatchNotification(
         pair, updated.clientEmail, updated.clientPhone, photographer.email, photographer.phone,
-        undefined, undefined, payNowQr
+        undefined, invoiceReceipt, payNowQr, undefined, undefined,
+        { date: updated.date, clientName: updated.clientName, sessionLabel: updated.sessionLabel }
       );
     } catch (notifyErr) {
       console.error('Invoice notification failed:', (notifyErr as Error).message);
