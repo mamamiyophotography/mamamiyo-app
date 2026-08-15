@@ -54,13 +54,13 @@ function fullPhone(countryCode: string, phone: string): string {
   return [countryCode.trim(), phone.trim()].filter(Boolean).join(' ');
 }
 
-export async function getSettings(db: Db): Promise<Settings> {
+export async function getSettings(db: any): Promise<Settings> {
   let s = await db.settings.findUnique({ where: { id: 1 } });
   if (!s) s = await db.settings.create({ data: { id: 1 } });
   return s;
 }
 
-export async function getAvailableSlots(db: Db, sessionTypeId: string): Promise<CandidateSlot[]> {
+export async function getAvailableSlots(db: any, sessionTypeId: string): Promise<CandidateSlot[]> {
   const st = sessionById(sessionTypeId);
   if (!st) throw new Error(`Unknown session type: ${sessionTypeId}`);
   const settings = await getSettings(db);
@@ -92,7 +92,7 @@ export type CreateBookingInput = {
   phone: string;
 };
 
-export async function createBooking(db: Db, input: CreateBookingInput) {
+export async function createBooking(db: any, input: CreateBookingInput) {
   const st = sessionById(input.sessionTypeId);
   if (!st) throw new Error(`Unknown session type: ${input.sessionTypeId}`);
   if (!input.referencePhotoUrls.length) throw new Error('At least one reference photo is required.');
@@ -190,7 +190,7 @@ function toNotifyBooking(b: { ref: string; sessionTypeId: string; sessionLabel: 
   return { ...b };
 }
 
-export async function confirmDepositAndNotify(db: Db, bookingId: string) {
+export async function confirmDepositAndNotify(db: any, bookingId: string) {
   const settings = await getSettings(db);
   const booking = await db.booking.update({
     where: { id: bookingId },
@@ -210,7 +210,7 @@ export async function confirmDepositAndNotify(db: Db, bookingId: string) {
   return booking;
 }
 
-export async function markCompleted(db: Db, bookingId: string) {
+export async function markCompleted(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
   const due = currentBalanceDue({ balanceDue: booking.balanceDue, extraLineItems: booking.extraLineItems as { description: string; amount: number }[] });
   if (due <= 0) {
@@ -219,7 +219,7 @@ export async function markCompleted(db: Db, bookingId: string) {
   return db.booking.update({ where: { id: bookingId }, data: { status: 'pending_balance' } });
 }
 
-export async function addExtraLineItem(db: Db, bookingId: string, description: string, amount: number) {
+export async function addExtraLineItem(db: any, bookingId: string, description: string, amount: number) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
   const items = (booking.extraLineItems as { description: string; amount: number }[]) || [];
   items.push({ description, amount });
@@ -233,7 +233,7 @@ export async function addExtraLineItem(db: Db, bookingId: string, description: s
   });
 }
 
-export async function generateInvoiceAndNotify(db: Db, bookingId: string) {
+export async function generateInvoiceAndNotify(db: any, bookingId: string) {
   const settings = await getSettings(db);
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
   const items = (booking.extraLineItems as { description: string; amount: number }[]) || [];
@@ -251,7 +251,7 @@ export async function generateInvoiceAndNotify(db: Db, bookingId: string) {
   return updated;
 }
 
-export async function confirmBalanceAndNotify(db: Db, bookingId: string) {
+export async function confirmBalanceAndNotify(db: any, bookingId: string) {
   const settings = await getSettings(db);
   const booking = await db.booking.update({
     where: { id: bookingId },
@@ -276,7 +276,7 @@ export async function confirmBalanceAndNotify(db: Db, bookingId: string) {
  *  client can only cancel their own booking) and omitted on the admin
  *  route (already trusted via the session middleware — see
  *  /api/admin/bookings/[id]/cancel). */
-export async function cancelBooking(db: Db, bookingId: string, requesterPhone?: string) {
+export async function cancelBooking(db: any, bookingId: string, requesterPhone?: string) {
   if (requesterPhone !== undefined) {
     const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
     if (!phonesMatch(booking.clientPhone, requesterPhone)) {
@@ -288,7 +288,7 @@ export async function cancelBooking(db: Db, bookingId: string, requesterPhone?: 
 
 /** Manual fallback only — activation normally happens automatically inside
  *  confirmBalanceAndNotify when session 1's balance is confirmed. */
-export async function activateBundleManuallyAndNotify(db: Db, bundleId: string) {
+export async function activateBundleManuallyAndNotify(db: any, bundleId: string) {
   const settings = await getSettings(db);
   const bundle = await db.bundle.findUniqueOrThrow({ where: { id: bundleId } });
   if (bundle.depositStatus !== 'paid' || bundle.activated) return bundle;
@@ -358,7 +358,7 @@ function phonesMatch(a: string, b: string): boolean {
   return na.length > 0 && nb.length > 0 && (na.endsWith(nb) || nb.endsWith(na));
 }
 
-export async function lookupByPhone(db: Db, rawPhone: string) {
+export async function lookupByPhone(db: any, rawPhone: string) {
   const norm = rawPhone.replace(/\D/g, '');
   if (!norm) return { bookings: [], bundles: [] };
   const [bookings, bundles] = await Promise.all([
@@ -371,7 +371,7 @@ export async function lookupByPhone(db: Db, rawPhone: string) {
   };
 }
 
-export async function purgeExpiredHolds(db: Db) {
+export async function purgeExpiredHolds(db: any) {
   const now = new Date();
   const { count } = await db.booking.updateMany({
     where: { status: 'pending', holdExpiresAt: { lt: now } },
@@ -380,7 +380,7 @@ export async function purgeExpiredHolds(db: Db) {
   return count;
 }
 
-export async function checkAndSendReminders(db: Db) {
+export async function checkAndSendReminders(db: any) {
   const settings = await getSettings(db);
   const now = new Date();
   const upcoming = await db.booking.findMany({ where: { status: 'confirmed' } });
