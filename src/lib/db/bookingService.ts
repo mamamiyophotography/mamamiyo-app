@@ -30,6 +30,7 @@ import {
   NotifyBooking,
 } from '../notifications';
 import { dispatchNotification } from '../notify';
+import { generateIcs, icsToBase64 } from '../ics';
 
 const PHOTOGRAPHER_EMAIL_ENV = 'PHOTOGRAPHER_EMAIL';
 const PHOTOGRAPHER_PHONE_ENV = 'PHOTOGRAPHER_PHONE';
@@ -206,7 +207,19 @@ export async function confirmDepositAndNotify(db: any, bookingId: string) {
 
   const pair = bookingConfirmedNotification(toNotifyBooking(booking), settings.businessName);
   const photographer = photographerContacts();
-  await dispatchNotification(pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone);
+  const studioAddress = 'K-Lodge, 32 Lorong K Telok Kurau #01-01, Singapore 425641';
+  const calendarEvent = {
+    uid: booking.ref,
+    summary: `${booking.sessionLabel} — ${settings.businessName}`,
+    description: `Your ${booking.sessionLabel} is confirmed.\n\nRef: ${booking.ref}\nBalance due after session: $${booking.balanceDue}\n\nQuestions? Reply to this email.`,
+    location: booking.location === 'home' ? booking.address || 'Your home (address on file)' : studioAddress,
+    dateISO: booking.date,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    organizerName: settings.businessName,
+    organizerEmail: process.env.RESEND_FROM_EMAIL || 'hello@mamamiyo-photography.com',
+  };
+  await dispatchNotification(pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone, calendarEvent);
   return booking;
 }
 
