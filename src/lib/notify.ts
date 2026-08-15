@@ -3,6 +3,7 @@ import { sendWhatsApp } from './whatsapp';
 import { NotificationPair } from './notifications';
 import { generateIcs, icsToBase64, IcsEvent } from './ics';
 import { STUDIO_INFO } from './constants';
+import { fmtBookingTitle } from './format';
 
 export type Receipt = {
   sessionLabel: string;
@@ -38,11 +39,18 @@ export type ClientDetails = {
  *  Returns null if the fetch fails — callers should handle gracefully. */
 async function toInlineImage(url: string): Promise<string | null> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return null;
-    const contentType = res.headers.get('content-type') || 'image/jpeg';
-    const buf = await res.arrayBuffer();
-    return `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`;
+    // Use a manual timeout via Promise.race — AbortSignal.timeout not
+    // available in all Node versions on Vercel
+    const timeout = new Promise<null>((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 10000)
+    );
+    const fetchPromise = fetch(url).then(async (res) => {
+      if (!res.ok) return null;
+      const contentType = res.headers.get('content-type') || 'image/jpeg';
+      const buf = await res.arrayBuffer();
+      return `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`;
+    });
+    return await Promise.race([fetchPromise, timeout]);
   } catch {
     return null;
   }
@@ -171,6 +179,7 @@ export async function dispatchNotification(
   payNowQr?: PayNowQr,
   referencePhotoUrls?: string[],
   clientDetails?: ClientDetails,
+  bookingMeta?: { date: string; clientName: string; sessionLabel: string },
 ): Promise<void> {
   if (!clientEmail || !photographerEmail) {
     console.warn('dispatchNotification: missing email address, skipping');
@@ -264,7 +273,11 @@ export async function dispatchNotification(
   }
   if (clientPhoneE164) sends.push(sendWhatsApp(clientPhoneE164, pair.client.whatsappBody));
   if (pair.photographer.emailSubject && photographerEmail) {
-    sends.push(sendEmail(photographerEmail, pair.photographer.emailSubject, pair.photographer.emailBody, att, photographerHtml));
+    // Photographer subject always uses YYYYMMDD ClientName PhotoshootType format
+    const photographerSubject = bookingMeta
+      ? fmtBookingTitle(bookingMeta.date, bookingMeta.clientName, bookingMeta.sessionLabel)
+      : pair.photographer.emailSubject;
+    sends.push(sendEmail(photographerEmail, photographerSubject, pair.photographer.emailBody, att, photographerHtml));
   }
   if (photographerPhoneE164) sends.push(sendWhatsApp(photographerPhoneE164, pair.photographer.whatsappBody));
 

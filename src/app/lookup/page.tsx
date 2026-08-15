@@ -13,7 +13,7 @@ type Booking = {
 type Bundle = { id: string; ref: string; clientName: string; creditsTotal: number; activated: boolean };
 
 export default function LookupPage() {
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [bundles, setBundles] = useState<Bundle[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,11 +21,11 @@ export default function LookupPage() {
   const [cancelError, setCancelError] = useState<string | null>(null);
 
   async function search() {
-    if (!phone.trim()) return;
+    if (!email.trim()) return;
     setLoading(true);
     setSelected(null);
     setCancelError(null);
-    const res = await fetch(`/api/bookings/lookup?phone=${encodeURIComponent(phone)}`);
+    const res = await fetch(`/api/bookings/lookup?email=${encodeURIComponent(email)}`);
     const data = await res.json();
     setBookings(data.bookings || []);
     setBundles(data.bundles || []);
@@ -37,7 +37,7 @@ export default function LookupPage() {
     const res = await fetch(`/api/bookings/${id}/cancel`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ email }),
     });
     if (!res.ok) {
       const data = await res.json();
@@ -55,7 +55,7 @@ export default function LookupPage() {
       <h1 style={{ fontSize: 26 }}>Look up my booking</h1>
       <p style={{ color: 'var(--ink-soft)', fontSize: 13.5 }}>We&apos;ll match this against the WhatsApp number you gave us when booking.</p>
       <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your phone number, e.g. 9123 4567" style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 10, padding: '10px 12px' }} />
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your email address" style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 10, padding: '10px 12px' }} />
         <button className="btn btn-primary" onClick={search} disabled={loading}>{loading ? 'Searching…' : 'Find'}</button>
       </div>
 
@@ -115,7 +115,7 @@ export default function LookupPage() {
         )
       )}
       {bookings !== null && bundles !== null && results.length === 0 && !selected && (
-        <div className="notice warn">No bookings found for that number — double check it matches what you used when booking.</div>
+        <div className="notice warn">No bookings found for that email — please check it matches the address you used when booking.</div>
       )}
     </div>
   );
@@ -132,6 +132,9 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<CandidateSlot | null>(null);
   const [addOns, setAddOns] = useState<Record<string, number>>({});
+  const [babyGender, setBabyGender] = useState('');
+  const [notes, setNotes] = useState('');
+  const [photos, setPhotos] = useState<{ file: File; previewUrl: string }[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -152,21 +155,28 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
 
   async function confirmRedeem() {
     if (!selectedSlot) return;
+    if (!babyGender) { setError('Please select baby\'s gender.'); return; }
+    if (!photos.length) { setError('Please attach at least one reference photo.'); return; }
     setSubmitting(true);
     setError(null);
-    const res = await fetch(`/api/bundles/${bundle.id}/redeem`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slot: selectedSlot, addOns }),
-    });
-    const data = await res.json();
-    setSubmitting(false);
-    if (!res.ok) {
-      setError(data.error || 'Redemption failed');
-      return;
+    try {
+      // Upload photos directly to Supabase
+      const { uploadPhotoFromBrowser } = await import('@/lib/uploadClient');
+      const referencePhotoUrls = await Promise.all(photos.map((p) => uploadPhotoFromBrowser(p.file)));
+      const res = await fetch(`/api/bundles/${bundle.id}/redeem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot: selectedSlot, addOns, referencePhotoUrls, notes, babyGender }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Redemption failed'); return; }
+      setDone(true);
+      onRedeemed();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
     }
-    setDone(true);
-    onRedeemed();
   }
 
   return (
@@ -213,8 +223,38 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
                   ))}
                 </div>
               )}
+                <div className="field" style={{ marginTop: 14 }}>
+                  <label>Baby's gender</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                    {[['boy', '👦 Boy'], ['girl', '👧 Girl'], ['prefer_not_to_say', 'Prefer not to say']].map(([val, label]) => (
+                      <button key={val} type="button" className={`chip ${babyGender === val ? 'selected' : ''}`} onClick={() => setBabyGender(val)}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Reference photos — required</label>
+                  <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 6 }}>Upload up to 5 reference photos for this session.</div>
+                  <input type="file" accept="image/*" multiple disabled={photos.length >= 5} onChange={(e) => {
+                    if (!e.target.files) return;
+                    const toAdd = Array.from(e.target.files).slice(0, 5 - photos.length);
+                    setPhotos((prev) => [...prev, ...toAdd.map((f) => ({ file: f, previewUrl: URL.createObjectURL(f) }))]);
+                  }} />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                    {photos.map((p, i) => (
+                      <div key={i} style={{ position: 'relative', width: 56, height: 56, borderRadius: 8, overflow: 'hidden', border: '1.5px solid var(--line)' }}>
+                        <img src={p.previewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button type="button" onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))} style={{ position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%', background: 'rgba(46,42,34,.75)', color: '#fff', border: 'none', fontSize: 10 }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 4 }}>{photos.length}/5 attached</div>
+                </div>
+                <div className="field">
+                  <label>Notes (optional)</label>
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything we should know for this session?" style={{ width: '100%', minHeight: 56, border: '1.5px solid var(--line)', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
+                </div>
               <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={!selectedSlot || submitting} onClick={confirmRedeem}>
-                {submitting ? 'Booking…' : 'Confirm this session'}
+                {submitting ? 'Uploading & booking…' : 'Confirm this session'}
               </button>
               {error && <div className="error-text">{error}</div>}
             </>

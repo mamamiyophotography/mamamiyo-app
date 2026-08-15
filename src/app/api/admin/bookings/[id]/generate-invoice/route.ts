@@ -4,7 +4,7 @@ import { getSettings } from '@/lib/db/bookingService';
 import { buildPayNowPayload } from '@/lib/paynow';
 import { currentBalanceDue } from '@/lib/pricing';
 import { invoiceNotification } from '@/lib/notifications';
-import { dispatchNotification } from '@/lib/notify';
+import { dispatchNotification, PayNowQr } from '@/lib/notify';
 
 function photographerContacts() {
   return {
@@ -31,7 +31,25 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       data: { invoiceRef, invoiceGeneratedAt: new Date(), balanceStatus: due > 0 ? 'pending' : 'n/a' },
     });
 
-    // Send notification — don't let this crash the whole route
+    // Build PayNow QR
+    let payNowPayload: string | null = null;
+    let payNowQr: PayNowQr | undefined;
+    try {
+      const mobile = (settings.paynowMobile || '').replace(/\D/g, '').slice(-8);
+      if (mobile.length === 8) {
+        payNowPayload = buildPayNowPayload({
+          mobile8: mobile,
+          amount: due,
+          refNumber: invoiceRef,
+          merchantName: settings.businessName,
+        });
+        payNowQr = { payload: payNowPayload, amount: due, ref: invoiceRef };
+      }
+    } catch (qrErr) {
+      console.error('PayNow QR generation failed:', (qrErr as Error).message);
+    }
+
+    // Send notification with PayNow QR embedded — don't crash the route
     try {
       const pair = invoiceNotification(
         {
@@ -42,28 +60,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         due, invoiceRef, items
       );
       const photographer = photographerContacts();
-      await dispatchNotification(pair, updated.clientEmail, updated.clientPhone, photographer.email, photographer.phone);
+      await dispatchNotification(
+        pair, updated.clientEmail, updated.clientPhone, photographer.email, photographer.phone,
+        undefined, undefined, payNowQr
+      );
     } catch (notifyErr) {
       console.error('Invoice notification failed:', (notifyErr as Error).message);
     }
 
-    // Build PayNow QR — don't crash if mobile not set yet
-    let payNowPayload: string | null = null;
-    try {
-      const mobile = (settings.paynowMobile || '').replace(/\D/g, '').slice(-8);
-      if (mobile.length === 8) {
-        payNowPayload = buildPayNowPayload({
-          mobile8: mobile,
-          amount: due,
-          refNumber: invoiceRef,
-          merchantName: settings.businessName,
-        });
-      }
-    } catch (qrErr) {
-      console.error('PayNow QR generation failed:', (qrErr as Error).message);
-    }
-
-    return NextResponse.json({ booking: updated, payNowPayload, due });
+    return NextResponse.json({ booking: { ...updated, referencePhotoUrls: [] }, payNowPayload, due });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }

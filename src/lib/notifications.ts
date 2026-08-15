@@ -48,26 +48,24 @@ export function bookingConfirmedNotification(b: NotifyBooking, businessName: str
     businessName,
   ].filter(Boolean);
 
-  // Clean, non-repetitive email — receipt and calendar button are injected
-  // by notify.ts (buildHtml) so we don't mention them again here.
+  // Email body — location is NOT here since it appears in the receipt table below.
+  // Calendar button is injected by notify.ts right after the prep link paragraph.
   const emailParts = [
     `Hi ${firstName}!`,
     `Your ${b.sessionLabel} on ${whenStr} is confirmed. See you then!`,
-    studioLine,
-    prep ? `For ${prep.note}, please visit ${prep.url}` : '',
+    prep ? `For ${prep.note}, please visit ${prep.url}\n\nPlease also add this session to your calendar — the invite (.ics) is attached.` : `Please add this session to your calendar — the invite (.ics) is attached.`,
     closingLineFor(b),
   ].filter(Boolean);
 
   return {
     client: {
-      // Two-line subject: type on line 1, date on line 2 — rendered by buildHtml as title
       emailSubject: `Booking Confirmed\n${b.sessionLabel} — ${fmtDatePretty(b.date)}, ${fmtTime12(b.startTime)}`,
       emailBody: emailParts.join('\n\n'),
       whatsappBody: waParts.join('\n\n'),
     },
     photographer: {
       emailSubject: `Booking confirmed — ${b.sessionLabel}`,
-      emailBody: `Deposit received. Booking confirmed.\n\nClient: ${b.clientName}\nSession: ${b.sessionLabel}\nWhen: ${whenStr}\nRef: ${b.ref}`,
+      emailBody: `Deposit received. Booking confirmed.\n\nClient: ${b.clientName}\nSession: ${b.sessionLabel}\nWhen: ${whenStr}\nLocation: ${b.location === 'home' ? `Home — ${b.address || 'see booking'}` : 'Studio'}\nRef: ${b.ref}`,
       whatsappBody: `Confirmed: ${b.sessionLabel} with ${b.clientName}\n${whenStr}\nRef: ${b.ref}`,
     },
   };
@@ -82,38 +80,34 @@ export function bundleSessionConfirmedNotification(
 ): NotificationPair {
   const firstName = firstNameOf(b.clientName);
   const whenStr = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
-  const studioLine = `\ud83d\udccd Studio location: ${studioAddressText()}`;
+  const sessionNum = sessionIndex + 1;
   const prep = prepLinkFor(b);
 
   const waParts = [
-    `Hi ${firstName}!\nSession ${sessionIndex + 1} of 3 is booked for ${whenStr}.\nBalance of $${balanceDue} due after the session.`,
-    studioLine,
-    prep ? `For ${prep.note}, please visit ${prep.url}` : '',
-    `Your receipt is sent to you via email.`,
+    `Hi ${firstName}!\nSession ${sessionNum} of 3 of your First Year Bundle is booked for ${whenStr}.\nBalance of $${balanceDue} due after the session.`,
+    prep ? `For ${prep.note}: ${prep.url}` : '',
     businessName,
   ].filter(Boolean);
 
+  // Same clean format as bookingConfirmedNotification — no studio line in body,
+  // no repetitive receipt/calendar mention, sections handled by notify.ts
   const emailParts = [
     `Hi ${firstName}!`,
-    `Session ${sessionIndex + 1} of 3 of your First Year Bundle is booked for ${whenStr}.\nBalance of $${balanceDue} due after the session.`,
-    studioLine,
-    prep ? `For ${prep.note}, please visit ${prep.url}` : '',
-    `Please add the event to your calendar; the invite is attached.`,
-    `I've also attached your itemised receipt for your records.`,
+    `Session ${sessionNum} of 3 of your First Year Bundle is confirmed for ${whenStr}. Balance of $${balanceDue} is due after the session.`,
+    prep ? `For ${prep.note}, please visit ${prep.url}\n\nPlease also add this session to your calendar — the invite (.ics) is attached.` : `Please add this session to your calendar — the invite (.ics) is attached.`,
     closingLineFor(b),
-    businessName,
   ].filter(Boolean);
 
   return {
     client: {
-      emailSubject: `Booking Confirmed: ${b.sessionLabel} \u2014 ${fmtDatePretty(b.date)}, ${fmtTime12(b.startTime)}`,
+      emailSubject: `Booking Confirmed\nFirst Year Bundle — Session ${sessionNum} of 3 — ${fmtDatePretty(b.date)}, ${fmtTime12(b.startTime)}`,
       emailBody: emailParts.join('\n\n'),
       whatsappBody: waParts.join('\n\n'),
     },
     photographer: {
-      emailSubject: `Bundle session ${sessionIndex + 1} of 3 booked`,
-      emailBody: `Client: ${b.clientName}\nWhen: ${whenStr}\nRef: ${b.ref}`,
-      whatsappBody: `Bundle session ${sessionIndex + 1} of 3 booked:\n${b.clientName}\n${whenStr}\nRef: ${b.ref}`,
+      emailSubject: `Bundle session ${sessionNum} of 3 confirmed — ${b.clientName}`,
+      emailBody: `Bundle session ${sessionNum} of 3 confirmed.\n\nClient: ${b.clientName}\nWhen: ${whenStr}\nBalance due after session: $${balanceDue}\nRef: ${b.ref}`,
+      whatsappBody: `Bundle session ${sessionNum}/3 confirmed: ${b.clientName}, ${whenStr}, ref ${b.ref}`,
     },
   };
 }
@@ -220,18 +214,27 @@ export function invoiceNotification(
   extraLineItems: { description: string; amount: number }[]
 ): NotificationPair {
   const firstName = firstNameOf(b.clientName);
-  const extraLines = extraLineItems.length ? extraLineItems.map((i) => `${i.description}: $${i.amount}`).join('; ') + '. ' : '';
+  const whenStr = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
+  const extraLines = extraLineItems.length
+    ? extraLineItems.map((i) => `${i.description}: $${i.amount}`).join('\n') + '\n'
+    : '';
 
   return {
     client: {
-      emailSubject: `Final invoice \u2014 ${b.sessionLabel}`,
-      emailBody: `${extraLines}Balance due: $${due}. Payment QR attached.`,
-      whatsappBody: `Hi ${firstName}! Here's your final invoice for ${b.sessionLabel}: ${extraLines}Balance due: $${due}, ref ${invoiceRef}. Scan the attached PayNow QR to settle — thank you!`,
+      emailSubject: `Invoice for Balance Payment\n${b.sessionLabel} — ${fmtDatePretty(b.date)}`,
+      emailBody: [
+        `Hi ${firstName}!`,
+        `Thank you for your ${b.sessionLabel} on ${whenStr}. Please find your balance payment invoice below.`,
+        `${extraLines}Balance due: $${due}\nRef: ${invoiceRef}`,
+        `Kindly make payment via PayNow — a QR code is attached for your convenience. Please use the reference number above so we can match your payment promptly.`,
+        `Do reach out if you have any questions. Thank you!`,
+      ].join('\n\n'),
+      whatsappBody: `Hi ${firstName}! Your balance invoice for ${b.sessionLabel} on ${whenStr} is ready. Amount due: $${due}, ref ${invoiceRef}. Please scan the attached PayNow QR to settle — thank you!`,
     },
     photographer: {
-      emailSubject: `Invoice generated & sent`,
-      emailBody: `${b.clientName}, ${b.sessionLabel}, ref ${invoiceRef}, $${due} due.`,
-      whatsappBody: `Invoice sent to ${b.clientName} — ref ${invoiceRef}, $${due} due.`,
+      emailSubject: `Invoice for balance payment sent — ${b.clientName}`,
+      emailBody: `Invoice sent to ${b.clientName}.\n\nSession: ${b.sessionLabel}\nDate: ${whenStr}\nRef: ${invoiceRef}\nAmount due: $${due}`,
+      whatsappBody: `Invoice sent to ${b.clientName} — ${b.sessionLabel}, ref ${invoiceRef}, $${due} due.`,
     },
   };
 }

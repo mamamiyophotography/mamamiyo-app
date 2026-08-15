@@ -26,6 +26,7 @@ export default function BookPage() {
   const [countryCode, setCountryCode] = useState('+65');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [babyGender, setBabyGender] = useState('');
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<{ file: File; previewUrl: string }[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -103,6 +104,7 @@ export default function BookPage() {
     email.trim() &&
     countryCode.trim() &&
     phone.trim() &&
+    babyGender.trim() &&
     photos.length > 0 &&
     (sessionType?.location !== 'home' || address.trim());
 
@@ -124,11 +126,10 @@ export default function BookPage() {
     setSubmitError(null);
     try {
       setUploading(true);
-      const formData = new FormData();
-      photos.forEach((p) => formData.append('files', p.file));
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploadData.error || 'Photo upload failed');
+      // Upload directly from browser to Supabase Storage — bypasses Vercel's
+      // 4.5MB request body limit entirely since files go straight to Supabase.
+      const { uploadPhotoFromBrowser } = await import('@/lib/uploadClient');
+      const referencePhotoUrls = await Promise.all(photos.map((p) => uploadPhotoFromBrowser(p.file)));
       setUploading(false);
 
       const res = await fetch('/api/bookings', {
@@ -142,7 +143,8 @@ export default function BookPage() {
           isWeekend: selectedSlot.isWeekend,
           addOns,
           notes,
-          referencePhotoUrls: uploadData.urls,
+          babyGender,
+          referencePhotoUrls: referencePhotoUrls,
           address,
           discountCode: appliedDiscount?.code || null,
           clientName: name,
@@ -378,6 +380,14 @@ export default function BookPage() {
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 6 }}>{photos.length}/5 attached</div>
           </div>
+          <div className="field">
+            <label>Baby's gender</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+              {[['boy', '👦 Boy'], ['girl', '👧 Girl'], ['prefer_not_to_say', 'Prefer not to say']].map(([val, label]) => (
+                <button key={val} type="button" className={`chip ${babyGender === val ? 'selected' : ''}`} onClick={() => setBabyGender(val)}>{label}</button>
+              ))}
+            </div>
+          </div>
           <div className="field"><label>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything we should know?" /></div>
         </div>
       )}
@@ -427,7 +437,7 @@ export default function BookPage() {
           <button className="btn btn-primary" style={{ marginTop: 16 }} disabled={!readyForReview || submitting} onClick={submitBooking}>
             {submitting ? (uploading ? 'Uploading photos…' : 'Creating booking…') : 'Generate payment QR'}
           </button>
-          {!readyForReview && <div style={{ fontSize: 12, color: 'var(--ink-faint)', marginTop: 6 }}>Fill in your name, email, WhatsApp number, address (if applicable), and attach at least one reference photo to continue.</div>}
+          {!readyForReview && <div style={{ fontSize: 12, color: 'var(--ink-faint)', marginTop: 6 }}>Fill in your name, email, WhatsApp number, baby's gender, address (if applicable), and attach at least one reference photo to continue.</div>}
           {submitError && <div className="error-text">{submitError}</div>}
         </div>
       )}

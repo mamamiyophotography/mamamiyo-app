@@ -88,6 +88,7 @@ export type CreateBookingInput = {
   isWeekend: boolean;
   addOns: Record<string, number>;
   notes: string;
+  babyGender?: string;  // 'boy' | 'girl' | 'prefer_not_to_say' | ''
   referencePhotoUrls: string[];
   address: string;
   discountCode?: string | null;
@@ -165,7 +166,10 @@ export async function createBooking(db: any, input: CreateBookingInput) {
         endTime: input.endTime,
         isWeekend: input.isWeekend,
         addOns: input.addOns,
-        notes: input.notes,
+        notes: [
+          input.babyGender ? `Baby gender: ${input.babyGender}` : '',
+          input.notes,
+        ].filter(Boolean).join('\n'),
         referencePhotoUrls: input.referencePhotoUrls,
         address: st.location === 'home' ? input.address : '',
         discountCode: discount?.code,
@@ -274,7 +278,8 @@ export async function confirmDepositAndNotify(db: any, bookingId: string) {
   await dispatchNotification(
     pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone,
     calendarEvent, receipt, undefined, (booking.referencePhotoUrls as string[]) || [],
-    { name: booking.clientName, email: booking.clientEmail, phone: booking.clientPhone, address: booking.address, notes: booking.notes }
+    { name: booking.clientName, email: booking.clientEmail, phone: booking.clientPhone, address: booking.address, notes: booking.notes },
+    { date: booking.date, clientName: booking.clientName, sessionLabel: booking.sessionLabel }
   );
   return booking;
 }
@@ -358,8 +363,13 @@ export async function confirmBalanceAndNotify(db: any, bookingId: string) {
  *  client can only cancel their own booking) and omitted on the admin
  *  route (already trusted via the session middleware — see
  *  /api/admin/bookings/[id]/cancel). */
-export async function cancelBooking(db: any, bookingId: string, requesterPhone?: string) {
-  if (requesterPhone !== undefined) {
+export async function cancelBooking(db: any, bookingId: string, requesterPhone?: string, requesterEmail?: string) {
+  if (requesterEmail !== undefined) {
+    const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+    if (booking.clientEmail.trim().toLowerCase() !== requesterEmail.trim().toLowerCase()) {
+      throw new Error('EMAIL_MISMATCH');
+    }
+  } else if (requesterPhone !== undefined) {
     const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
     if (!phonesMatch(booking.clientPhone, requesterPhone)) {
       throw new Error('PHONE_MISMATCH');
@@ -385,7 +395,10 @@ export async function redeemBundleSessionAndNotify(
   db: Db,
   bundleId: string,
   slot: { date: string; startTime: string; endTime: string; isWeekend: boolean },
-  addOns: Record<string, number>
+  addOns: Record<string, number>,
+  referencePhotoUrls: string[] = [],
+  notes: string = '',
+  babyGender: string = '',
 ) {
   const settings = await getSettings(db);
   const bundle = await db.bundle.findUniqueOrThrow({ where: { id: bundleId } });
@@ -399,18 +412,26 @@ export async function redeemBundleSessionAndNotify(
   const weekendFee = slot.isWeekend ? settings.weekendSurcharge : 0;
   const balanceDue = baseBalance + addOnsTotal + weekendFee;
 
+  const combinedNotes = [
+    babyGender ? `Baby gender: ${babyGender}` : '',
+    notes,
+  ].filter(Boolean).join('\n');
+
+  const sessionLabel = `First Year Bundle — session ${sessionIndex + 2} of 3`;
+
   const booking = await db.booking.create({
     data: {
       ref: refCode('MMY'),
       sessionTypeId: 'bundle',
-      sessionLabel: `First Year Bundle — session ${sessionIndex + 1} of 3`,
+      sessionLabel,
       location: 'studio',
       date: slot.date,
       startTime: slot.startTime,
       endTime: slot.endTime,
       isWeekend: slot.isWeekend,
       addOns: addOns,
-      referencePhotoUrls: [],
+      notes: combinedNotes,
+      referencePhotoUrls,
       clientName: bundle.clientName,
       clientEmail: bundle.clientEmail,
       clientPhone: bundle.clientPhone,
@@ -422,18 +443,35 @@ export async function redeemBundleSessionAndNotify(
       depositStatus: 'n/a',
       balanceStatus: balanceDue > 0 ? 'pending' : 'n/a',
       bundleParentId: bundle.id,
-      bundleSessionNumber: sessionIndex + 1,
+      bundleSessionNumber: sessionIndex + 2,
     },
   });
 
   const pair = bundleSessionConfirmedNotification(toNotifyBooking(booking), sessionIndex, balanceDue, settings.businessName);
   const photographer = photographerContacts();
-  await dispatchNotification(pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone);
+  await dispatchNotification(
+    pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone,
+    undefined, undefined, undefined, referencePhotoUrls,
+    { name: bundle.clientName, email: bundle.clientEmail, phone: bundle.clientPhone, notes: combinedNotes },
+    { date: slot.date, clientName: bundle.clientName, sessionLabel }
+  );
   return booking;
 }
 
-/** Loose phone matching, tolerant of country-code prefixes/formatting
- *  differences — shared between lookup and the ownership check below. */
+export async function lookupByEmail(db: any, email: string) {
+  const norm = email.trim().toLowerCase();
+  if (!norm) return { bookings: [], bundles: [] };
+  const [bookings, bundles] = await Promise.all([
+    db.booking.findMany({ orderBy: { date: 'desc' } }),
+    db.bundle.findMany({ where: { depositStatus: 'paid' } }),
+  ]);
+  return {
+    bookings: bookings.filter((b: any) => b.clientEmail.trim().toLowerCase() === norm),
+    bundles: bundles.filter((b: any) => b.clientEmail.trim().toLowerCase() === norm),
+  };
+}
+
+/** @deprecated Use lookupByEmail instead — kept for phone-based ownership check in cancelBooking */
 function phonesMatch(a: string, b: string): boolean {
   const na = a.replace(/\D/g, '');
   const nb = b.replace(/\D/g, '');
