@@ -35,28 +35,23 @@ export type ClientDetails = {
   notes?: string;
 };
 
-/** Fetch a URL and return a base64 data URI, for inline email images.
- *  Returns null if the fetch fails — callers should handle gracefully. */
+/** Attempt to fetch a photo URL and return base64 data URI.
+ *  Returns null on any failure — always safe to call. */
 async function toInlineImage(url: string): Promise<string | null> {
   try {
-    // Use a manual timeout via Promise.race — AbortSignal.timeout not
-    // available in all Node versions on Vercel
-    const timeout = new Promise<null>((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), 10000)
-    );
-    const fetchPromise = fetch(url).then(async (res) => {
-      if (!res.ok) return null;
-      const contentType = res.headers.get('content-type') || 'image/jpeg';
-      const buf = await res.arrayBuffer();
-      return `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`;
-    });
-    return await Promise.race([fetchPromise, timeout]);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const contentType = res.headers.get('content-type') || 'image/jpeg';
+    const buf = await res.arrayBuffer();
+    return `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`;
   } catch {
     return null;
   }
 }
 
-/** Fetch all reference photo URLs and convert to inline data URIs in parallel. */
 async function fetchInlinePhotos(urls: string[]): Promise<string[]> {
   const results = await Promise.all(urls.map(toInlineImage));
   return results.filter((r): r is string => r !== null);
@@ -71,7 +66,8 @@ function buildHtml(opts: {
   clientDetails?: { label: string; value: string }[];
   receiptDetails?: { label: string; value: string }[];
   inlinePhotos?: string[];
-  inlineQrDataUrl?: string;   // QR shown inline at end of email
+  photoUrls?: string[];      // fallback clickable links if inline fails
+  inlineQrDataUrl?: string;
   payNowNote?: string;
 }): string {
   const gold = '#b08d57';
@@ -94,17 +90,7 @@ function buildHtml(opts: {
       `<tr><td style="padding:6px 0;color:${soft};font-size:13px;width:150px;vertical-align:top;border-bottom:1px solid ${line};">${d.label}</td>` +
       `<td style="padding:6px 0;color:${ink};font-size:13px;font-weight:600;vertical-align:top;border-bottom:1px solid ${line};">${d.value.replace(/\n/g, '<br>')}</td></tr>`
     ).join('');
-    return `<div style="margin:20px 0 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">${emoji ? emoji + ' ' : ''}${header}</div>` +
-      `<table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tbody>${rowsHtml}</tbody></table></div>`;
-  }
-
-  function photoGrid(inlinePhotos: string[]): string {
-    if (!inlinePhotos.length) return '';
-    const thumbs = inlinePhotos.map(src =>
-      `<td style="padding:4px;"><img src="${src}" style="width:110px;height:110px;object-fit:cover;border-radius:8px;border:1.5px solid ${line};display:block;" alt="Reference photo"></td>`
-    ).join('');
-    return `<div style="margin:20px 0 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">📸 Reference Photos</div>` +
-      `<table cellpadding="0" cellspacing="0" style="margin-top:8px;"><tbody><tr>${thumbs}</tr></tbody></table></div>`;
+    return `<div style="margin:20px 0 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">${emoji ? emoji + ' ' : ''}${header}</div><table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tbody>${rowsHtml}</tbody></table></div>`;
   }
 
   // Build body — inject calendar button after paragraph mentioning calendar
@@ -120,33 +106,45 @@ function buildHtml(opts: {
     bodyHtml += `<p style="margin:14px 0;color:${ink};font-size:15px;line-height:1.6;">${opts.payNowNote.replace(/\n/g, '<br>')}</p>`;
   }
 
-  // Sections in order: studio → client/setup (with photos inside) → receipt → QR
+  // Studio section
   if (opts.studioDetails?.length) bodyHtml += sectionTable('Studio Details', opts.studioDetails, '📍');
+
+  // Client details (photographer email)
   if (opts.clientDetails?.length) bodyHtml += sectionTable('Client Details', opts.clientDetails, '👤');
 
-  // Setup Choices: photos first, then notes — all inside the same section
-  if (opts.setupDetails?.length || opts.inlinePhotos?.length) {
+  // Setup Choices: photos first (inline or linked), then notes
+  if (opts.setupDetails?.length || opts.inlinePhotos?.length || opts.photoUrls?.length) {
     const rowsHtml = (opts.setupDetails || []).map(d =>
       `<tr><td style="padding:6px 0;color:${soft};font-size:13px;width:150px;vertical-align:top;border-bottom:1px solid ${line};">${d.label}</td>` +
       `<td style="padding:6px 0;color:${ink};font-size:13px;font-weight:600;vertical-align:top;border-bottom:1px solid ${line};">${d.value.replace(/\n/g, '<br>')}</td></tr>`
     ).join('');
-    const photoHtml = opts.inlinePhotos?.length
-      ? `<div style="padding:10px 0;border-bottom:1px solid ${line};"><div style="font-size:12px;color:${soft};margin-bottom:6px;">Reference photos</div><table cellpadding="0" cellspacing="0"><tbody><tr>${
-          opts.inlinePhotos.map(src =>
-            `<td style="padding:0 6px 0 0;"><img src="${src}" style="width:100px;height:100px;object-fit:cover;border-radius:6px;border:1.5px solid ${line};display:block;" alt="Reference photo"></td>`
-          ).join('')
-        }</tr></tbody></table></div>`
-      : '';
-    bodyHtml += `<div style="margin:20px 0 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">🎨 Setup Choices</div>${photoHtml}<table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tbody>${rowsHtml}</tbody></table></div>`;
+
+    let photoSection = '';
+    if (opts.inlinePhotos?.length) {
+      // Inline base64 thumbnails
+      const thumbs = opts.inlinePhotos.map(src =>
+        `<td style="padding:0 6px 0 0;"><img src="${src}" width="100" height="100" style="width:100px;height:100px;object-fit:cover;border-radius:6px;border:1.5px solid ${line};display:block;" alt="Reference photo"></td>`
+      ).join('');
+      photoSection = `<div style="padding:10px 0;border-bottom:1px solid ${line};"><div style="font-size:12px;color:${soft};margin-bottom:6px;font-family:sans-serif;">Reference photos</div><table cellpadding="0" cellspacing="0"><tbody><tr>${thumbs}</tr></tbody></table></div>`;
+    } else if (opts.photoUrls?.length) {
+      // Fallback: clickable links
+      const links = opts.photoUrls.map((url, i) =>
+        `<a href="${url}" target="_blank" style="display:inline-block;margin:0 6px 6px 0;padding:4px 10px;background:${cream};border:1px solid ${line};border-radius:6px;font-size:12px;color:${ink};text-decoration:none;font-family:sans-serif;">Photo ${i + 1} 🔗</a>`
+      ).join('');
+      photoSection = `<div style="padding:10px 0;border-bottom:1px solid ${line};"><div style="font-size:12px;color:${soft};margin-bottom:6px;font-family:sans-serif;">Reference photos</div>${links}</div>`;
+    }
+
+    bodyHtml += `<div style="margin:20px 0 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">🎨 Setup Choices</div>${photoSection}<table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tbody>${rowsHtml}</tbody></table></div>`;
   }
 
+  // Receipt
   if (opts.receiptDetails?.length) bodyHtml += sectionTable('Receipt', opts.receiptDetails, '🧾');
 
-  // QR code inline at end of email (not as attachment)
+  // QR code inline
   if (opts.inlineQrDataUrl) {
     bodyHtml += `<div style="margin:20px 0 0;text-align:center;padding:20px;background:${cream};border-radius:10px;border:1px solid ${line};">` +
       `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;margin-bottom:12px;">💳 PayNow QR Code</div>` +
-      `<img src="${opts.inlineQrDataUrl}" style="width:200px;height:200px;border-radius:8px;" alt="PayNow QR">` +
+      `<img src="${opts.inlineQrDataUrl}" width="200" height="200" style="width:200px;height:200px;border-radius:8px;" alt="PayNow QR">` +
       `<div style="font-size:12px;color:${soft};margin-top:8px;font-family:sans-serif;">Scan with your banking app to pay</div></div>`;
   }
 
@@ -166,8 +164,9 @@ function buildHtml(opts: {
 }
 
 function receiptRows(r: Receipt): { label: string; value: string }[] {
+  const basePrice = r.total - (r.isWeekend ? r.weekendSurcharge : 0) + r.discountAmount - r.addOns.filter(a => a.qty > 0).reduce((s, a) => s + a.price * a.qty, 0);
   const rows: { label: string; value: string }[] = [];
-  rows.push({ label: 'Package price', value: `$${r.total - (r.isWeekend ? r.weekendSurcharge : 0) + r.discountAmount - r.addOns.filter(a => a.qty > 0).reduce((s, a) => s + a.price * a.qty, 0)}` });
+  rows.push({ label: 'Package price', value: `$${basePrice}` });
   if (r.location === 'home' && r.address) {
     rows.push({ label: 'Address', value: r.address });
   }
@@ -223,7 +222,7 @@ export async function dispatchNotification(
     } catch { /* silent */ }
   }
 
-  // PayNow QR — generate as inline data URL for embedding in email, not as attachment
+  // PayNow QR inline
   let inlineQrDataUrl: string | undefined;
   let payNowNote = '';
   if (payNowQr) {
@@ -234,24 +233,24 @@ export async function dispatchNotification(
     } catch { /* silent */ }
   }
 
-  // Fetch inline photos
+  // Fetch inline photos — try server-side fetch, fall back to URLs as links
   let inlinePhotos: string[] = [];
-  if (referencePhotoUrls?.length) {
-    inlinePhotos = await fetchInlinePhotos(referencePhotoUrls.slice(0, 5));
+  const photoUrls = referencePhotoUrls?.slice(0, 5) || [];
+  if (photoUrls.length) {
+    try {
+      inlinePhotos = await fetchInlinePhotos(photoUrls);
+    } catch { /* silent — photoUrls fallback used instead */ }
   }
 
-  const attachments = icsAttachment ? [icsAttachment] : undefined;
-  const att = attachments?.length ? attachments : undefined;
+  const att = icsAttachment ? [icsAttachment] : undefined;
 
-  // Studio details (only for studio sessions)
   const studio = receipt?.location === 'studio' ? studioRows() : undefined;
 
-  // Client setup details (for client email — notes + photo count)
+  // Client setup: notes only (photos shown separately via inlinePhotos/photoUrls)
   const setupForClient: { label: string; value: string }[] = [];
   if (clientDetails?.notes) setupForClient.push({ label: 'Your notes', value: clientDetails.notes });
 
-
-  // Client details for photographer
+  // Photographer client info
   const clientInfoRows: { label: string; value: string }[] = [];
   if (clientDetails) {
     clientInfoRows.push({ label: 'Name', value: clientDetails.name });
@@ -261,7 +260,6 @@ export async function dispatchNotification(
     if (clientDetails.notes) clientInfoRows.push({ label: 'Notes', value: clientDetails.notes });
   }
 
-  // Client email HTML
   const clientParagraphs = pair.client.emailBody.split('\n\n').filter(Boolean);
   const clientHtml = buildHtml({
     subject: pair.client.emailSubject,
@@ -270,12 +268,12 @@ export async function dispatchNotification(
     studioDetails: studio,
     setupDetails: setupForClient.length ? setupForClient : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
-    inlinePhotos,
+    inlinePhotos: inlinePhotos.length ? inlinePhotos : undefined,
+    photoUrls: !inlinePhotos.length && photoUrls.length ? photoUrls : undefined,
     inlineQrDataUrl,
     payNowNote: payNowNote || undefined,
   });
 
-  // Photographer email HTML
   const photographerParagraphs = pair.photographer.emailBody.split('\n\n').filter(Boolean);
   const photographerHtml = buildHtml({
     subject: pair.photographer.emailSubject,
@@ -284,7 +282,8 @@ export async function dispatchNotification(
     studioDetails: studio,
     clientDetails: clientInfoRows.length ? clientInfoRows : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
-    inlinePhotos,
+    inlinePhotos: inlinePhotos.length ? inlinePhotos : undefined,
+    photoUrls: !inlinePhotos.length && photoUrls.length ? photoUrls : undefined,
     inlineQrDataUrl,
     payNowNote: payNowNote || undefined,
   });
@@ -295,7 +294,6 @@ export async function dispatchNotification(
   }
   if (clientPhoneE164) sends.push(sendWhatsApp(clientPhoneE164, pair.client.whatsappBody));
   if (pair.photographer.emailSubject && photographerEmail) {
-    // Photographer subject always uses YYYYMMDD ClientName PhotoshootType format
     const photographerSubject = bookingMeta
       ? fmtBookingTitle(bookingMeta.date, bookingMeta.clientName, bookingMeta.sessionLabel)
       : pair.photographer.emailSubject;

@@ -17,19 +17,19 @@ type Booking = {
 
 const STATUS_TABS = [
   { key: 'active', label: 'Active' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'confirmed', label: 'Confirmed' },
-  { key: 'pending_balance', label: 'Pending balance' },
-  { key: 'completed', label: 'Completed' },
+  { key: 'pending', label: '1. Pending deposit' },
+  { key: 'confirmed', label: '2. Booking confirmed' },
+  { key: 'pending_balance', label: '3. Pending balance' },
+  { key: 'completed', label: '4. Photoshoot complete' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
 const STATUS_LABEL: Record<string, { label: string; color: string; bg: string }> = {
-  pending:         { label: 'Pending',         color: '#8c6d3f', bg: '#f1e6d3' },
-  confirmed:       { label: 'Confirmed',       color: '#2e6b3e', bg: '#d4edda' },
-  pending_balance: { label: 'Pending balance', color: '#7a4a00', bg: '#fff3cd' },
-  completed:       { label: 'Completed',       color: '#4b5940', bg: '#e4e9dd' },
-  cancelled:       { label: 'Cancelled',       color: '#6b6152', bg: '#f0ece6' },
+  pending:         { label: '1. Pending deposit',    color: '#8c6d3f', bg: '#f1e6d3' },
+  confirmed:       { label: '2. Booking confirmed',  color: '#2e6b3e', bg: '#d4edda' },
+  pending_balance: { label: '3. Pending balance',    color: '#7a4a00', bg: '#fff3cd' },
+  completed:       { label: '4. Photoshoot complete',color: '#4b5940', bg: '#e4e9dd' },
+  cancelled:       { label: 'Cancelled',             color: '#6b6152', bg: '#f0ece6' },
 };
 
 export default function AdminBookingsPage() {
