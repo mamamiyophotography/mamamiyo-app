@@ -411,7 +411,7 @@ export default function BookPage() {
             {Object.entries(addOns).filter(([, q]) => q > 0).map(([id, q]) => (
               <div className="ticket-row" key={id}><span>{ADDONS[id].name} ×{q}</span><b>+${ADDONS[id].price * q}</b></div>
             ))}
-            <div className="ticket-row"><span>Weekend / PH surcharge</span><b>{pricing.weekendFee > 0 ? `+$${pricing.weekendFee}` : '$0'}</b></div>
+            <div className="ticket-row"><span>{pricing.weekendFee > 0 ? 'Weekend / PH surcharge' : 'Surcharge'}</span><b>{pricing.weekendFee > 0 ? `+$${pricing.weekendFee}` : '$0'}</b></div>
             {pricing.discountAmount > 0 && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount ({appliedDiscount?.code})</span><b style={{ color: 'var(--sage)' }}>−${pricing.discountAmount}</b></div>}
 
             {/* Total */}
