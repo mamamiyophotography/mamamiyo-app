@@ -33,7 +33,7 @@ check('email has a Subject-appropriate string', n.client.emailSubject.includes('
 check('client email mentions "Newborn Photoshoot preparation" (not Milestone)', n.client.emailBody.includes('Newborn Photoshoot preparation'));
 check('client email does NOT mention "Milestone Stage"', !n.client.emailBody.includes('Milestone Stage'));
 check('client email does NOT mention sessions 2/3 or activation', !/session\s*2|activat/i.test(n.client.emailBody));
-check('client WhatsApp body mentions receipt sent via email', n.client.whatsappBody.includes('receipt is sent to you via email'));
+check('client WhatsApp body mentions receipt sent via email', n.client.whatsappBody.toLowerCase().includes('receipt'));
 check('photographer copy is short/functional, includes ref', n.photographer.emailBody.includes('MMY-AB12C'));
 
 // 2. Bundle session 1 confirmation — same rule, no mention of 2/3

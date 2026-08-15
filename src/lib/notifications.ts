@@ -38,37 +38,37 @@ export function bookingConfirmedNotification(b: NotifyBooking, businessName: str
   const firstName = firstNameOf(b.clientName);
   const whenStr = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
   const prep = prepLinkFor(b);
-  const studioLine = b.location === 'studio' ? `\ud83d\udccd Studio location: ${studioAddressText()}` : '';
+  const studioLine = b.location === 'studio' ? `📍 Studio: ${studioAddressText()}` : '';
 
   const waParts = [
     `Hi ${firstName}!\nYour ${b.sessionLabel} on ${whenStr} is confirmed.\nSee you then!`,
     studioLine,
-    prep ? `For ${prep.note}, please visit ${prep.url}` : '',
-    `Your receipt is sent to you via email.`,
+    prep ? `For ${prep.note}: ${prep.url}` : '',
+    `Your itemised receipt has been emailed to you.`,
     businessName,
   ].filter(Boolean);
 
+  // Clean, non-repetitive email — receipt and calendar button are injected
+  // by notify.ts (buildHtml) so we don't mention them again here.
   const emailParts = [
     `Hi ${firstName}!`,
-    `Your ${b.sessionLabel} on ${whenStr} is confirmed.\nSee you then!`,
+    `Your ${b.sessionLabel} on ${whenStr} is confirmed. See you then!`,
     studioLine,
     prep ? `For ${prep.note}, please visit ${prep.url}` : '',
-    `Please add the event to your calendar; the invite is attached.`,
-    `I've also attached your itemised receipt for your records.`,
     closingLineFor(b),
-    businessName,
   ].filter(Boolean);
 
   return {
     client: {
-      emailSubject: `Booking Confirmed: ${b.sessionLabel} \u2014 ${fmtDatePretty(b.date)}, ${fmtTime12(b.startTime)}`,
+      // Two-line subject: type on line 1, date on line 2 — rendered by buildHtml as title
+      emailSubject: `Booking Confirmed\n${b.sessionLabel} — ${fmtDatePretty(b.date)}, ${fmtTime12(b.startTime)}`,
       emailBody: emailParts.join('\n\n'),
       whatsappBody: waParts.join('\n\n'),
     },
     photographer: {
-      emailSubject: `New booking confirmed \u2014 ${b.sessionLabel}`,
-      emailBody: `Deposit received & booking confirmed.\n\nClient: ${b.clientName}\nSession: ${b.sessionLabel}\nWhen: ${whenStr}\nRef: ${b.ref}`,
-      whatsappBody: `New confirmed booking:\n${b.sessionLabel} with ${b.clientName}\n${whenStr}\nRef: ${b.ref}`,
+      emailSubject: `Booking confirmed — ${b.sessionLabel}`,
+      emailBody: `Deposit received. Booking confirmed.\n\nClient: ${b.clientName}\nSession: ${b.sessionLabel}\nWhen: ${whenStr}\nRef: ${b.ref}`,
+      whatsappBody: `Confirmed: ${b.sessionLabel} with ${b.clientName}\n${whenStr}\nRef: ${b.ref}`,
     },
   };
 }

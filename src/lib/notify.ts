@@ -26,42 +26,72 @@ export type PayNowQr = {
   ref: string;
 };
 
-// Inline HTML builder — avoids importing from email.ts which may not have
-// buildEmailHtml in older deployed versions
-function buildHtml(subject: string, paragraphs: string[], details?: { label: string; value: string }[], calUrl?: string): string {
+// Inline HTML builder — self-contained, no external imports needed
+function buildHtml(
+  subject: string,  // may contain \n to split into two lines
+  paragraphs: string[],
+  details?: { label: string; value: string }[],
+  calendarUrl?: string,   // if set, renders button after first mention of calendar in text
+  payNowNote?: string,    // extra PayNow paragraph
+): string {
   const gold = '#b08d57';
   const ink = '#2e2a22';
   const soft = '#6b6152';
   const cream = '#fbf6ec';
   const line = '#e6decb';
 
+  // Split subject into up to two lines
+  const [titleLine1, titleLine2] = subject.split('\n');
+  const titleHtml = titleLine2
+    ? `<div style="color:${cream};font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">${titleLine1}</div><div style="color:${gold};font-size:17px;font-family:Georgia,serif;">${titleLine2}</div>`
+    : `<div style="color:${gold};font-size:18px;font-family:Georgia,serif;">${titleLine1}</div>`;
+
+  const calBtn = calendarUrl
+    ? `<div style="margin:16px 0;"><a href="${calendarUrl}" target="_blank" style="display:inline-block;background:${gold};color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:10px 20px;border-radius:8px;font-family:sans-serif;">📅 Add to Google Calendar</a></div>`
+    : '';
+
   const rows = (details || []).map(d =>
     `<tr><td style="padding:5px 0;color:${soft};font-size:13px;width:160px;vertical-align:top;">${d.label}</td>` +
     `<td style="padding:5px 0;color:${ink};font-size:13px;font-weight:600;vertical-align:top;">${d.value.replace(/\n/g, '<br>')}</td></tr>`
   ).join('');
+  const table = rows
+    ? `<table style="width:100%;border-collapse:collapse;margin:16px 0;background:${cream};border-radius:8px;padding:12px;" cellpadding="0" cellspacing="0"><tbody>${rows}</tbody></table>`
+    : '';
 
-  const table = rows ? `<table style="width:100%;border-collapse:collapse;margin:16px 0;background:${cream};border-radius:8px;padding:12px;" cellpadding="0" cellspacing="0"><tbody>${rows}</tbody></table>` : '';
+  // Build body — insert calendar button after the paragraph that mentions calendar
+  let bodyHtml = '';
+  for (const p of paragraphs) {
+    const mentionsCalendar = /calendar|invite|ics/i.test(p);
+    bodyHtml += `<p style="margin:0 0 14px;color:${ink};font-size:15px;line-height:1.6;">${p.replace(/\n/g, '<br>')}</p>`;
+    if (mentionsCalendar && calBtn) {
+      bodyHtml += calBtn;
+    }
+  }
+  // If no paragraph mentioned calendar but we have a button, append it
+  if (calBtn && !bodyHtml.includes(calBtn)) {
+    bodyHtml += calBtn;
+  }
 
-  const calBtn = calUrl ? `<div style="text-align:center;margin:20px 0;"><a href="${calUrl}" target="_blank" style="display:inline-block;background:${gold};color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:9px;font-family:sans-serif;">📅 Add to Google Calendar</a></div>` : '';
-
-  const body = paragraphs.map(p => `<p style="margin:0 0 14px;color:${ink};font-size:15px;line-height:1.6;">${p.replace(/\n/g, '<br>')}</p>`).join('');
+  if (payNowNote) {
+    bodyHtml += `<p style="margin:0 0 14px;color:${ink};font-size:15px;line-height:1.6;">${payNowNote.replace(/\n/g, '<br>')}</p>`;
+  }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#f5f0e8;font-family:Georgia,serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f0e8;padding:32px 16px;"><tr><td align="center">
 <table width="540" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:14px;overflow:hidden;border:1px solid ${line};">
 <tr><td style="background:${ink};padding:24px 32px;text-align:center;">
-  <div style="color:${cream};font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-bottom:3px;">Mamamiyo Photography</div>
-  <div style="color:${gold};font-size:18px;font-family:Georgia,serif;">${subject}</div>
+  <div style="color:${cream};font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;">Mamamiyo Photography</div>
+  ${titleHtml}
 </td></tr>
-<tr><td style="padding:28px 32px;">${body}${table}${calBtn}</td></tr>
+<tr><td style="padding:28px 32px;">${bodyHtml}${table}</td></tr>
 <tr><td style="padding:16px 32px;border-top:1px solid ${line};text-align:center;">
   <div style="color:${soft};font-size:11px;font-family:sans-serif;">Mamamiyo Photography &nbsp;·&nbsp; <a href="https://www.mamamiyo-photography.com" style="color:${gold};text-decoration:none;">mamamiyo-photography.com</a></div>
 </td></tr>
 </table></td></tr></table></body></html>`;
 }
 
-function fmtReceipt(r: Receipt): { label: string; value: string }[] {
+function receiptDetails(r: Receipt): { label: string; value: string }[] {
   const rows: { label: string; value: string }[] = [
     { label: 'Session', value: r.sessionLabel },
     { label: 'Location', value: r.location === 'home'
@@ -89,17 +119,16 @@ export async function dispatchNotification(
   calendarEvent?: IcsEvent,
   receipt?: Receipt,
   payNowQr?: PayNowQr,
+  referencePhotoUrls?: string[],  // attach photos to both emails
 ): Promise<void> {
-  // Skip sending if email addresses are missing
   if (!clientEmail || !photographerEmail) {
     console.warn('dispatchNotification: missing email address, skipping');
     return;
   }
 
+  // Build ICS attachment
   let icsAttachment: { filename: string; content: string } | undefined;
   let gcalUrl = '';
-  let qrAttachment: { filename: string; content: string } | undefined;
-
   if (calendarEvent) {
     try {
       icsAttachment = { filename: 'booking.ics', content: icsToBase64(generateIcs(calendarEvent)) };
@@ -107,16 +136,19 @@ export async function dispatchNotification(
       const startT = calendarEvent.startTime.replace(':', '') + '00';
       const endT = calendarEvent.endTime.replace(':', '') + '00';
       gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(calendarEvent.summary)}&dates=${gcalDate}T${startT}/${gcalDate}T${endT}&location=${encodeURIComponent(calendarEvent.location)}&details=${encodeURIComponent(calendarEvent.description)}`;
-    } catch { /* calendar generation failed silently */ }
+    } catch { /* silent */ }
   }
 
+  // Build PayNow QR attachment
+  let qrAttachment: { filename: string; content: string } | undefined;
+  let payNowNote = '';
   if (payNowQr) {
     try {
       const QRCode = (await import('qrcode')).default;
       const qrDataUrl = await QRCode.toDataURL(payNowQr.payload, { margin: 1, width: 280 });
-      const base64 = qrDataUrl.replace(/^data:image\/png;base64,/, '');
-      qrAttachment = { filename: 'paynow-qr.png', content: base64 };
-    } catch { /* QR generation failed silently */ }
+      qrAttachment = { filename: 'paynow-qr.png', content: qrDataUrl.replace(/^data:image\/png;base64,/, '') };
+      payNowNote = `Balance due: $${payNowQr.amount} (ref: ${payNowQr.ref})\nA PayNow QR code is attached — scan it with your banking app to pay.`;
+    } catch { /* silent */ }
   }
 
   const attachments = [
@@ -124,26 +156,40 @@ export async function dispatchNotification(
     ...(qrAttachment ? [qrAttachment] : []),
   ];
 
-  // Build client email HTML
+  // Build client email — calendar button injected inline after calendar mention
   const clientParagraphs = pair.client.emailBody.split('\n\n').filter(Boolean);
-  if (receipt) clientParagraphs.push(`Your itemised receipt is shown below.`);
-  if (payNowQr) clientParagraphs.push(`Balance due: $${payNowQr.amount} (ref: ${payNowQr.ref})\nA PayNow QR code is attached — scan it with your banking app to pay.`);
-  const clientDetails = receipt ? fmtReceipt(receipt) : undefined;
-  const clientHtml = buildHtml(pair.client.emailSubject, clientParagraphs, clientDetails, gcalUrl || undefined);
+  const clientDetails = receipt ? receiptDetails(receipt) : undefined;
+  const clientHtml = buildHtml(
+    pair.client.emailSubject,
+    clientParagraphs,
+    clientDetails,
+    gcalUrl || undefined,
+    payNowNote || undefined,
+  );
 
-  // Build photographer email HTML
+  // Build photographer email
   const photographerParagraphs = pair.photographer.emailBody.split('\n\n').filter(Boolean);
-  if (receipt) photographerParagraphs.push(`Client receipt attached.`);
-  if (payNowQr) photographerParagraphs.push(`Balance due: $${payNowQr.amount} (ref: ${payNowQr.ref})`);
-  const photographerDetails = receipt ? fmtReceipt(receipt) : undefined;
-  const photographerHtml = buildHtml(pair.photographer.emailSubject, photographerParagraphs, photographerDetails, gcalUrl || undefined);
+  // Add reference photo links for photographer
+  if (referencePhotoUrls?.length) {
+    photographerParagraphs.push(
+      `Reference photos (${referencePhotoUrls.length}):\n` +
+      referencePhotoUrls.map((url, i) => `Photo ${i + 1}: ${url}`).join('\n')
+    );
+  }
+  const photographerDetails = receipt ? receiptDetails(receipt) : undefined;
+  const photographerHtml = buildHtml(
+    pair.photographer.emailSubject,
+    photographerParagraphs,
+    photographerDetails,
+    gcalUrl || undefined,
+    payNowNote || undefined,
+  );
 
   const att = attachments.length ? attachments : undefined;
 
-  // Skip sending to empty addresses
   const sends: Promise<void>[] = [];
   if (pair.client.emailSubject && clientEmail) {
-    sends.push(sendEmail(clientEmail, pair.client.emailSubject, pair.client.emailBody, att, clientHtml));
+    sends.push(sendEmail(clientEmail, pair.client.emailSubject.replace('\n', ' — '), pair.client.emailBody, att, clientHtml));
   }
   if (clientPhoneE164) sends.push(sendWhatsApp(clientPhoneE164, pair.client.whatsappBody));
   if (pair.photographer.emailSubject && photographerEmail) {
@@ -152,12 +198,9 @@ export async function dispatchNotification(
   if (photographerPhoneE164) sends.push(sendWhatsApp(photographerPhoneE164, pair.photographer.whatsappBody));
 
   const results = await Promise.allSettled(sends);
-
-  const emailFailures = results.filter((r) => r.status === 'rejected');
-  if (emailFailures.length) {
-    const messages = emailFailures
-      .map((r) => (r as PromiseRejectedResult).reason?.message || 'unknown error')
-      .join('; ');
+  const failures = results.filter(r => r.status === 'rejected');
+  if (failures.length) {
+    const messages = failures.map(r => (r as PromiseRejectedResult).reason?.message || 'unknown').join('; ');
     throw new Error(`Notification email delivery failed: ${messages}`);
   }
 }

@@ -200,11 +200,15 @@ export async function createBooking(db: any, input: CreateBookingInput) {
     address: result.address, notes: result.notes,
   };
   const newRequestPair = newBookingRequestNotification(notifyBooking, 'Mamamiyo Photography');
+  const photoUrls = (result.referencePhotoUrls as string[]) || [];
+  const photoLines = photoUrls.length
+    ? `\n\nReference photos (${photoUrls.length}):\n` + photoUrls.map((u, i) => `Photo ${i + 1}: ${u}`).join('\n')
+    : '';
   // Only send to photographer — client gets nothing until deposit is confirmed
   await sendEmail(
     photographer.email,
     newRequestPair.photographer.emailSubject,
-    newRequestPair.photographer.emailBody,
+    newRequestPair.photographer.emailBody + photoLines,
   ).catch(() => {}); // Don't block the booking if this fails
 
   return result;
@@ -261,7 +265,10 @@ export async function confirmDepositAndNotify(db: any, bookingId: string) {
     depositAmount: booking.depositAmount,
     balanceDue: booking.balanceDue,
   };
-  await dispatchNotification(pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone, calendarEvent, receipt);
+  await dispatchNotification(
+    pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone,
+    calendarEvent, receipt, undefined, (booking.referencePhotoUrls as string[]) || []
+  );
   return booking;
 }
 
