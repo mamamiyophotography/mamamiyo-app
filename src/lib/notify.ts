@@ -20,6 +20,12 @@ export type Receipt = {
   balanceDue: number;
 };
 
+export type PayNowQr = {
+  payload: string;  // the raw PayNow string, used to generate QR client-side
+  amount: number;
+  ref: string;
+};
+
 function fmtReceipt(r: Receipt): string {
   const lines: string[] = [
     `Session: ${r.sessionLabel}`,
@@ -62,9 +68,11 @@ export async function dispatchNotification(
   photographerPhoneE164: string,
   calendarEvent?: IcsEvent,
   receipt?: Receipt,
+  payNowQr?: PayNowQr,
 ): Promise<void> {
   let icsAttachment: { filename: string; content: string } | undefined;
   let gcalUrl = '';
+  let qrAttachment: { filename: string; content: string } | undefined;
 
   if (calendarEvent) {
     icsAttachment = { filename: 'booking.ics', content: icsToBase64(generateIcs(calendarEvent)) };
@@ -74,12 +82,30 @@ export async function dispatchNotification(
     gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(calendarEvent.summary)}&dates=${gcalDate}T${startT}/${gcalDate}T${endT}&location=${encodeURIComponent(calendarEvent.location)}&details=${encodeURIComponent(calendarEvent.description)}`;
   }
 
-  const attachments = icsAttachment ? [icsAttachment] : undefined;
+  if (payNowQr) {
+    try {
+      const QRCode = (await import('qrcode')).default;
+      const qrDataUrl = await QRCode.toDataURL(payNowQr.payload, { margin: 1, width: 280 });
+      // Convert data URL to base64 content
+      const base64 = qrDataUrl.replace(/^data:image\/png;base64,/, '');
+      qrAttachment = { filename: 'paynow-qr.png', content: base64 };
+    } catch {
+      // QR generation failed silently
+    }
+  }
+
+  const attachments = [
+    ...(icsAttachment ? [icsAttachment] : []),
+    ...(qrAttachment ? [qrAttachment] : []),
+  ];
 
   // Build HTML for client email
   const clientParagraphs = pair.client.emailBody.split('\n\n').filter(Boolean);
   if (receipt) {
     clientParagraphs.push(`Your itemised receipt:\n${fmtReceipt(receipt)}`);
+  }
+  if (payNowQr) {
+    clientParagraphs.push(`Balance due: $${payNowQr.amount}\nReference: ${payNowQr.ref}\n\nA PayNow QR code is attached — open the attachment and scan it with your banking app to pay.`);
   }
   const clientHtml = buildEmailHtml({
     title: pair.client.emailSubject,
@@ -100,9 +126,9 @@ export async function dispatchNotification(
   });
 
   const results = await Promise.allSettled([
-    sendEmail(clientEmail, pair.client.emailSubject, pair.client.emailBody, attachments, clientHtml),
+    sendEmail(clientEmail, pair.client.emailSubject, pair.client.emailBody, attachments.length ? attachments : undefined, clientHtml),
     sendWhatsApp(clientPhoneE164, pair.client.whatsappBody),
-    sendEmail(photographerEmail, pair.photographer.emailSubject, pair.photographer.emailBody, attachments, photographerHtml),
+    sendEmail(photographerEmail, pair.photographer.emailSubject, pair.photographer.emailBody, attachments.length ? attachments : undefined, photographerHtml),
     sendWhatsApp(photographerPhoneE164, pair.photographer.whatsappBody),
   ]);
 

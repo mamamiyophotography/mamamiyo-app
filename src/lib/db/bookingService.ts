@@ -302,8 +302,18 @@ export async function generateInvoiceAndNotify(db: any, bookingId: string) {
 
   const pair = invoiceNotification(toNotifyBooking(updated), due, invoiceRef, items);
   const photographer = photographerContacts();
+  // Build PayNow QR for email attachment
+  let payNowQr: { payload: string; amount: number; ref: string } | undefined;
+  try {
+    const mobile = (settings.paynowMobile || '').replace(/\D/g, '').slice(-8);
+    if (mobile.length === 8) {
+      const { buildPayNowPayload } = await import('../paynow');
+      const payload = buildPayNowPayload({ mobile8: mobile, amount: due, refNumber: invoiceRef, merchantName: settings.businessName });
+      payNowQr = { payload, amount: due, ref: invoiceRef };
+    }
+  } catch { /* QR failed silently */ }
   // Don't let notification failure block invoice generation
-  await dispatchNotification(pair, updated.clientEmail, updated.clientPhone, photographer.email, photographer.phone).catch((err) => {
+  await dispatchNotification(pair, updated.clientEmail, updated.clientPhone, photographer.email, photographer.phone, undefined, undefined, payNowQr).catch((err) => {
     console.error('Invoice notification failed:', err?.message);
   });
   return updated;

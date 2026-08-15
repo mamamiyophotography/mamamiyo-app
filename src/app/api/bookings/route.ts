@@ -15,13 +15,27 @@ export async function POST(req: NextRequest) {
   try {
     const booking = await createBooking(db, input);
     const settings = await getSettings(db);
-    const payNowPayload = buildPayNowPayload({
-      mobile8: settings.paynowMobile,
-      amount: booking.depositAmount,
-      refNumber: booking.ref,
-      merchantName: settings.businessName,
-    });
-    return NextResponse.json({ booking, payNowPayload }, { status: 201 });
+
+    // Build PayNow QR safely — don't crash if mobile not configured yet
+    let payNowPayload: string | null = null;
+    try {
+      const mobile = (settings.paynowMobile || '').replace(/\D/g, '').slice(-8);
+      if (mobile.length === 8) {
+        payNowPayload = buildPayNowPayload({
+          mobile8: mobile,
+          amount: booking.depositAmount,
+          refNumber: booking.ref,
+          merchantName: settings.businessName,
+        });
+      }
+    } catch {
+      // QR generation failed — client still gets the booking confirmation
+    }
+
+    // Exclude referencePhotoUrls from response — large URLs aren't needed
+    // by the client at this point and can push past Vercel's 4.5MB limit
+    const { referencePhotoUrls: _photos, ...bookingSlim } = booking as any;
+    return NextResponse.json({ booking: bookingSlim, payNowPayload }, { status: 201 });
   } catch (err) {
     const message = (err as Error).message;
     if (message === 'SLOT_TAKEN') {
