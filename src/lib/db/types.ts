@@ -84,18 +84,18 @@ export interface Db {
   availabilityBlock: {
     findMany(args?: { where?: { location?: string } }): Promise<AvailabilityBlock[]>;
     create(args: { data: Omit<AvailabilityBlock, 'id'> }): Promise<AvailabilityBlock>;
-    delete(args: { where: { id: string } }): Promise<void>;
+    delete(args: { where: { id: string } }): Promise<AvailabilityBlock | void>;
   };
   publicHoliday: {
     findMany(): Promise<PublicHoliday[]>;
     create(args: { data: Omit<PublicHoliday, 'id'> }): Promise<PublicHoliday>;
-    delete(args: { where: { id: string } }): Promise<void>;
+    delete(args: { where: { id: string } }): Promise<PublicHoliday | void>;
   };
   discountCode: {
     findUnique(args: { where: { code: string } }): Promise<DiscountCode | null>;
     findMany(): Promise<DiscountCode[]>;
     create(args: { data: Omit<DiscountCode, 'id'> }): Promise<DiscountCode>;
-    delete(args: { where: { id: string } }): Promise<void>;
+    delete(args: { where: { id: string } }): Promise<DiscountCode | void>;
   };
   booking: {
     findFirst(args: { where: unknown }): Promise<Booking | null>;
