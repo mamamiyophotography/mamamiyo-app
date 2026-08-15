@@ -224,9 +224,8 @@ export function invoiceNotification(
       emailSubject: `Invoice for Balance Payment\n${b.sessionLabel} — ${fmtDatePretty(b.date)}`,
       emailBody: [
         `Hi ${firstName}!`,
-        `Thank you for your ${b.sessionLabel} on ${whenStr}. Your balance payment details are below.`,
-        `${extraLines}Balance due: $${due}\nReference: ${invoiceRef}`,
-        `Please scan the PayNow QR code below to pay. Use ${b.clientEmail} as your payment reference so we can match it promptly.`,
+        `Thank you for your ${b.sessionLabel} on ${whenStr}.`,
+        `${extraLines}Your invoice and PayNow QR code are below. Please use ${b.clientEmail} as your payment reference.`,
       ].join('\n\n'),
       whatsappBody: `Hi ${firstName}! Your balance of $${due} for ${b.sessionLabel} on ${whenStr} is due. Ref: ${invoiceRef}. Check your email for the PayNow QR code — thank you!`,
     },

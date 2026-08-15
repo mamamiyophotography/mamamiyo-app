@@ -35,28 +35,6 @@ export type ClientDetails = {
   notes?: string;
 };
 
-/** Attempt to fetch a photo URL and return base64 data URI.
- *  Returns null on any failure — always safe to call. */
-async function toInlineImage(url: string): Promise<string | null> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    const contentType = res.headers.get('content-type') || 'image/jpeg';
-    const buf = await res.arrayBuffer();
-    return `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchInlinePhotos(urls: string[]): Promise<string[]> {
-  const results = await Promise.all(urls.map(toInlineImage));
-  return results.filter((r): r is string => r !== null);
-}
-
 function buildHtml(opts: {
   subject: string;
   paragraphs: string[];
@@ -68,7 +46,8 @@ function buildHtml(opts: {
   inlinePhotos?: string[];
   photoUrls?: string[];      // fallback clickable links if inline fails
   inlineQrDataUrl?: string;
-  payNowNote?: string;
+  payNowAmount?: number;
+  payNowRef?: string;
 }): string {
   const gold = '#b08d57';
   const ink = '#2e2a22';
@@ -102,10 +81,6 @@ function buildHtml(opts: {
   }
   if (calBtn && !bodyHtml.includes(calBtn)) bodyHtml += calBtn;
 
-  if (opts.payNowNote) {
-    bodyHtml += `<p style="margin:14px 0;color:${ink};font-size:15px;line-height:1.6;">${opts.payNowNote.replace(/\n/g, '<br>')}</p>`;
-  }
-
   // Studio section
   if (opts.studioDetails?.length) bodyHtml += sectionTable('Studio Details', opts.studioDetails, '📍');
 
@@ -121,9 +96,9 @@ function buildHtml(opts: {
 
     let photoSection = '';
     if (opts.inlinePhotos?.length) {
-      // Inline base64 thumbnails
-      const thumbs = opts.inlinePhotos.map(src =>
-        `<td style="padding:0 6px 0 0;"><img src="${src}" width="100" height="100" style="width:100px;height:100px;object-fit:cover;border-radius:6px;border:1.5px solid ${line};display:block;" alt="Reference photo"></td>`
+      // External URL img tags — loaded by email client directly (not base64)
+      const thumbs = opts.inlinePhotos.map(url =>
+        `<td style="padding:0 6px 0 0;"><img src="${url}" width="100" height="100" style="width:100px;height:100px;object-fit:cover;border-radius:6px;border:1.5px solid ${line};display:block;" alt="Reference photo"></td>`
       ).join('');
       photoSection = `<div style="padding:10px 0;border-bottom:1px solid ${line};"><div style="font-size:12px;color:${soft};margin-bottom:6px;font-family:sans-serif;">Reference photos</div><table cellpadding="0" cellspacing="0"><tbody><tr>${thumbs}</tr></tbody></table></div>`;
     } else if (opts.photoUrls?.length) {
@@ -138,13 +113,15 @@ function buildHtml(opts: {
   }
 
   // Receipt
-  if (opts.receiptDetails?.length) bodyHtml += sectionTable('Receipt', opts.receiptDetails, '🧾');
+  if (opts.receiptDetails?.length) bodyHtml += sectionTable(opts.inlineQrDataUrl ? 'Invoice' : 'Receipt', opts.receiptDetails, '🧾');
 
-  // QR code inline
+  // QR code inline — always at the very end
   if (opts.inlineQrDataUrl) {
     bodyHtml += `<div style="margin:20px 0 0;text-align:center;padding:20px;background:${cream};border-radius:10px;border:1px solid ${line};">` +
-      `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;margin-bottom:12px;">💳 PayNow QR Code</div>` +
-      `<img src="${opts.inlineQrDataUrl}" width="200" height="200" style="width:200px;height:200px;border-radius:8px;" alt="PayNow QR">` +
+      `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;margin-bottom:8px;">💳 PayNow QR Code</div>` +
+      (opts.payNowAmount ? `<div style="font-size:15px;font-weight:700;color:${ink};margin-bottom:4px;">Amount due: $${opts.payNowAmount}</div>` : '') +
+      (opts.payNowRef ? `<div style="font-size:12px;color:${soft};margin-bottom:12px;font-family:sans-serif;">Reference: ${opts.payNowRef}</div>` : '') +
+      `<img src="${opts.inlineQrDataUrl}" width="200" height="200" style="width:200px;height:200px;display:block;margin:0 auto;border-radius:8px;" alt="PayNow QR">` +
       `<div style="font-size:12px;color:${soft};margin-top:8px;font-family:sans-serif;">Scan with your banking app to pay</div></div>`;
   }
 
@@ -224,23 +201,20 @@ export async function dispatchNotification(
 
   // PayNow QR inline
   let inlineQrDataUrl: string | undefined;
-  let payNowNote = '';
+  let payNowRef = '';
+  let payNowAmount = 0;
   if (payNowQr) {
     try {
       const QRCode = (await import('qrcode')).default;
-      inlineQrDataUrl = await QRCode.toDataURL(payNowQr.payload, { margin: 1, width: 280 });
-      payNowNote = `Balance due: $${payNowQr.amount}\nReference: ${payNowQr.ref}\nPlease scan the QR code below with your banking app to pay via PayNow.`;
+      inlineQrDataUrl = await QRCode.toDataURL(payNowQr.payload, { margin: 2, width: 200, errorCorrectionLevel: 'M' });
+      payNowRef = payNowQr.ref;
+      payNowAmount = payNowQr.amount;
     } catch { /* silent */ }
   }
 
-  // Fetch inline photos — try server-side fetch, fall back to URLs as links
-  let inlinePhotos: string[] = [];
+  // Photos — use Supabase URLs directly as img src (bucket is public)
+  // Email clients load these externally. No server-side base64 conversion needed.
   const photoUrls = referencePhotoUrls?.slice(0, 5) || [];
-  if (photoUrls.length) {
-    try {
-      inlinePhotos = await fetchInlinePhotos(photoUrls);
-    } catch { /* silent — photoUrls fallback used instead */ }
-  }
 
   const att = icsAttachment ? [icsAttachment] : undefined;
 
@@ -268,10 +242,10 @@ export async function dispatchNotification(
     studioDetails: studio,
     setupDetails: setupForClient.length ? setupForClient : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
-    inlinePhotos: inlinePhotos.length ? inlinePhotos : undefined,
-    photoUrls: !inlinePhotos.length && photoUrls.length ? photoUrls : undefined,
+    inlinePhotos: photoUrls.length ? photoUrls : undefined,
     inlineQrDataUrl,
-    payNowNote: payNowNote || undefined,
+    payNowAmount: payNowAmount || undefined,
+    payNowRef: payNowRef || undefined,
   });
 
   const photographerParagraphs = pair.photographer.emailBody.split('\n\n').filter(Boolean);
@@ -282,10 +256,10 @@ export async function dispatchNotification(
     studioDetails: studio,
     clientDetails: clientInfoRows.length ? clientInfoRows : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
-    inlinePhotos: inlinePhotos.length ? inlinePhotos : undefined,
-    photoUrls: !inlinePhotos.length && photoUrls.length ? photoUrls : undefined,
+    inlinePhotos: photoUrls.length ? photoUrls : undefined,
     inlineQrDataUrl,
-    payNowNote: payNowNote || undefined,
+    payNowAmount: payNowAmount || undefined,
+    payNowRef: payNowRef || undefined,
   });
 
   const sends: Promise<void>[] = [];
