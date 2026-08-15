@@ -1,40 +1,43 @@
 import { NextResponse } from 'next/server';
-import { getSettings } from '@/lib/db/bookingService';
-import { db } from '@/lib/db/client';
-import { buildPayNowPayload } from '@/lib/paynow';
-import { sendEmail } from '@/lib/email';
 
 export async function GET() {
   const results: Record<string, string> = {};
   try {
-    results.db = 'ok';
-    const settings = await getSettings(db);
-    results.paynowMobile = settings.paynowMobile;
+    // Test 1: Can we import the booking route's exact imports?
+    results.step1 = 'importing createBooking...';
+    const { createBooking } = await import('@/lib/db/bookingService');
+    results.step1 = 'ok';
 
-    // Test PayNow
-    const mobile = (settings.paynowMobile || '').replace(/\D/g, '').slice(-8);
-    const payload = buildPayNowPayload({ mobile8: mobile, amount: 100, refNumber: 'TEST', merchantName: settings.businessName });
-    results.paynow = 'ok length=' + payload.length;
+    // Test 2: Can we import the upload route?
+    results.step2 = 'importing storage...';
+    const storage = await import('@/lib/storage');
+    results.step2 = typeof storage.uploadReferencePhoto === 'function' ? 'ok' : 'missing uploadReferencePhoto';
 
-    // Test email imports
-    results.sendEmail = typeof sendEmail === 'function' ? 'ok' : 'missing';
+    // Test 3: What does the actual booking POST route import?
+    results.step3 = 'checking bookings route imports...';
+    const { buildPayNowPayload } = await import('@/lib/paynow');
+    results.step3 = 'ok';
 
-    // Test notify import
-    const { dispatchNotification } = await import('@/lib/notify');
-    results.dispatchNotification = typeof dispatchNotification === 'function' ? 'ok' : 'missing';
+    // Test 4: Check if NEXT_PUBLIC_SUPABASE_URL is set (needed by storage.ts)
+    results.NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'MISSING';
+    results.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'MISSING';
+    results.NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'set' : 'MISSING';
 
-    // Test new booking notification import
-    const { newBookingRequestNotification } = await import('@/lib/notifications');
-    results.newBookingRequestNotification = typeof newBookingRequestNotification === 'function' ? 'ok' : 'missing';
-
-    // Test photographer env vars
-    results.PHOTOGRAPHER_EMAIL = process.env.PHOTOGRAPHER_EMAIL ? 'set' : 'MISSING';
-    results.PHOTOGRAPHER_PHONE = process.env.PHOTOGRAPHER_PHONE ? 'set' : 'MISSING';
-    results.RESEND_API_KEY = process.env.RESEND_API_KEY ? 'set' : 'MISSING';
+    // Test 5: Try instantiating Supabase client
+    results.step5 = 'testing supabase client...';
+    const { createClient } = await import('@supabase/supabase-js');
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+      results.step5 = `MISSING: url=${!!url} key=${!!key}`;
+    } else {
+      createClient(url, key);
+      results.step5 = 'ok';
+    }
 
   } catch (err) {
     results.error = (err as Error).message;
-    results.stack = (err as Error).stack?.slice(0, 800) || '';
+    results.stack = (err as Error).stack?.slice(0, 1000) || '';
   }
   return NextResponse.json(results);
 }
