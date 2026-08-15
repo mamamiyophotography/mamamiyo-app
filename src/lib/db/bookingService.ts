@@ -30,7 +30,7 @@ import {
   newBookingRequestNotification,
   NotifyBooking,
 } from '../notifications';
-import { dispatchNotification, Receipt } from '../notify';
+import { dispatchNotification, Receipt, ClientDetails } from '../notify';
 import { sendEmail } from '../email';
 import { generateIcs, icsToBase64 } from '../ics';
 
@@ -205,11 +205,17 @@ export async function createBooking(db: any, input: CreateBookingInput) {
     ? `\n\nReference photos (${photoUrls.length}):\n` + photoUrls.map((u, i) => `Photo ${i + 1}: ${u}`).join('\n')
     : '';
   // Only send to photographer — client gets nothing until deposit is confirmed
-  await sendEmail(
-    photographer.email,
-    newRequestPair.photographer.emailSubject,
-    newRequestPair.photographer.emailBody + photoLines,
-  ).catch(() => {}); // Don't block the booking if this fails
+  try {
+    await sendEmail(
+      photographer.email,
+      newRequestPair.photographer.emailSubject,
+      newRequestPair.photographer.emailBody + photoLines,
+    );
+    console.log('[createBooking] Photographer notification sent to', photographer.email);
+  } catch (err) {
+    // Log but don't block — booking is already created
+    console.error('[createBooking] Photographer notification failed:', (err as Error).message);
+  }
 
   return result;
 }
@@ -267,7 +273,8 @@ export async function confirmDepositAndNotify(db: any, bookingId: string) {
   };
   await dispatchNotification(
     pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone,
-    calendarEvent, receipt, undefined, (booking.referencePhotoUrls as string[]) || []
+    calendarEvent, receipt, undefined, (booking.referencePhotoUrls as string[]) || [],
+    { name: booking.clientName, email: booking.clientEmail, phone: booking.clientPhone, address: booking.address, notes: booking.notes }
   );
   return booking;
 }

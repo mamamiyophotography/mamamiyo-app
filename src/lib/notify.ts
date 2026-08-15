@@ -26,79 +26,120 @@ export type PayNowQr = {
   ref: string;
 };
 
-// Inline HTML builder — self-contained, no external imports needed
-function buildHtml(
-  subject: string,  // may contain \n to split into two lines
-  paragraphs: string[],
-  details?: { label: string; value: string }[],
-  calendarUrl?: string,   // if set, renders button after first mention of calendar in text
-  payNowNote?: string,    // extra PayNow paragraph
-): string {
+export type ClientDetails = {
+  name: string;
+  email: string;
+  phone: string;
+  address?: string;
+  notes?: string;
+};
+
+/** Fetch a URL and return a base64 data URI, for inline email images.
+ *  Returns null if the fetch fails — callers should handle gracefully. */
+async function toInlineImage(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const contentType = res.headers.get('content-type') || 'image/jpeg';
+    const buf = await res.arrayBuffer();
+    return `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch all reference photo URLs and convert to inline data URIs in parallel. */
+async function fetchInlinePhotos(urls: string[]): Promise<string[]> {
+  const results = await Promise.all(urls.map(toInlineImage));
+  return results.filter((r): r is string => r !== null);
+}
+
+function buildHtml(opts: {
+  subject: string;        // may contain \n to split into two header lines
+  paragraphs: string[];
+  calendarUrl?: string;   // button injected right after paragraph that mentions calendar
+  studioDetails?: { label: string; value: string }[];  // only for studio sessions
+  setupDetails?: { label: string; value: string }[];   // notes + photo count for client
+  clientDetails?: { label: string; value: string }[];  // full client info for photographer
+  receiptDetails?: { label: string; value: string }[];
+  inlinePhotos?: string[];  // base64 data URIs
+  payNowNote?: string;
+}): string {
   const gold = '#b08d57';
   const ink = '#2e2a22';
   const soft = '#6b6152';
   const cream = '#fbf6ec';
   const line = '#e6decb';
 
-  // Split subject into up to two lines
-  const [titleLine1, titleLine2] = subject.split('\n');
+  const [titleLine1, titleLine2] = opts.subject.split('\n');
   const titleHtml = titleLine2
-    ? `<div style="color:${cream};font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">${titleLine1}</div><div style="color:${gold};font-size:17px;font-family:Georgia,serif;">${titleLine2}</div>`
-    : `<div style="color:${gold};font-size:18px;font-family:Georgia,serif;">${titleLine1}</div>`;
+    ? `<div style="color:#c5a87c;font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-bottom:5px;">${titleLine1}</div><div style="color:${gold};font-size:17px;font-family:Georgia,serif;">${titleLine2}</div>`
+    : `<div style="color:${gold};font-size:17px;font-family:Georgia,serif;">${titleLine1}</div>`;
 
-  const calBtn = calendarUrl
-    ? `<div style="margin:16px 0;"><a href="${calendarUrl}" target="_blank" style="display:inline-block;background:${gold};color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:10px 20px;border-radius:8px;font-family:sans-serif;">📅 Add to Google Calendar</a></div>`
+  const calBtn = opts.calendarUrl
+    ? `<div style="margin:16px 0 20px;"><a href="${opts.calendarUrl}" target="_blank" style="display:inline-block;background:${gold};color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:10px 20px;border-radius:8px;font-family:sans-serif;">📅 Add to Google Calendar</a></div>`
     : '';
 
-  const rows = (details || []).map(d =>
-    `<tr><td style="padding:5px 0;color:${soft};font-size:13px;width:160px;vertical-align:top;">${d.label}</td>` +
-    `<td style="padding:5px 0;color:${ink};font-size:13px;font-weight:600;vertical-align:top;">${d.value.replace(/\n/g, '<br>')}</td></tr>`
-  ).join('');
-  const table = rows
-    ? `<table style="width:100%;border-collapse:collapse;margin:16px 0;background:${cream};border-radius:8px;padding:12px;" cellpadding="0" cellspacing="0"><tbody>${rows}</tbody></table>`
-    : '';
+  function sectionTable(header: string, rows: { label: string; value: string }[], emoji = ''): string {
+    const rowsHtml = rows.map(d =>
+      `<tr><td style="padding:6px 0;color:${soft};font-size:13px;width:150px;vertical-align:top;border-bottom:1px solid ${line};">${d.label}</td>` +
+      `<td style="padding:6px 0;color:${ink};font-size:13px;font-weight:600;vertical-align:top;border-bottom:1px solid ${line};">${d.value.replace(/\n/g, '<br>')}</td></tr>`
+    ).join('');
+    return `<div style="margin:20px 0 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">${emoji ? emoji + ' ' : ''}${header}</div>` +
+      `<table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tbody>${rowsHtml}</tbody></table></div>`;
+  }
 
-  // Build body — insert calendar button after the paragraph that mentions calendar
+  function photoGrid(inlinePhotos: string[]): string {
+    if (!inlinePhotos.length) return '';
+    const thumbs = inlinePhotos.map(src =>
+      `<td style="padding:4px;"><img src="${src}" style="width:110px;height:110px;object-fit:cover;border-radius:8px;border:1.5px solid ${line};display:block;" alt="Reference photo"></td>`
+    ).join('');
+    return `<div style="margin:20px 0 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">📸 Reference Photos</div>` +
+      `<table cellpadding="0" cellspacing="0" style="margin-top:8px;"><tbody><tr>${thumbs}</tr></tbody></table></div>`;
+  }
+
+  // Build body — inject calendar button after paragraph mentioning calendar
   let bodyHtml = '';
-  for (const p of paragraphs) {
+  for (const p of opts.paragraphs) {
     const mentionsCalendar = /calendar|invite|ics/i.test(p);
     bodyHtml += `<p style="margin:0 0 14px;color:${ink};font-size:15px;line-height:1.6;">${p.replace(/\n/g, '<br>')}</p>`;
-    if (mentionsCalendar && calBtn) {
-      bodyHtml += calBtn;
-    }
+    if (mentionsCalendar && calBtn) bodyHtml += calBtn;
   }
-  // If no paragraph mentioned calendar but we have a button, append it
-  if (calBtn && !bodyHtml.includes(calBtn)) {
-    bodyHtml += calBtn;
+  if (calBtn && !bodyHtml.includes(calBtn)) bodyHtml += calBtn;
+
+  if (opts.payNowNote) {
+    bodyHtml += `<p style="margin:14px 0;color:${ink};font-size:15px;line-height:1.6;">${opts.payNowNote.replace(/\n/g, '<br>')}</p>`;
   }
 
-  if (payNowNote) {
-    bodyHtml += `<p style="margin:0 0 14px;color:${ink};font-size:15px;line-height:1.6;">${payNowNote.replace(/\n/g, '<br>')}</p>`;
-  }
+  // Sections in order: studio → client/setup → receipt → photos
+  if (opts.studioDetails?.length) bodyHtml += sectionTable('Studio Details', opts.studioDetails, '📍');
+  if (opts.clientDetails?.length) bodyHtml += sectionTable('Client Details', opts.clientDetails, '👤');
+  if (opts.setupDetails?.length) bodyHtml += sectionTable('Setup Choices', opts.setupDetails, '🎨');
+  if (opts.receiptDetails?.length) bodyHtml += sectionTable('Receipt', opts.receiptDetails, '🧾');
+  if (opts.inlinePhotos?.length) bodyHtml += photoGrid(opts.inlinePhotos);
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#f5f0e8;font-family:Georgia,serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f0e8;padding:32px 16px;"><tr><td align="center">
-<table width="540" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:14px;overflow:hidden;border:1px solid ${line};">
-<tr><td style="background:${ink};padding:24px 32px;text-align:center;">
-  <div style="color:${cream};font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;">Mamamiyo Photography</div>
+<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:14px;overflow:hidden;border:1px solid ${line};">
+<tr><td style="background:${ink};padding:24px 36px;text-align:center;">
+  <div style="color:#c5a87c;font-size:9px;letter-spacing:4px;text-transform:uppercase;margin-bottom:8px;">Mamamiyo Photography</div>
   ${titleHtml}
 </td></tr>
-<tr><td style="padding:28px 32px;">${bodyHtml}${table}</td></tr>
-<tr><td style="padding:16px 32px;border-top:1px solid ${line};text-align:center;">
+<tr><td style="padding:28px 36px;">${bodyHtml}</td></tr>
+<tr><td style="padding:14px 36px;border-top:1px solid ${line};text-align:center;">
   <div style="color:${soft};font-size:11px;font-family:sans-serif;">Mamamiyo Photography &nbsp;·&nbsp; <a href="https://www.mamamiyo-photography.com" style="color:${gold};text-decoration:none;">mamamiyo-photography.com</a></div>
 </td></tr>
 </table></td></tr></table></body></html>`;
 }
 
-function receiptDetails(r: Receipt): { label: string; value: string }[] {
-  const rows: { label: string; value: string }[] = [
-    { label: 'Session', value: r.sessionLabel },
-    { label: 'Location', value: r.location === 'home'
-      ? `Your home\n${r.address || 'address on file'}`
-      : `${STUDIO_INFO.name}\n${STUDIO_INFO.addressLines.join('\n')}\n${STUDIO_INFO.access}\n${STUDIO_INFO.parkingOk}` },
-    { label: r.isWeekend ? 'Weekend surcharge' : 'Surcharge', value: r.isWeekend ? `+$${r.weekendSurcharge}` : '$0' },
-  ];
+function receiptRows(r: Receipt): { label: string; value: string }[] {
+  const rows: { label: string; value: string }[] = [];
+  rows.push({ label: 'Package price', value: `$${r.total - (r.isWeekend ? r.weekendSurcharge : 0) + r.discountAmount - r.addOns.filter(a => a.qty > 0).reduce((s, a) => s + a.price * a.qty, 0)}` });
+  if (r.location === 'home' && r.address) {
+    rows.push({ label: 'Address', value: r.address });
+  }
+  rows.push({ label: r.isWeekend ? 'Weekend surcharge' : 'Surcharge', value: r.isWeekend ? `+$${r.weekendSurcharge}` : '$0' });
   r.addOns.filter(a => a.qty > 0).forEach(a =>
     rows.push({ label: `${a.name} ×${a.qty}`, value: `+$${a.price * a.qty}` })
   );
@@ -110,6 +151,15 @@ function receiptDetails(r: Receipt): { label: string; value: string }[] {
   return rows;
 }
 
+function studioRows(): { label: string; value: string }[] {
+  return [
+    { label: 'Name', value: STUDIO_INFO.name },
+    { label: 'Address', value: STUDIO_INFO.addressLines.join('\n') },
+    { label: 'Access', value: STUDIO_INFO.access },
+    { label: 'Parking', value: STUDIO_INFO.parkingOk },
+  ];
+}
+
 export async function dispatchNotification(
   pair: NotificationPair,
   clientEmail: string,
@@ -119,27 +169,28 @@ export async function dispatchNotification(
   calendarEvent?: IcsEvent,
   receipt?: Receipt,
   payNowQr?: PayNowQr,
-  referencePhotoUrls?: string[],  // attach photos to both emails
+  referencePhotoUrls?: string[],
+  clientDetails?: ClientDetails,
 ): Promise<void> {
   if (!clientEmail || !photographerEmail) {
     console.warn('dispatchNotification: missing email address, skipping');
     return;
   }
 
-  // Build ICS attachment
+  // ICS attachment
   let icsAttachment: { filename: string; content: string } | undefined;
   let gcalUrl = '';
   if (calendarEvent) {
     try {
       icsAttachment = { filename: 'booking.ics', content: icsToBase64(generateIcs(calendarEvent)) };
-      const gcalDate = calendarEvent.dateISO.replace(/-/g, '');
-      const startT = calendarEvent.startTime.replace(':', '') + '00';
-      const endT = calendarEvent.endTime.replace(':', '') + '00';
-      gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(calendarEvent.summary)}&dates=${gcalDate}T${startT}/${gcalDate}T${endT}&location=${encodeURIComponent(calendarEvent.location)}&details=${encodeURIComponent(calendarEvent.description)}`;
+      const d = calendarEvent.dateISO.replace(/-/g, '');
+      const s = calendarEvent.startTime.replace(':', '') + '00';
+      const e = calendarEvent.endTime.replace(':', '') + '00';
+      gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(calendarEvent.summary)}&dates=${d}T${s}/${d}T${e}&location=${encodeURIComponent(calendarEvent.location)}&details=${encodeURIComponent(calendarEvent.description)}`;
     } catch { /* silent */ }
   }
 
-  // Build PayNow QR attachment
+  // PayNow QR attachment
   let qrAttachment: { filename: string; content: string } | undefined;
   let payNowNote = '';
   if (payNowQr) {
@@ -151,41 +202,61 @@ export async function dispatchNotification(
     } catch { /* silent */ }
   }
 
+  // Fetch inline photos
+  let inlinePhotos: string[] = [];
+  if (referencePhotoUrls?.length) {
+    inlinePhotos = await fetchInlinePhotos(referencePhotoUrls.slice(0, 5));
+  }
+
   const attachments = [
     ...(icsAttachment ? [icsAttachment] : []),
     ...(qrAttachment ? [qrAttachment] : []),
   ];
-
-  // Build client email — calendar button injected inline after calendar mention
-  const clientParagraphs = pair.client.emailBody.split('\n\n').filter(Boolean);
-  const clientDetails = receipt ? receiptDetails(receipt) : undefined;
-  const clientHtml = buildHtml(
-    pair.client.emailSubject,
-    clientParagraphs,
-    clientDetails,
-    gcalUrl || undefined,
-    payNowNote || undefined,
-  );
-
-  // Build photographer email
-  const photographerParagraphs = pair.photographer.emailBody.split('\n\n').filter(Boolean);
-  // Add reference photo links for photographer
-  if (referencePhotoUrls?.length) {
-    photographerParagraphs.push(
-      `Reference photos (${referencePhotoUrls.length}):\n` +
-      referencePhotoUrls.map((url, i) => `Photo ${i + 1}: ${url}`).join('\n')
-    );
-  }
-  const photographerDetails = receipt ? receiptDetails(receipt) : undefined;
-  const photographerHtml = buildHtml(
-    pair.photographer.emailSubject,
-    photographerParagraphs,
-    photographerDetails,
-    gcalUrl || undefined,
-    payNowNote || undefined,
-  );
-
   const att = attachments.length ? attachments : undefined;
+
+  // Studio details (only for studio sessions)
+  const studio = receipt?.location === 'studio' ? studioRows() : undefined;
+
+  // Client setup details (for client email — notes + photo count)
+  const setupForClient: { label: string; value: string }[] = [];
+  if (clientDetails?.notes) setupForClient.push({ label: 'Your notes', value: clientDetails.notes });
+
+
+  // Client details for photographer
+  const clientInfoRows: { label: string; value: string }[] = [];
+  if (clientDetails) {
+    clientInfoRows.push({ label: 'Name', value: clientDetails.name });
+    clientInfoRows.push({ label: 'Email', value: clientDetails.email });
+    clientInfoRows.push({ label: 'Phone', value: clientDetails.phone });
+    if (clientDetails.address) clientInfoRows.push({ label: 'Address', value: clientDetails.address });
+    if (clientDetails.notes) clientInfoRows.push({ label: 'Notes', value: clientDetails.notes });
+  }
+
+  // Client email HTML
+  const clientParagraphs = pair.client.emailBody.split('\n\n').filter(Boolean);
+  const clientHtml = buildHtml({
+    subject: pair.client.emailSubject,
+    paragraphs: clientParagraphs,
+    calendarUrl: gcalUrl || undefined,
+    studioDetails: studio,
+    setupDetails: setupForClient.length ? setupForClient : undefined,
+    receiptDetails: receipt ? receiptRows(receipt) : undefined,
+    inlinePhotos,
+    payNowNote: payNowNote || undefined,
+  });
+
+  // Photographer email HTML
+  const photographerParagraphs = pair.photographer.emailBody.split('\n\n').filter(Boolean);
+  const photographerHtml = buildHtml({
+    subject: pair.photographer.emailSubject,
+    paragraphs: photographerParagraphs,
+    calendarUrl: gcalUrl || undefined,
+    studioDetails: studio,
+    clientDetails: clientInfoRows.length ? clientInfoRows : undefined,
+    receiptDetails: receipt ? receiptRows(receipt) : undefined,
+    inlinePhotos,
+    payNowNote: payNowNote || undefined,
+  });
 
   const sends: Promise<void>[] = [];
   if (pair.client.emailSubject && clientEmail) {
