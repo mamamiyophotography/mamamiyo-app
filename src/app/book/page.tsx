@@ -165,6 +165,14 @@ export default function BookPage() {
 
   // ---------------- render ----------------
   if (step === 'result' && result) {
+    // Build a Google Calendar link and a downloadable .ics for the result screen.
+    // Note: the .ics here is client-side generated (for the "Add to calendar" button
+    // before the email arrives). The real ICS sent by email is generated server-side
+    // after deposit confirmation — this one is just a convenience for the pending state.
+    const gcalBase = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+    const gcalDate = result.booking.date.replace(/-/g, '');
+    const gcalUrl = `${gcalBase}&text=${encodeURIComponent(result.booking.sessionLabel + ' — Mamamiyo Photography')}&dates=${gcalDate}T090000/${gcalDate}T120000&details=${encodeURIComponent('Ref: ' + result.booking.ref)}`;
+
     return (
       <div className="wrap">
         <h1>Mamamiyo Photography</h1>
@@ -182,8 +190,17 @@ export default function BookPage() {
               </div>
             </div>
           )}
-          <div className="notice">
-            We&apos;ll confirm your booking by email once the deposit is received. Save your reference code <b>{result.booking.ref}</b> to look up your booking anytime.
+          <a
+            href={gcalUrl}
+            target="_blank"
+            rel="noopener"
+            className="btn btn-ghost"
+            style={{ display: 'inline-flex', marginTop: 8, textDecoration: 'none' }}
+          >
+            📅 Add to Google Calendar
+          </a>
+          <div className="notice" style={{ marginTop: 12 }}>
+            We&apos;ll confirm your booking by email once the deposit is received — the confirmation email includes a calendar invite (.ics) that works with all calendar apps. Save your reference code <b>{result.booking.ref}</b> to look up your booking anytime.
           </div>
         </div>
       </div>
@@ -384,16 +401,27 @@ export default function BookPage() {
           </div>
 
           <div className="card">
+            {/* Session details */}
             <div className="ticket-row"><span>Date</span><b>{fmtDatePretty(selectedSlot.date)}, {fmtTime12(selectedSlot.startTime)}</b></div>
+            <div className="ticket-row"><span>Session</span><b>{sessionType.name}</b></div>
+
+            {/* Line items */}
+            <div style={{ borderTop: '1px dashed var(--line)', margin: '10px 0' }} />
             <div className="ticket-row"><span>{sessionType.isBundle ? 'Session 1 price' : 'Session price'}</span><b>${pricing.sessionPrice}</b></div>
             {Object.entries(addOns).filter(([, q]) => q > 0).map(([id, q]) => (
               <div className="ticket-row" key={id}><span>{ADDONS[id].name} ×{q}</span><b>+${ADDONS[id].price * q}</b></div>
             ))}
-            {pricing.weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${pricing.weekendFee}</b></div>}
-            {pricing.discountAmount > 0 && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount</span><b style={{ color: 'var(--sage)' }}>−${pricing.discountAmount}</b></div>}
-            <div className="ticket-row"><span>{sessionType.isBundle ? 'Session 1 total' : 'Total package'}</span><b>${pricing.total}</b></div>
-            <div className="ticket-row"><span>Balance (paid after session)</span><b>${pricing.balanceDue}</b></div>
-            <div className="ticket-total"><span>Deposit due now</span><span className="amt">${pricing.depositAmount}</span></div>
+            <div className="ticket-row"><span>Weekend / PH surcharge</span><b>{pricing.weekendFee > 0 ? `+$${pricing.weekendFee}` : '$0'}</b></div>
+            {pricing.discountAmount > 0 && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount ({appliedDiscount?.code})</span><b style={{ color: 'var(--sage)' }}>−${pricing.discountAmount}</b></div>}
+
+            {/* Total */}
+            <div style={{ borderTop: '1.5px solid var(--ink)', margin: '10px 0' }} />
+            <div className="ticket-row" style={{ fontWeight: 700 }}><span>{sessionType.isBundle ? 'Session 1 total' : 'Total'}</span><b>${pricing.total}</b></div>
+
+            {/* Payment breakdown */}
+            <div style={{ borderTop: '1px dashed var(--line)', margin: '14px 0 10px' }} />
+            <div className="ticket-total" style={{ marginTop: 0, marginBottom: 8 }}><span style={{ fontWeight: 700 }}>Deposit due now</span><span className="amt">${pricing.depositAmount}</span></div>
+            <div className="ticket-row" style={{ color: 'var(--ink-soft)' }}><span>Balance due after session</span><b style={{ color: 'var(--ink-soft)' }}>${pricing.balanceDue}</b></div>
           </div>
 
           <button className="btn btn-primary" style={{ marginTop: 16 }} disabled={!readyForReview || submitting} onClick={submitBooking}>

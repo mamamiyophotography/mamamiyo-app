@@ -302,7 +302,10 @@ export async function generateInvoiceAndNotify(db: any, bookingId: string) {
 
   const pair = invoiceNotification(toNotifyBooking(updated), due, invoiceRef, items);
   const photographer = photographerContacts();
-  await dispatchNotification(pair, updated.clientEmail, updated.clientPhone, photographer.email, photographer.phone);
+  // Don't let notification failure block invoice generation
+  await dispatchNotification(pair, updated.clientEmail, updated.clientPhone, photographer.email, photographer.phone).catch((err) => {
+    console.error('Invoice notification failed:', err?.message);
+  });
   return updated;
 }
 
