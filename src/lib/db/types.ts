@@ -113,6 +113,7 @@ export interface Db {
     findMany(args?: { where?: unknown }): Promise<Bundle[]>;
     create(args: { data: unknown }): Promise<Bundle>;
     update(args: { where: { id: string }; data: Partial<Bundle> }): Promise<Bundle>;
+    delete(args: { where: { id: string } }): Promise<Bundle | void>;
   };
   $transaction<T>(fn: (tx: Db) => Promise<T>): Promise<T>;
 }
