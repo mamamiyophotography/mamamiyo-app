@@ -439,23 +439,40 @@ export default function BookPage() {
             <div className="ticket-row"><span>Date</span><b>{fmtDatePretty(selectedSlot.date)}, {fmtTime12(selectedSlot.startTime)}</b></div>
             <div className="ticket-row"><span>Session</span><b>{sessionType.name}</b></div>
 
-            {/* Line items */}
-            <div style={{ borderTop: '1px dashed var(--line)', margin: '10px 0' }} />
-            <div className="ticket-row"><span>{sessionType.isBundle ? 'Session 1 price' : 'Session price'}</span><b>${pricing.sessionPrice}</b></div>
-            {Object.entries(addOns).filter(([, q]) => q > 0).map(([id, q]) => (
-              <div className="ticket-row" key={id}><span>{ADDONS[id].name} ×{q}</span><b>+${ADDONS[id].price * q}</b></div>
-            ))}
-            {pricing.weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${pricing.weekendFee}</b></div>}
-            {pricing.discountAmount > 0 && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount ({appliedDiscount?.code})</span><b style={{ color: 'var(--sage)' }}>−${pricing.discountAmount}</b></div>}
-
-            {/* Total */}
-            <div style={{ borderTop: '1.5px solid var(--ink)', margin: '10px 0' }} />
-            <div className="ticket-row" style={{ fontWeight: 700 }}><span>{sessionType.isBundle ? 'Session 1 total' : 'Total'}</span><b>${pricing.total}</b></div>
-
-            {/* Payment breakdown */}
-            <div style={{ borderTop: '1px dashed var(--line)', margin: '14px 0 10px' }} />
-            <div className="ticket-total" style={{ marginTop: 0, marginBottom: 8 }}><span style={{ fontWeight: 700 }}>Deposit due now</span><span className="amt">${pricing.depositAmount}</span></div>
-            <div className="ticket-row" style={{ color: 'var(--ink-soft)' }}><span>Balance due after session</span><b style={{ color: 'var(--ink-soft)' }}>${pricing.balanceDue}</b></div>
+            {sessionType.isBundle ? (<>
+              {/* Bundle: only show deposit due now + payment schedule */}
+              <div style={{ borderTop: '1px dashed var(--line)', margin: '10px 0' }} />
+              {pricing.weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${pricing.weekendFee}</b></div>}
+              {Object.entries(addOns).filter(([, q]) => q > 0).map(([id, q]) => (
+                <div className="ticket-row" key={id}><span>{ADDONS[id].name} ×{q}</span><b>+${ADDONS[id].price * q}</b></div>
+              ))}
+              <div style={{ borderTop: '1px dashed var(--line)', margin: '10px 0' }} />
+              <div className="ticket-total" style={{ marginTop: 0, marginBottom: 12 }}><span style={{ fontWeight: 700 }}>Deposit due now</span><span className="amt">${pricing.depositAmount}</span></div>
+              <div style={{ padding: '12px 14px', background: 'var(--cream)', borderRadius: 8, border: '1px dashed var(--line)', fontSize: 13 }}>
+                <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ink-soft)' }}>Bundle Payment Schedule</div>
+                <div style={{ lineHeight: 2, color: 'var(--ink)' }}>
+                  <div>Deposit to secure booking: <b>$100</b></div>
+                  <div>Balance after Session 1: <b>$330</b></div>
+                  <div>Balance after Session 2: <b>$330</b></div>
+                  <div>Balance after Session 3: <b>$328</b></div>
+                  <div style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>Total: <b>$1,088</b></div>
+                </div>
+              </div>
+            </>) : (<>
+              {/* Non-bundle: full price breakdown */}
+              <div style={{ borderTop: '1px dashed var(--line)', margin: '10px 0' }} />
+              <div className="ticket-row"><span>Session price</span><b>${pricing.sessionPrice}</b></div>
+              {Object.entries(addOns).filter(([, q]) => q > 0).map(([id, q]) => (
+                <div className="ticket-row" key={id}><span>{ADDONS[id].name} ×{q}</span><b>+${ADDONS[id].price * q}</b></div>
+              ))}
+              {pricing.weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${pricing.weekendFee}</b></div>}
+              {pricing.discountAmount > 0 && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount ({appliedDiscount?.code})</span><b style={{ color: 'var(--sage)' }}>−${pricing.discountAmount}</b></div>}
+              <div style={{ borderTop: '1.5px solid var(--ink)', margin: '10px 0' }} />
+              <div className="ticket-row" style={{ fontWeight: 700 }}><span>Total</span><b>${pricing.total}</b></div>
+              <div style={{ borderTop: '1px dashed var(--line)', margin: '14px 0 10px' }} />
+              <div className="ticket-total" style={{ marginTop: 0, marginBottom: 8 }}><span style={{ fontWeight: 700 }}>Deposit due now</span><span className="amt">${pricing.depositAmount}</span></div>
+              <div className="ticket-row" style={{ color: 'var(--ink-soft)' }}><span>Balance due after session</span><b style={{ color: 'var(--ink-soft)' }}>${pricing.balanceDue}</b></div>
+            </>)}
           </div>
 
           <button className="btn btn-primary" style={{ marginTop: 16 }} disabled={submitting} onClick={submitBooking}>

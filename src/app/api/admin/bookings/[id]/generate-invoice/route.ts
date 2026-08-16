@@ -71,12 +71,17 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         .map(([id, qty]) => ({ name: ADDONS[id]?.name || id, qty, price: ADDONS[id]?.price || 0 })),
       discountCode: (updated.discountCode as string | null) || null,
       discountAmount: (updated.discountAmount as number) || 0,
-      extraLineItems: items,  // post-session charges shown separately
-      total: booking.total,   // original session total (before extra items)
+      extraLineItems: items,
+      // For bundle invoices: total = session balance (e.g. $330), not the full booking total ($430)
+      // For non-bundle: total = original session price
+      total: String(updated.sessionTypeId) === 'bundle'
+        ? (updated.balanceDue as number)   // session balance only
+        : (booking.total as number),
       depositAmount: updated.depositAmount,
       balanceDue: due,
       isBundle: String(updated.sessionTypeId) === 'bundle',
       bundleSessionNumber: updated.bundleSessionNumber as number | null,
+      isInvoice: true,
     };
 
     try {
