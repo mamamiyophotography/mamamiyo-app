@@ -211,6 +211,7 @@ export default function BookPage() {
 
   return (
     <div className="wrap">
+      <div style={{ position: 'fixed', bottom: 8, right: 8, background: '#2e2a22', color: '#b08d57', fontSize: 10, padding: '3px 8px', borderRadius: 6, zIndex: 999, fontFamily: 'monospace' }}>v2.1 — compulsory</div>
       <div style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--gold-deep)', fontWeight: 600 }}>Mamamiyo Photography</div>
       <h1 style={{ fontSize: 30, marginTop: 6 }}>Book your session</h1>
       <p style={{ color: 'var(--ink-soft)' }}>Pick a package, choose a time, and secure it with a $100 deposit via PayNow.</p>
