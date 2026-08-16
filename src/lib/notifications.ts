@@ -215,9 +215,7 @@ export function invoiceNotification(
 ): NotificationPair {
   const firstName = firstNameOf(b.clientName);
   const whenStr = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
-  const extraLines = extraLineItems.length
-    ? extraLineItems.map((i) => `${i.description}: $${i.amount}`).join('\n') + '\n'
-    : '';
+  // extraLineItems shown in receipt table — not repeated in email body
 
   return {
     client: {
@@ -225,7 +223,7 @@ export function invoiceNotification(
       emailBody: [
         `Hi ${firstName}!`,
         `Thank you for your ${b.sessionLabel} on ${whenStr}.`,
-        `${extraLines}Your invoice and PayNow QR code are below. Please use ${b.clientEmail} as your payment reference.`,
+        `Your invoice and PayNow QR code are below. Please use ${b.clientEmail} as your payment reference.\n\nFor product options (photo albums, canvas, plaques), visit https://www.mamamiyo-photography.com/products`,
       ].join('\n\n'),
       whatsappBody: `Hi ${firstName}! Your balance of $${due} for ${b.sessionLabel} on ${whenStr} is due. Ref: ${invoiceRef}. Check your email for the PayNow QR code — thank you!`,
     },

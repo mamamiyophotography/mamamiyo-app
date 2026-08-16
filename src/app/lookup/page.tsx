@@ -211,9 +211,24 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
               )}
               {bundleType.addOns.length > 0 && (
                 <div style={{ marginTop: 14 }}>
-                  {bundleType.addOns.map((id) => (
+                  {/* Service add-ons */}
+                  {bundleType.addOns.filter((id: string) => ['extraSetup','extraOutfit','headcount'].includes(id)).map((id: string) => (
                     <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px dashed var(--line)', fontSize: 13 }}>
                       <span>{ADDONS[id].name} <span style={{ fontSize: 11.5, color: 'var(--ink-soft)' }}>${ADDONS[id].price} each</span></span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: Math.max(0, (a[id] || 0) - 1) }))} style={{ width: 24, height: 24, borderRadius: 6, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>−</button>
+                        <span style={{ minWidth: 14, textAlign: 'center', fontWeight: 700 }}>{addOns[id] || 0}</span>
+                        <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: (a[id] || 0) + 1 }))} style={{ width: 24, height: 24, borderRadius: 6, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>+</button>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Products */}
+                  <div style={{ marginTop: 8, marginBottom: 4, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--ink-soft)' }}>
+                    Products — <a href="https://www.mamamiyo-photography.com/products" target="_blank" rel="noopener" style={{ color: 'var(--gold-deep)', fontWeight: 400, textTransform: 'none' }}>view options</a>
+                  </div>
+                  {bundleType.addOns.filter((id: string) => !['extraSetup','extraOutfit','headcount'].includes(id)).map((id: string) => (
+                    <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px dashed var(--line)', fontSize: 12 }}>
+                      <span>{ADDONS[id].name} <span style={{ color: 'var(--ink-soft)' }}>${ADDONS[id].price}</span></span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: Math.max(0, (a[id] || 0) - 1) }))} style={{ width: 24, height: 24, borderRadius: 6, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>−</button>
                         <span style={{ minWidth: 14, textAlign: 'center', fontWeight: 700 }}>{addOns[id] || 0}</span>

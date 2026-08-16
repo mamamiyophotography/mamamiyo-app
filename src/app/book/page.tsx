@@ -336,11 +336,27 @@ export default function BookPage() {
                 <b style={{ color: 'var(--rust)' }}>+$50</b>
               </div>
             )}
-            {sessionType.addOns.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-faint)' }}>No add-ons for this package.</div>}
-            {sessionType.addOns.map((id) => (
+            {/* Service add-ons: setup & headcount */}
+            {sessionType.addOns.filter(id => ['extraSetup','extraOutfit','headcount'].includes(id)).map((id) => (
               <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px dashed var(--line)' }}>
                 <span>
                   {ADDONS[id].name} <span style={{ fontSize: 12.5, color: 'var(--ink-soft)' }}>${ADDONS[id].price} each</span>
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: Math.max(0, (a[id] || 0) - 1) }))} style={{ width: 26, height: 26, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>−</button>
+                  <span style={{ minWidth: 16, textAlign: 'center', fontWeight: 700 }}>{addOns[id] || 0}</span>
+                  <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: (a[id] || 0) + 1 }))} style={{ width: 26, height: 26, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>+</button>
+                </div>
+              </div>
+            ))}
+            {/* Products: photo albums, canvas, plaques */}
+            <div style={{ marginTop: 10, marginBottom: 4, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--ink-soft)', letterSpacing: 0.5 }}>
+              Products — <a href="https://www.mamamiyo-photography.com/products" target="_blank" rel="noopener" style={{ color: 'var(--gold-deep)', fontWeight: 400, textTransform: 'none' }}>view all options</a>
+            </div>
+            {sessionType.addOns.filter(id => !['extraSetup','extraOutfit','headcount'].includes(id)).map((id) => (
+              <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px dashed var(--line)' }}>
+                <span style={{ fontSize: 13 }}>
+                  {ADDONS[id].name} <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>${ADDONS[id].price}</span>
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: Math.max(0, (a[id] || 0) - 1) }))} style={{ width: 26, height: 26, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>−</button>

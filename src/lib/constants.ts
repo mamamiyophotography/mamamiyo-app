@@ -36,7 +36,7 @@ export const SESSION_TYPES: SessionType[] = [
       'Approximately 70 softcopy photos with basic editing',
       '10 photos with detailed retouching',
     ],
-    addOns: ['extraSetup', 'headcount'],
+    addOns: ['extraSetup', 'headcount', 'album8x8', 'album10x10', 'album12x12', 'canvas11x14', 'canvas16x24', 'plaque5x7', 'plaque6x8'],
     referenceSetups: 2,  // 2 baby solo setups
     icon: 'N',
     swatch: '#C98B7A',
@@ -53,7 +53,7 @@ export const SESSION_TYPES: SessionType[] = [
       '50+ softcopy photos with basic editing',
       '10 photos with detailed retouching',
     ],
-    addOns: ['extraSetup', 'headcount'],
+    addOns: ['extraSetup', 'headcount', 'album8x8', 'album10x10', 'album12x12', 'canvas11x14', 'canvas16x24', 'plaque5x7', 'plaque6x8'],
     referenceSetups: 1,  // 1 baby solo setup
     icon: 'F',
     swatch: '#8A9A78',
@@ -71,7 +71,7 @@ export const SESSION_TYPES: SessionType[] = [
       'Approximately 70 softcopy photos with basic editing',
       '10 photos with detailed retouching',
     ],
-    addOns: ['extraSetup', 'headcount'],
+    addOns: ['extraSetup', 'headcount', 'album8x8', 'album10x10', 'album12x12', 'canvas11x14', 'canvas16x24', 'plaque5x7', 'plaque6x8'],
     referenceSetups: 1,  // 1 baby solo setup
     icon: 'B',
     swatch: '#B08D57',
@@ -88,7 +88,7 @@ export const SESSION_TYPES: SessionType[] = [
       'Approximately 50 softcopy photos with basic editing',
       '10 photos with detailed retouching',
     ],
-    addOns: ['extraOutfit', 'headcount'],
+    addOns: ['extraOutfit', 'headcount', 'album8x8', 'album10x10', 'album12x12', 'canvas11x14', 'canvas16x24', 'plaque5x7', 'plaque6x8'],
     referenceSetups: 2,  // 2 outfit changes
     icon: 'M',
     swatch: '#9B7B93',
@@ -100,7 +100,7 @@ export const SESSION_TYPES: SessionType[] = [
     durationMin: 60,
     location: 'studio',
     meta: '3 sessions · At the studio · 1 setup each',
-    addOns: ['extraSetup', 'photobook'],
+    addOns: ['extraSetup', 'headcount', 'album8x8', 'album10x10', 'album12x12', 'canvas11x14', 'canvas16x24', 'plaque5x7', 'plaque6x8'],
     referenceSetups: 1,  // 1 setup per session
     icon: '\u2605',
     swatch: '#8C6D3F',
@@ -120,10 +120,20 @@ export const SESSION_TYPES: SessionType[] = [
 export const BUNDLE_SESSION_BALANCES = [330, 330, 328];
 
 export const ADDONS: Record<string, { name: string; price: number }> = {
+  // Service add-ons
   extraSetup: { name: 'Additional Setup', price: 100 },
-  extraOutfit: { name: 'Additional outfit', price: 100 },
-  photobook: { name: 'Photobook (8\u00d78in, 30 pages)', price: 100 },
+  extraOutfit: { name: 'Additional Outfit', price: 100 },
   headcount: { name: 'Additional Headcount', price: 30 },
+  // Photo Album (layflat, rigid paper)
+  album8x8: { name: 'Photo Album 8×8in / 20×20cm (20 pages, up to 30 images)', price: 108 },
+  album10x10: { name: 'Photo Album 10×10in / 25×25cm (20 pages, up to 30 images)', price: 138 },
+  album12x12: { name: 'Photo Album 12×12in / 30×30cm (20 pages, up to 30 images)', price: 158 },
+  // Canvas
+  canvas11x14: { name: 'Canvas 11×14in / 28×35cm', price: 88 },
+  canvas16x24: { name: 'Canvas 16×24in / 40×60cm', price: 128 },
+  // Wooden / Crystal Plaque
+  plaque5x7: { name: 'Wooden/Crystal Plaque 5×7in / 12×17cm', price: 58 },
+  plaque6x8: { name: 'Wooden/Crystal Plaque 6×8in / 15×20cm', price: 68 },
 };
 
 export const STUDIO_INFO = {
