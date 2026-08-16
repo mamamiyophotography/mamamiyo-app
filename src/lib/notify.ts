@@ -76,13 +76,12 @@ function buildHtml(opts: {
       const isBoldLabel = d.label.startsWith('**') && d.label.endsWith('**');
       const isBoldValue = d.value.startsWith('**') && d.value.endsWith('**');
       const label = isBoldLabel ? `<strong>${d.label.slice(2, -2)}</strong>` : d.label;
-      // Handle mixed bold within value (e.g. "line1\n**bold line**")
       const valueFormatted = d.value.replace(/\n\*\*(.*?)\*\*/g, '<br><strong>$1</strong>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
       const rowStyle = isBoldLabel || isBoldValue
         ? `padding:8px 0;color:#2e2a22;font-size:14px;vertical-align:top;border-top:1.5px solid #2e2a22;`
         : `padding:6px 0;color:#6b6152;font-size:13px;vertical-align:top;border-bottom:1px solid #e6decb;`;
       return `<tr>` +
-        `<td style="${rowStyle}width:90px;min-width:90px;padding-right:12px;">${label}</td>` +
+        `<td style="${rowStyle}width:120px;min-width:120px;padding-right:16px;white-space:nowrap;">${label}</td>` +
         `<td style="${rowStyle}font-weight:600;word-break:break-word;">${valueFormatted}</td>` +
         `</tr>`;
     }).join('');
@@ -198,7 +197,7 @@ function receiptRows(r: Receipt): { label: string; value: string }[] {
     rows.push({ label: 'Package Price', value: '$' + basePrice });
   }
 
-  if (weekendFee > 0) rows.push({ label: 'Weekend / PH Surcharge', value: '+$' + weekendFee });
+  if (weekendFee > 0) rows.push({ label: 'Wknd/PH Surcharge', value: '+$' + weekendFee });
   r.addOns.filter(a => a.qty > 0).forEach(a =>
     rows.push({ label: a.name + ' × ' + a.qty, value: '+$' + (a.price * a.qty) })
   );
@@ -223,8 +222,8 @@ function paymentSummaryRows(r: Receipt): { label: string; value: string }[] {
 
 function studioRows(): { label: string; value: string }[] {
   return [
-    { label: 'Name', value: STUDIO_INFO.name },
-    { label: 'Address', value: STUDIO_INFO.addressLines.join('\n') },
+    { label: 'Studio', value: STUDIO_INFO.name },
+    { label: 'Address', value: STUDIO_INFO.addressLines.join(', ') },
     { label: 'Access', value: STUDIO_INFO.access },
     { label: 'Parking', value: `${STUDIO_INFO.parkingOk}\n**Do NOT park in other slots**` },
   ];
