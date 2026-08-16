@@ -53,7 +53,7 @@ check('bundle session 1 confirmation uses "Milestone Stage 1" prep wording', b1.
 
 // 3. Bundle session 2 redemption confirmation
 const bundleS2: NotifyBooking = { ...bundleS1, sessionLabel: 'First Year Bundle — session 2 of 3', bundleSessionNumber: 2 };
-const b2 = bundleSessionConfirmedNotification(bundleS2, 1, 330, business); // sessionIndex 1 = session 2
+const b2 = bundleSessionConfirmedNotification(bundleS2, 0, 330, business); // sessionIndex 0 = session 2
 check('bundle session 2 mentions "Session 2 of 3"', b2.client.whatsappBody.includes('Session 2 of 3'));
 check('bundle session 2 mentions correct balance $330', b2.client.whatsappBody.includes('$330'));
 check('bundle session 2 uses "Milestone Stage" prep wording (stage 2/3)', b2.client.emailBody.includes('Milestone Stage 2 preparation'));

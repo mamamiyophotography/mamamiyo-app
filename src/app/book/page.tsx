@@ -355,7 +355,7 @@ export default function BookPage() {
             </div>
             {sessionType.addOns.filter(id => !['extraSetup','extraOutfit','headcount'].includes(id)).map((id) => (
               <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px dashed var(--line)' }}>
-                <span style={{ fontSize: 13 }}>
+                <span style={{ fontSize: 13, paddingLeft: 12 }}>
                   {ADDONS[id].name} <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>${ADDONS[id].price}</span>
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

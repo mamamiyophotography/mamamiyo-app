@@ -53,7 +53,7 @@ export default function LookupPage() {
   return (
     <div className="wrap">
       <h1 style={{ fontSize: 26 }}>Look up my booking</h1>
-      <p style={{ color: 'var(--ink-soft)', fontSize: 13.5 }}>We&apos;ll match this against the WhatsApp number you gave us when booking.</p>
+      <p style={{ color: 'var(--ink-soft)', fontSize: 13.5 }}>Enter the email address you used when booking.</p>
       <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your email address" style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 10, padding: '10px 12px' }} />
         <button className="btn btn-primary" onClick={search} disabled={loading}>{loading ? 'Searching…' : 'Find'}</button>
@@ -106,7 +106,7 @@ export default function LookupPage() {
                 ) : (
                   <>
                     <div style={{ fontWeight: 600 }}>First Year Bundle</div>
-                    <span>{(r.item as Bundle).activated ? 'active' : 'pending'}</span>
+                    <span style={{ fontSize: 12 }}>{(r.item as Bundle).activated ? 'Sessions ready to book' : 'Awaiting activation'}</span>
                   </>
                 )}
               </button>
