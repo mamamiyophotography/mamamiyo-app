@@ -440,19 +440,11 @@ export default function BookPage() {
             <div className="ticket-row"><span>Session</span><b>{sessionType.name}</b></div>
 
             {sessionType.isBundle ? (<>
-              {/* Bundle: deposit + any surcharges due now, then payment schedule */}
+              {/* Bundle: deposit due now — surcharge on session balance, shown in schedule */}
               <div style={{ borderTop: '1px dashed var(--line)', margin: '10px 0' }} />
-              {pricing.weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${pricing.weekendFee}</b></div>}
-              {Object.entries(addOns).filter(([, q]) => q > 0).map(([id, q]) => (
-                <div className="ticket-row" key={id}><span>{ADDONS[id].name} ×{q}</span><b>+${ADDONS[id].price * q}</b></div>
-              ))}
-              <div style={{ borderTop: '1.5px solid var(--ink)', margin: '10px 0' }} />
               <div className="ticket-total" style={{ marginTop: 0, marginBottom: 12 }}>
-                <span style={{ fontWeight: 700 }}>Due now</span>
-                <span className="amt">${pricing.depositAmount + pricing.weekendFee}</span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 10, marginTop: -6 }}>
-                Deposit $100{pricing.weekendFee > 0 ? ` + weekend surcharge $${pricing.weekendFee}` : ''}
+                <span style={{ fontWeight: 700 }}>Deposit due now</span>
+                <span className="amt">${pricing.depositAmount}</span>
               </div>
               <div style={{ padding: '12px 14px', background: 'var(--cream)', borderRadius: 8, border: '1px dashed var(--line)', fontSize: 13 }}>
                 <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ink-soft)' }}>Bundle Payment Schedule</div>

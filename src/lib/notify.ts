@@ -283,7 +283,7 @@ export async function dispatchNotification(
 
   const studio = receipt?.location === 'studio' ? studioRows() : undefined;
 
-  // Bundle payment schedule — shown in ALL bundle emails regardless of whether receipt is present
+  // Bundle payment schedule — fixed reference, never changes regardless of surcharge
   const isBundle = receipt?.isBundle || pair.client.emailSubject.toLowerCase().includes('bundle') || pair.photographer.emailSubject.toLowerCase().includes('bundle');
   const bundleSchedule = isBundle ? [
     'First Year Bundle ($1,088 total)',
