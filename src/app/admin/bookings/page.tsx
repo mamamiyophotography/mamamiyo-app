@@ -180,7 +180,13 @@ export default function AdminBookingsPage() {
                   const addOnsRecord = (b.addOns || {}) as Record<string, number>;
                   const addOnsTotal = Object.entries(addOnsRecord).filter(([,q]) => q > 0).reduce((s, [id, q]) => s + (ADDONS[id]?.price || 0) * q, 0);
                   const weekendFee = b.isWeekend ? 50 : 0;
-                  const basePrice = b.total - addOnsTotal - weekendFee + b.discountAmount;
+                  const isBundle = b.sessionTypeId === 'bundle';
+                  const basePrice = isBundle
+                    ? b.balanceDue - addOnsTotal - weekendFee  // session balance only (e.g. $330)
+                    : b.total - addOnsTotal - weekendFee + b.discountAmount;
+                  const baseLabel = isBundle
+                    ? `Session ${b.bundleSessionNumber || 1} balance`
+                    : 'Package price';
                   const extraTotal = b.extraLineItems.reduce((s, i) => s + i.amount, 0);
                   const totalDue = b.balanceDue + extraTotal;
                   return (
@@ -188,7 +194,7 @@ export default function AdminBookingsPage() {
                     <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Final bill</div>
 
                     {/* Full breakdown */}
-                    <div className="ticket-row"><span>Package price</span><b>${basePrice}</b></div>
+                    <div className="ticket-row"><span>{baseLabel}</span><b>${basePrice}</b></div>
                     {Object.entries(addOnsRecord).filter(([,q]) => q > 0).map(([id, q]) => (
                       <div className="ticket-row" key={id}><span>{ADDONS[id]?.name} ×{q}</span><b>+${(ADDONS[id]?.price || 0) * q}</b></div>
                     ))}
@@ -238,8 +244,8 @@ export default function AdminBookingsPage() {
                     )}
 
                     <div style={{ borderTop: '1.5px solid var(--ink)', margin: '8px 0 6px', paddingTop: 6 }}>
-                      <div className="ticket-row"><span>Total</span><b>${b.total + extraTotal}</b></div>
-                      <div className="ticket-row"><span>Deposit paid</span><b>−${b.depositAmount}</b></div>
+                      <div className="ticket-row"><span>Total</span><b>${(isBundle ? b.balanceDue : b.total) + extraTotal}</b></div>
+                      {!isBundle && <div className="ticket-row"><span>Deposit paid</span><b>−${b.depositAmount}</b></div>}
                       <div className="ticket-total" style={{ marginTop: 6 }}>
                         <span style={{ fontWeight: 700 }}>Balance due</span>
                         <span className="amt">${totalDue}</span>

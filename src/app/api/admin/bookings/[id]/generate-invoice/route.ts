@@ -72,10 +72,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       discountCode: (updated.discountCode as string | null) || null,
       discountAmount: (updated.discountAmount as number) || 0,
       extraLineItems: items,
-      // For bundle invoices: total = base session balance without surcharge (e.g. $330)
-      // receiptRows will add weekendFee on top separately
+      // For bundle invoices: total = pure session balance ($330/$330/$328)
+      // receiptRows adds weekendFee and addOns on top separately
       total: String(updated.sessionTypeId) === 'bundle'
-        ? (updated.balanceDue as number) - (updated.isWeekend ? settings.weekendSurcharge : 0)
+        ? (updated.balanceDue as number) - weekendFee - addOnsTotal
         : (booking.total as number),
       depositAmount: updated.depositAmount,
       balanceDue: due,

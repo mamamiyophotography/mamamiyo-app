@@ -187,10 +187,8 @@ function receiptRows(r: Receipt): { label: string; value: string }[] {
       rows.push({ label: '**Total paid now**', value: '**$' + r.depositAmount + '**' });
       return rows;
     } else {
-      // BALANCE INVOICE — show session balance + surcharges
-      // basePrice = the session balance (e.g. $330 for session 1, $330 for s2, $328 for s3)
-      const sessionBalance = r.total; // for invoice: total = session balance only
-      rows.push({ label: 'Session ' + sn + ' balance', value: '$' + sessionBalance });
+      // BALANCE INVOICE — session balance is pure base (e.g. $330), surcharge & addons shown separately
+      rows.push({ label: 'Session ' + sn + ' balance', value: '$' + r.total });
     }
   } else {
     const basePrice = r.total - addOnsTotal - weekendFee + (r.discountAmount || 0);
