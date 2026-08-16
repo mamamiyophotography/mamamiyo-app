@@ -44,6 +44,7 @@ function buildHtml(opts: {
   setupDetails?: { label: string; value: string }[];
   clientDetails?: { label: string; value: string }[];
   receiptDetails?: { label: string; value: string }[];
+  paymentSummary?: { label: string; value: string }[];
   inlinePhotos?: string[];
   photoUrls?: string[];      // fallback clickable links if inline fails
   inlineQrDataUrl?: string;
@@ -67,11 +68,22 @@ function buildHtml(opts: {
     : '';
 
   function sectionTable(header: string, rows: { label: string; value: string }[], emoji = ''): string {
-    const rowsHtml = rows.map(d =>
-      `<tr><td style="padding:6px 0;color:${soft};font-size:13px;width:150px;vertical-align:top;border-bottom:1px solid ${line};">${d.label}</td>` +
-      `<td style="padding:6px 0;color:${ink};font-size:13px;font-weight:600;vertical-align:top;border-bottom:1px solid ${line};">${d.value.replace(/\n/g, '<br>')}</td></tr>`
-    ).join('');
-    return `<div style="margin:20px 0 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">${emoji ? emoji + ' ' : ''}${header}</div><table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tbody>${rowsHtml}</tbody></table></div>`;
+    const rowsHtml = rows.map(d => {
+      const isBoldLabel = d.label.startsWith('**') && d.label.endsWith('**');
+      const isBoldValue = d.value.startsWith('**') && d.value.endsWith('**');
+      const label = isBoldLabel ? `<strong>${d.label.slice(2, -2)}</strong>` : d.label;
+      const value = isBoldValue ? `<strong>${d.value.slice(2, -2)}</strong>` : d.value;
+      const rowStyle = isBoldLabel || isBoldValue
+        ? `padding:8px 0;color:${ink};font-size:14px;vertical-align:top;border-top:1.5px solid ${ink};`
+        : `padding:6px 0;color:${soft};font-size:13px;vertical-align:top;border-bottom:1px solid ${line};`;
+      return `<tr>` +
+        `<td style="${rowStyle}width:60%;">${label}</td>` +
+        `<td style="${rowStyle}text-align:right;font-weight:600;">${value}</td>` +
+        `</tr>`;
+    }).join('');
+    return `<div style="margin:20px 0 0;">` +
+      `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">${emoji ? emoji + ' ' : ''}${header}</div>` +
+      `<table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tbody>${rowsHtml}</tbody></table></div>`;
   }
 
   // Build body — inject calendar button after paragraph mentioning calendar
@@ -114,8 +126,14 @@ function buildHtml(opts: {
     bodyHtml += `<div style="margin:20px 0 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">🎨 Setup Choices</div>${photoSection}<table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tbody>${rowsHtml}</tbody></table></div>`;
   }
 
-  // Receipt
-  if (opts.receiptDetails?.length) bodyHtml += sectionTable(opts.inlineQrDataUrl ? 'Invoice' : 'Receipt', opts.receiptDetails, '🧾');
+  // Receipt with Payment Summary
+  if (opts.receiptDetails?.length) {
+    bodyHtml += sectionTable(opts.inlineQrDataUrl ? 'Invoice' : 'Receipt', opts.receiptDetails, '🧾');
+    if (opts.paymentSummary?.length) {
+      bodyHtml += sectionTable('Payment Summary', opts.paymentSummary, '💰');
+    }
+    bodyHtml += `<p style="margin:16px 0 0;color:${soft};font-size:13px;text-align:center;font-style:italic;">Thank you for choosing us! ♡</p>`;
+  }
 
   // QR code inline — always at the very end
   if (opts.inlineQrDataUrl || opts.qrApiUrl) {
@@ -150,13 +168,13 @@ function receiptRows(r: Receipt): { label: string; value: string }[] {
   const basePrice = r.total - addOnsTotal - weekendFee + (r.discountAmount || 0);
 
   const rows: { label: string; value: string }[] = [];
-  rows.push({ label: 'Package price', value: `$${basePrice}` });
-  if (r.location === 'home' && r.address) {
-    rows.push({ label: 'Address', value: r.address });
+  rows.push({ label: 'Package Price', value: `$${basePrice}` });
+  // Only show surcharge if non-zero
+  if (weekendFee > 0) {
+    rows.push({ label: 'Weekend / PH Surcharge', value: `+$${weekendFee}` });
   }
-  rows.push({ label: r.isWeekend ? 'Weekend surcharge' : 'Surcharge', value: r.isWeekend ? `+$${weekendFee}` : '$0' });
   r.addOns.filter(a => a.qty > 0).forEach(a =>
-    rows.push({ label: `${a.name} ×${a.qty}`, value: `+$${a.price * a.qty}` })
+    rows.push({ label: `${a.name} × ${a.qty}`, value: `+$${a.price * a.qty}` })
   );
   if (r.discountCode && r.discountAmount > 0)
     rows.push({ label: `Discount (${r.discountCode})`, value: `-$${r.discountAmount}` });
@@ -168,10 +186,16 @@ function receiptRows(r: Receipt): { label: string; value: string }[] {
     );
   }
 
-  rows.push({ label: 'Total', value: `$${r.total + (r.extraLineItems || []).reduce((s, i) => s + i.amount, 0)}` });
-  rows.push({ label: 'Deposit paid', value: `$${r.depositAmount}` });
-  rows.push({ label: 'Balance due', value: `$${r.balanceDue}` });
+  const grandTotal = r.total + (r.extraLineItems || []).reduce((s, i) => s + i.amount, 0);
+  rows.push({ label: '**Total**', value: `**$${grandTotal}**` });
   return rows;
+}
+
+function paymentSummaryRows(r: Receipt): { label: string; value: string }[] {
+  return [
+    { label: 'Deposit Paid', value: `-$${r.depositAmount}` },
+    { label: '**Balance Due**', value: `**$${r.balanceDue}**` },
+  ];
 }
 
 function studioRows(): { label: string; value: string }[] {
@@ -259,6 +283,7 @@ export async function dispatchNotification(
     studioDetails: studio,
     setupDetails: setupForClient.length ? setupForClient : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
+    paymentSummary: receipt ? paymentSummaryRows(receipt) : undefined,
     inlinePhotos: photoUrls.length ? photoUrls : undefined,
     qrApiUrl,
     payNowAmount: payNowAmount || undefined,
@@ -273,6 +298,7 @@ export async function dispatchNotification(
     studioDetails: studio,
     clientDetails: clientInfoRows.length ? clientInfoRows : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
+    paymentSummary: receipt ? paymentSummaryRows(receipt) : undefined,
     inlinePhotos: photoUrls.length ? photoUrls : undefined,
     qrApiUrl,
     payNowAmount: payNowAmount || undefined,

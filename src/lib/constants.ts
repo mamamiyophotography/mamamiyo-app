@@ -120,10 +120,10 @@ export const SESSION_TYPES: SessionType[] = [
 export const BUNDLE_SESSION_BALANCES = [330, 330, 328];
 
 export const ADDONS: Record<string, { name: string; price: number }> = {
-  extraSetup: { name: 'Additional setup', price: 100 },
+  extraSetup: { name: 'Additional Setup', price: 100 },
   extraOutfit: { name: 'Additional outfit', price: 100 },
   photobook: { name: 'Photobook (8\u00d78in, 30 pages)', price: 100 },
-  headcount: { name: 'Extra headcount', price: 30 },
+  headcount: { name: 'Additional Headcount', price: 30 },
 };
 
 export const STUDIO_INFO = {

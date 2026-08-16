@@ -211,7 +211,6 @@ export default function BookPage() {
 
   return (
     <div className="wrap">
-      <div style={{ position: 'fixed', bottom: 8, right: 8, background: '#2e2a22', color: '#b08d57', fontSize: 10, padding: '3px 8px', borderRadius: 6, zIndex: 999, fontFamily: 'monospace' }}>v2.1 — compulsory</div>
       <div style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--gold-deep)', fontWeight: 600 }}>Mamamiyo Photography</div>
       <h1 style={{ fontSize: 30, marginTop: 6 }}>Book your session</h1>
       <p style={{ color: 'var(--ink-soft)' }}>Pick a package, choose a time, and secure it with a $100 deposit via PayNow.</p>
@@ -430,7 +429,7 @@ export default function BookPage() {
             {Object.entries(addOns).filter(([, q]) => q > 0).map(([id, q]) => (
               <div className="ticket-row" key={id}><span>{ADDONS[id].name} ×{q}</span><b>+${ADDONS[id].price * q}</b></div>
             ))}
-            <div className="ticket-row"><span>{pricing.weekendFee > 0 ? 'Weekend / PH surcharge' : 'Surcharge'}</span><b>{pricing.weekendFee > 0 ? `+$${pricing.weekendFee}` : '$0'}</b></div>
+            {pricing.weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${pricing.weekendFee}</b></div>}
             {pricing.discountAmount > 0 && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount ({appliedDiscount?.code})</span><b style={{ color: 'var(--sage)' }}>−${pricing.discountAmount}</b></div>}
 
             {/* Total */}
