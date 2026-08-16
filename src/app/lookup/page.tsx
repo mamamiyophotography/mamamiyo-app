@@ -241,7 +241,7 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
                 <div className="field" style={{ marginTop: 14 }}>
                   <label>Baby's gender</label>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-                    {[['boy', '👦 Boy'], ['girl', '👧 Girl'], ['prefer_not_to_say', 'Prefer not to say']].map(([val, label]) => (
+                    {[['boy', '👦 Boy'], ['girl', '👧 Girl']].map(([val, label]) => (
                       <button key={val} type="button" className={`chip ${babyGender === val ? 'selected' : ''}`} onClick={() => setBabyGender(val)}>{label}</button>
                     ))}
                   </div>

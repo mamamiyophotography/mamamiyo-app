@@ -132,7 +132,8 @@ function buildHtml(opts: {
 
   // Receipt with Payment Summary
   if (opts.receiptDetails?.length) {
-    bodyHtml += sectionTable(opts.inlineQrDataUrl || opts.qrApiUrl || opts.payNowRef ? 'Invoice' : 'Receipt', opts.receiptDetails, '🧾');
+    const isInvoice = !!(opts.inlineQrDataUrl || opts.qrApiUrl || opts.payNowRef);
+    bodyHtml += sectionTable(isInvoice ? 'Invoice' : 'Receipt', opts.receiptDetails, '🧾');
     if (opts.paymentSummary?.length) {
       bodyHtml += sectionTable('Payment Summary', opts.paymentSummary, '💰');
     }
@@ -141,6 +142,10 @@ function buildHtml(opts: {
       bodyHtml += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;margin-bottom:8px;">📋 Bundle Payment Schedule</div>`;
       bodyHtml += `<pre style="margin:0;font-size:13px;color:${ink};font-family:Georgia,serif;white-space:pre-wrap;">${opts.bundleSchedule}</pre>`;
       bodyHtml += `</div>`;
+      // Book next session button on confirmation receipts (not invoices)
+      if (!isInvoice) {
+        bodyHtml += `<div style="text-align:center;margin:20px 0;"><a href="https://mamamiyo-app.vercel.app/lookup" target="_blank" style="display:inline-block;background:${gold};color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:11px 24px;border-radius:9px;font-family:sans-serif;">Book next session →</a></div>`;
+      }
     }
     bodyHtml += `<p style="margin:16px 0 0;color:${soft};font-size:13px;text-align:center;font-style:italic;">Thank you for choosing us! ♡</p>`;
   }
@@ -279,7 +284,9 @@ export async function dispatchNotification(
 
   const att = icsAttachment ? [icsAttachment] : undefined;
 
-  const studio = receipt?.location === 'studio' ? studioRows() : undefined;
+  // Studio details only shown on booking confirmations, not invoices
+  const isInvoiceEmail = !!payNowQr;
+  const studio = !isInvoiceEmail && receipt?.location === 'studio' ? studioRows() : undefined;
 
   // Bundle payment schedule — fixed reference, never changes regardless of surcharge
   const isBundle = receipt?.isBundle || pair.client.emailSubject.toLowerCase().includes('bundle') || pair.photographer.emailSubject.toLowerCase().includes('bundle');

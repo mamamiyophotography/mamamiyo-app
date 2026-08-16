@@ -407,7 +407,8 @@ export async function redeemBundleSessionAndNotify(
   if (!bundle.activated) throw new Error('BUNDLE_NOT_ACTIVATED');
 
   const redeemed = await db.booking.count({ where: { bundleParentId: bundleId, status: { not: 'cancelled' } } });
-  const sessionIndex = redeemed; // 0-based: 0 = session 2, 1 = session 3
+  const sessionIndex = redeemed; // 0-based count of existing sessions
+  const sessionNumber = sessionIndex + 1; // session 2 when redeemed=1, session 3 when redeemed=2
   const baseBalance = BUNDLE_SESSION_BALANCES[sessionIndex] || 0;
   const { computeAddOnsTotal } = await import('../pricing');
   const addOnsTotal = computeAddOnsTotal(addOns);
@@ -419,7 +420,7 @@ export async function redeemBundleSessionAndNotify(
     notes,
   ].filter(Boolean).join('\n');
 
-  const sessionLabel = `First Year Bundle — session ${sessionIndex + 2} of 3`;
+  const sessionLabel = `First Year Bundle — session ${sessionNumber} of 3`;
 
   const booking = await db.booking.create({
     data: {
@@ -445,11 +446,11 @@ export async function redeemBundleSessionAndNotify(
       depositStatus: 'n/a',
       balanceStatus: balanceDue > 0 ? 'pending' : 'n/a',
       bundleParentId: bundle.id,
-      bundleSessionNumber: sessionIndex + 2,
+      bundleSessionNumber: sessionNumber,
     },
   });
 
-  const pair = bundleSessionConfirmedNotification(toNotifyBooking(booking), sessionIndex, balanceDue, settings.businessName);
+  const pair = bundleSessionConfirmedNotification(toNotifyBooking(booking), sessionNumber - 2, balanceDue, settings.businessName);
   const photographer = photographerContacts();
   await dispatchNotification(
     pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone,
