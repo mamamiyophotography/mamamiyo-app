@@ -218,15 +218,7 @@ export function invoiceNotification(
   const whenStr = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
 
   // Bundle payment schedule — shown for all bundle sessions so client understands the structure
-  const bundleSchedule = b.sessionTypeId === 'bundle' && b.bundleSessionNumber ? (() => {
-    const sessionNum = b.bundleSessionNumber;
-    const balances = BUNDLE_SESSION_BALANCES;
-    return `\n\nFirst Year Bundle Payment Schedule:\n` +
-      `• Session 1 deposit: $100 (paid)\n` +
-      `• Session 1 balance: $${balances[0]} ${sessionNum > 1 ? '(paid)' : '← due now'}\n` +
-      `• Session 2 balance: $${balances[1]} ${sessionNum > 2 ? '(paid)' : sessionNum === 2 ? '← due now' : '(after session 2)'}\n` +
-      `• Session 3 balance: $${balances[2]} ${sessionNum === 3 ? '← due now' : '(after session 3)'}`;
-  })() : '';
+  // Payment schedule shown in yellow box section — not repeated in email body
 
   return {
     client: {
@@ -234,7 +226,7 @@ export function invoiceNotification(
       emailBody: [
         `Hi ${firstName}!`,
         `Thank you for your ${b.sessionLabel} on ${whenStr}.`,
-        `Your invoice and PayNow QR code are below. Please use your email (${b.clientEmail}) as your payment reference.\n\nFor product options (photo albums, canvas, plaques), visit https://www.mamamiyo-photography.com/products${bundleSchedule}`,
+        `Your invoice and PayNow QR code are below. Please use your email (${b.clientEmail}) as your payment reference.\n\nFor product options (photo albums, canvas, plaques), visit https://www.mamamiyo-photography.com/products`,
       ].join('\n\n'),
       whatsappBody: `Hi ${firstName}! Your balance of $${due} for ${b.sessionLabel} on ${whenStr} is due (ref: ${invoiceRef}). Check your email for the PayNow QR code and invoice. Use your email as payment reference — thank you!`,
     },

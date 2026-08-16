@@ -132,7 +132,7 @@ function buildHtml(opts: {
 
   // Receipt with Payment Summary
   if (opts.receiptDetails?.length) {
-    bodyHtml += sectionTable(opts.inlineQrDataUrl ? 'Invoice' : 'Receipt', opts.receiptDetails, '🧾');
+    bodyHtml += sectionTable(opts.inlineQrDataUrl || opts.qrApiUrl || opts.payNowRef ? 'Invoice' : 'Receipt', opts.receiptDetails, '🧾');
     if (opts.paymentSummary?.length) {
       bodyHtml += sectionTable('Payment Summary', opts.paymentSummary, '💰');
     }
