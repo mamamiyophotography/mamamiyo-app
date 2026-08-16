@@ -22,6 +22,7 @@ export type Receipt = {
   balanceDue: number;  // final balance due (including extra items)
   isBundle?: boolean;
   bundleSessionNumber?: number | null;
+  isInvoice?: boolean;  // true for balance payment invoice, false for booking confirmation
 };
 
 export type PayNowQr = {
@@ -175,48 +176,39 @@ function buildHtml(opts: {
 function receiptRows(r: Receipt): { label: string; value: string }[] {
   const addOnsTotal = r.addOns.filter(a => a.qty > 0).reduce((s, a) => s + a.price * a.qty, 0);
   const weekendFee = r.isWeekend ? r.weekendSurcharge : 0;
-  const basePrice = r.total - addOnsTotal - weekendFee + (r.discountAmount || 0);
+  const extraTotal = (r.extraLineItems || []).reduce((s, i) => s + i.amount, 0);
 
   const rows: { label: string; value: string }[] = [];
 
   if (r.isBundle && r.bundleSessionNumber) {
     const sn = r.bundleSessionNumber;
-    if (sn === 1) {
-      // Deposit already collected at booking — just show session 1 balance
-      const s1Balance = basePrice - r.depositAmount;
-      rows.push({ label: 'Session 1 balance', value: '$' + s1Balance });
+    if (!r.isInvoice) {
+      // BOOKING CONFIRMATION — session 1: just show deposit paid
+      rows.push({ label: 'Deposit paid', value: '$' + r.depositAmount });
+      rows.push({ label: '**Total paid now**', value: '**$' + r.depositAmount + '**' });
+      return rows;
     } else {
-      rows.push({ label: 'Session ' + sn + ' balance', value: '$' + basePrice });
+      // BALANCE INVOICE — show session balance + surcharges
+      // basePrice = the session balance (e.g. $330 for session 1, $330 for s2, $328 for s3)
+      const sessionBalance = r.total; // for invoice: total = session balance only
+      rows.push({ label: 'Session ' + sn + ' balance', value: '$' + sessionBalance });
     }
   } else {
+    const basePrice = r.total - addOnsTotal - weekendFee + (r.discountAmount || 0);
     rows.push({ label: 'Package Price', value: '$' + basePrice });
   }
 
-  if (weekendFee > 0) {
-    rows.push({ label: 'Weekend / PH Surcharge', value: '+$' + weekendFee });
-  }
+  if (weekendFee > 0) rows.push({ label: 'Weekend / PH Surcharge', value: '+$' + weekendFee });
   r.addOns.filter(a => a.qty > 0).forEach(a =>
     rows.push({ label: a.name + ' × ' + a.qty, value: '+$' + (a.price * a.qty) })
   );
   if (r.discountCode && r.discountAmount > 0)
     rows.push({ label: 'Discount (' + r.discountCode + ')', value: '-$' + r.discountAmount });
+  if (r.extraLineItems?.length)
+    r.extraLineItems.forEach(item => rows.push({ label: item.description, value: '+$' + item.amount }));
 
-  if (r.extraLineItems?.length) {
-    r.extraLineItems.forEach(item =>
-      rows.push({ label: item.description, value: '+$' + item.amount })
-    );
-  }
-
-  const grandTotal = r.total + (r.extraLineItems || []).reduce((s, i) => s + i.amount, 0);
-  if (r.isBundle && r.bundleSessionNumber) {
-    const sessionAddOns = addOnsTotal + weekendFee;
-    const sessionBase = r.bundleSessionNumber === 1
-      ? grandTotal - r.depositAmount  // session 1: balance only (deposit already paid)
-      : grandTotal;                   // session 2/3: full amount due
-    rows.push({ label: '**Total due**', value: '**$' + (sessionBase + (r.extraLineItems || []).reduce((s, i) => s + i.amount, 0)) + '**' });
-  } else {
-    rows.push({ label: '**Total**', value: '**$' + grandTotal + '**' });
-  }
+  const totalDue = r.balanceDue;
+  rows.push({ label: '**Total due**', value: '**$' + totalDue + '**' });
   return rows;
 }
 
@@ -292,8 +284,9 @@ export async function dispatchNotification(
 
   const studio = receipt?.location === 'studio' ? studioRows() : undefined;
 
-  // Bundle payment schedule — shown in all bundle booking and invoice emails
-  const bundleSchedule = receipt?.isBundle ? [
+  // Bundle payment schedule — shown in ALL bundle emails regardless of whether receipt is present
+  const isBundle = receipt?.isBundle || pair.client.emailSubject.toLowerCase().includes('bundle') || pair.photographer.emailSubject.toLowerCase().includes('bundle');
+  const bundleSchedule = isBundle ? [
     'First Year Bundle ($1,088 total)',
     '',
     '• Deposit to secure booking:     $100',
