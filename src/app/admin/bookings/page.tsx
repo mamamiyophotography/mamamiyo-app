@@ -200,7 +200,39 @@ export default function AdminBookingsPage() {
                       <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed var(--line)' }}>
                         <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginBottom: 4 }}>Additional charges</div>
                         {b.extraLineItems.map((item, i) => (
-                          <div className="ticket-row" key={i}><span>{item.description}</span><b>+${item.amount}</b></div>
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px dashed var(--line)' }}>
+                            <input
+                              defaultValue={item.description}
+                              onBlur={async (e) => {
+                                if (e.target.value === item.description) return;
+                                const updated = [...b.extraLineItems];
+                                updated[i] = { ...item, description: e.target.value };
+                                await runAction(b.id, 'extra-line-item', { replace: updated });
+                              }}
+                              style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 6, padding: '4px 8px', fontSize: 12.5 }}
+                            />
+                            <input
+                              defaultValue={item.amount}
+                              type="number"
+                              onBlur={async (e) => {
+                                const val = Number(e.target.value);
+                                if (val === item.amount) return;
+                                const updated = [...b.extraLineItems];
+                                updated[i] = { ...item, amount: val };
+                                await runAction(b.id, 'extra-line-item', { replace: updated });
+                              }}
+                              style={{ width: 60, border: '1.5px solid var(--line)', borderRadius: 6, padding: '4px 8px', fontSize: 12.5 }}
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!confirm(`Delete "${item.description}"?`)) return;
+                                const updated = b.extraLineItems.filter((_: unknown, j: number) => j !== i);
+                                await runAction(b.id, 'extra-line-item', { replace: updated });
+                              }}
+                              style={{ width: 24, height: 24, borderRadius: 6, border: '1.5px solid var(--rust-pale)', background: 'var(--rust-pale)', color: 'var(--rust)', fontSize: 14, cursor: 'pointer' }}
+                            >×</button>
+                          </div>
                         ))}
                       </div>
                     )}
