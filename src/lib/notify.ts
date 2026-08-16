@@ -16,9 +16,10 @@ export type Receipt = {
   addOns: { name: string; qty: number; price: number }[];
   discountCode?: string | null;
   discountAmount: number;
-  total: number;
+  extraLineItems?: { description: string; amount: number }[];  // post-session charges
+  total: number;       // original session total (before extra items)
   depositAmount: number;
-  balanceDue: number;
+  balanceDue: number;  // final balance due (including extra items)
 };
 
 export type PayNowQr = {
@@ -144,21 +145,32 @@ function buildHtml(opts: {
 }
 
 function receiptRows(r: Receipt): { label: string; value: string }[] {
-  const basePrice = r.total - (r.isWeekend ? r.weekendSurcharge : 0) + r.discountAmount - r.addOns.filter(a => a.qty > 0).reduce((s, a) => s + a.price * a.qty, 0);
+  const addOnsTotal = r.addOns.filter(a => a.qty > 0).reduce((s, a) => s + a.price * a.qty, 0);
+  const weekendFee = r.isWeekend ? r.weekendSurcharge : 0;
+  const basePrice = r.total - addOnsTotal - weekendFee + (r.discountAmount || 0);
+
   const rows: { label: string; value: string }[] = [];
   rows.push({ label: 'Package price', value: `$${basePrice}` });
   if (r.location === 'home' && r.address) {
     rows.push({ label: 'Address', value: r.address });
   }
-  rows.push({ label: r.isWeekend ? 'Weekend surcharge' : 'Surcharge', value: r.isWeekend ? `+$${r.weekendSurcharge}` : '$0' });
+  rows.push({ label: r.isWeekend ? 'Weekend surcharge' : 'Surcharge', value: r.isWeekend ? `+$${weekendFee}` : '$0' });
   r.addOns.filter(a => a.qty > 0).forEach(a =>
     rows.push({ label: `${a.name} ×${a.qty}`, value: `+$${a.price * a.qty}` })
   );
   if (r.discountCode && r.discountAmount > 0)
     rows.push({ label: `Discount (${r.discountCode})`, value: `-$${r.discountAmount}` });
-  rows.push({ label: 'Total', value: `$${r.total}` });
+
+  // Extra post-session charges
+  if (r.extraLineItems?.length) {
+    r.extraLineItems.forEach(item =>
+      rows.push({ label: item.description, value: `+$${item.amount}` })
+    );
+  }
+
+  rows.push({ label: 'Total', value: `$${r.total + (r.extraLineItems || []).reduce((s, i) => s + i.amount, 0)}` });
   rows.push({ label: 'Deposit paid', value: `$${r.depositAmount}` });
-  rows.push({ label: 'Balance due after session', value: `$${r.balanceDue}` });
+  rows.push({ label: 'Balance due', value: `$${r.balanceDue}` });
   return rows;
 }
 

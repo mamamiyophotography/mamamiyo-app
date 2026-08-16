@@ -176,13 +176,46 @@ export default function AdminBookingsPage() {
                 )}
 
                 {/* Final bill panel */}
-                {b.status === 'pending_balance' && (
+                {b.status === 'pending_balance' && (() => {
+                  const addOnsRecord = (b.addOns || {}) as Record<string, number>;
+                  const addOnsTotal = Object.entries(addOnsRecord).filter(([,q]) => q > 0).reduce((s, [id, q]) => s + (ADDONS[id]?.price || 0) * q, 0);
+                  const weekendFee = b.isWeekend ? 50 : 0;
+                  const basePrice = b.total - addOnsTotal - weekendFee + b.discountAmount;
+                  const extraTotal = b.extraLineItems.reduce((s, i) => s + i.amount, 0);
+                  const totalDue = b.balanceDue + extraTotal;
+                  return (
                   <div style={{ marginTop: 14, background: 'var(--gold-pale)', borderRadius: 10, padding: 14 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Final bill</div>
-                    {b.extraLineItems.map((item, i) => (
-                      <div className="ticket-row" key={i}><span>{item.description}</span><b>+${item.amount}</b></div>
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Final bill</div>
+
+                    {/* Full breakdown */}
+                    <div className="ticket-row"><span>Package price</span><b>${basePrice}</b></div>
+                    {Object.entries(addOnsRecord).filter(([,q]) => q > 0).map(([id, q]) => (
+                      <div className="ticket-row" key={id}><span>{ADDONS[id]?.name} ×{q}</span><b>+${(ADDONS[id]?.price || 0) * q}</b></div>
                     ))}
-                    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    {weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${weekendFee}</b></div>}
+                    {b.discountAmount > 0 && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount ({b.discountCode})</span><b>−${b.discountAmount}</b></div>}
+
+                    {/* Extra line items added post-session */}
+                    {b.extraLineItems.length > 0 && (
+                      <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed var(--line)' }}>
+                        <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginBottom: 4 }}>Additional charges</div>
+                        {b.extraLineItems.map((item, i) => (
+                          <div className="ticket-row" key={i}><span>{item.description}</span><b>+${item.amount}</b></div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ borderTop: '1.5px solid var(--ink)', margin: '8px 0 6px', paddingTop: 6 }}>
+                      <div className="ticket-row"><span>Total</span><b>${b.total + extraTotal}</b></div>
+                      <div className="ticket-row"><span>Deposit paid</span><b>−${b.depositAmount}</b></div>
+                      <div className="ticket-total" style={{ marginTop: 6 }}>
+                        <span style={{ fontWeight: 700 }}>Balance due</span>
+                        <span className="amt">${totalDue}</span>
+                      </div>
+                    </div>
+
+                    {/* Add extra line items */}
+                    <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                       <input placeholder="Description" value={lineDesc} onChange={(e) => setLineDesc(e.target.value)} style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontSize: 12.5 }} />
                       <input placeholder="$" type="number" value={lineAmount} onChange={(e) => setLineAmount(e.target.value)} style={{ width: 70, border: '1.5px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontSize: 12.5 }} />
                       <button className="btn btn-ghost" onClick={async () => {
@@ -191,20 +224,20 @@ export default function AdminBookingsPage() {
                         setLineDesc(''); setLineAmount('');
                       }}>Add</button>
                     </div>
-                    <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={isBusy} onClick={() => generateInvoice(b.id)}>
-                      Generate invoice & payment QR
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button className="btn btn-primary" disabled={isBusy} onClick={() => generateInvoice(b.id)}>
+                        Generate &amp; send invoice to client
+                      </button>
+                      <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-balance')}>
+                        Confirm balance received
+                      </button>
+                    </div>
                     {invoiceQr?.bookingId === b.id && (
-                      <div style={{ textAlign: 'center', marginTop: 12 }}>
-                        <img src={invoiceQr.dataUrl} alt="Invoice PayNow QR" style={{ borderRadius: 10 }} />
-                        <div style={{ fontSize: 12, marginTop: 6 }}>${invoiceQr.due} due — screenshot or forward to client</div>
-                      </div>
+                      <div className="notice" style={{ marginTop: 8 }}>Invoice sent to {b.clientEmail} — PayNow QR included in email.</div>
                     )}
-                    <button className="btn btn-ghost" style={{ marginTop: 10 }} disabled={isBusy} onClick={() => runAction(b.id, 'confirm-balance')}>
-                      Confirm balance received
-                    </button>
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Action buttons */}
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>

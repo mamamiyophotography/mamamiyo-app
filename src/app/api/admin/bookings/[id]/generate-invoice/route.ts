@@ -5,6 +5,7 @@ import { buildPayNowPayload } from '@/lib/paynow';
 import { currentBalanceDue } from '@/lib/pricing';
 import { invoiceNotification } from '@/lib/notifications';
 import { dispatchNotification, PayNowQr, Receipt } from '@/lib/notify';
+import { ADDONS } from '@/lib/constants';
 
 function photographerContacts() {
   return {
@@ -49,33 +50,44 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       console.error('PayNow QR generation failed:', (qrErr as Error).message);
     }
 
-    // Send notification with PayNow QR embedded — don't crash the route
+    // Build accurate invoice receipt — includes original add-ons and extra charges
+    const addOnsRecord = (booking.addOns as Record<string, number>) || {};
+    const weekendFee = booking.isWeekend ? settings.weekendSurcharge : 0;
+    const addOnsTotal = Object.entries(addOnsRecord)
+      .filter(([, q]) => q > 0)
+      .reduce((s, [id, q]) => s + (ADDONS[id]?.price || 0) * q, 0);
+    const basePrice = booking.total - addOnsTotal - weekendFee + ((booking.discountAmount as number) || 0);
+
+    const invoiceReceipt: Receipt = {
+      sessionLabel: updated.sessionLabel,
+      date: updated.date,
+      startTime: updated.startTime,
+      location: updated.location,
+      address: updated.address || '',
+      isWeekend: updated.isWeekend,
+      weekendSurcharge: settings.weekendSurcharge,
+      addOns: Object.entries(addOnsRecord)
+        .filter(([, q]) => q > 0)
+        .map(([id, qty]) => ({ name: ADDONS[id]?.name || id, qty, price: ADDONS[id]?.price || 0 })),
+      discountCode: (updated.discountCode as string | null) || null,
+      discountAmount: (updated.discountAmount as number) || 0,
+      extraLineItems: items,  // post-session charges shown separately
+      total: booking.total,   // original session total (before extra items)
+      depositAmount: updated.depositAmount,
+      balanceDue: due,        // final balance including extra items
+    };
+
     try {
       const pair = invoiceNotification(
         {
           ref: updated.ref, sessionTypeId: updated.sessionTypeId, sessionLabel: updated.sessionLabel,
           location: updated.location, date: updated.date, startTime: updated.startTime,
           clientName: updated.clientName, bundleSessionNumber: updated.bundleSessionNumber,
+          clientEmail: updated.clientEmail,
         },
         due, invoiceRef, items
       );
       const photographer = photographerContacts();
-      // Build a simplified receipt showing the balance calculation
-      const invoiceReceipt: Receipt = {
-        sessionLabel: updated.sessionLabel,
-        date: updated.date,
-        startTime: updated.startTime,
-        location: updated.location,
-        address: updated.address || '',
-        isWeekend: updated.isWeekend,
-        weekendSurcharge: 50,
-        addOns: [],
-        discountCode: null,
-        discountAmount: 0,
-        total: updated.total + items.reduce((s: number, i: { amount: number }) => s + i.amount, 0),
-        depositAmount: updated.depositAmount,
-        balanceDue: due,
-      };
       await dispatchNotification(
         pair, updated.clientEmail, updated.clientPhone, photographer.email, photographer.phone,
         undefined, invoiceReceipt, payNowQr, undefined, undefined,
