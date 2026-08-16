@@ -274,6 +274,8 @@ export async function confirmDepositAndNotify(db: any, bookingId: string) {
     total: booking.total,
     depositAmount: booking.depositAmount,
     balanceDue: booking.balanceDue,
+    isBundle: booking.sessionTypeId === 'bundle',
+    bundleSessionNumber: booking.bundleSessionNumber,
   };
   await dispatchNotification(
     pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone,

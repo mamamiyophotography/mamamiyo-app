@@ -74,7 +74,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       extraLineItems: items,  // post-session charges shown separately
       total: booking.total,   // original session total (before extra items)
       depositAmount: updated.depositAmount,
-      balanceDue: due,        // final balance including extra items
+      balanceDue: due,
+      isBundle: String(updated.sessionTypeId) === 'bundle',
+      bundleSessionNumber: updated.bundleSessionNumber as number | null,
     };
 
     try {

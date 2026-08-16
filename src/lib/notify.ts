@@ -20,6 +20,8 @@ export type Receipt = {
   total: number;       // original session total (before extra items)
   depositAmount: number;
   balanceDue: number;  // final balance due (including extra items)
+  isBundle?: boolean;
+  bundleSessionNumber?: number | null;
 };
 
 export type PayNowQr = {
@@ -45,6 +47,7 @@ function buildHtml(opts: {
   clientDetails?: { label: string; value: string }[];
   receiptDetails?: { label: string; value: string }[];
   paymentSummary?: { label: string; value: string }[];
+  bundleSchedule?: string;  // payment schedule text for bundle emails
   inlinePhotos?: string[];
   photoUrls?: string[];      // fallback clickable links if inline fails
   inlineQrDataUrl?: string;
@@ -133,6 +136,12 @@ function buildHtml(opts: {
     if (opts.paymentSummary?.length) {
       bodyHtml += sectionTable('Payment Summary', opts.paymentSummary, '💰');
     }
+    if (opts.bundleSchedule) {
+      bodyHtml += `<div style="margin:16px 0 0;padding:14px;background:${cream};border-radius:8px;border:1px solid ${line};">`;
+      bodyHtml += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;margin-bottom:8px;">📋 Bundle Payment Schedule</div>`;
+      bodyHtml += `<pre style="margin:0;font-size:13px;color:${ink};font-family:Georgia,serif;white-space:pre-wrap;">${opts.bundleSchedule}</pre>`;
+      bodyHtml += `</div>`;
+    }
     bodyHtml += `<p style="margin:16px 0 0;color:${soft};font-size:13px;text-align:center;font-style:italic;">Thank you for choosing us! ♡</p>`;
   }
 
@@ -169,26 +178,41 @@ function receiptRows(r: Receipt): { label: string; value: string }[] {
   const basePrice = r.total - addOnsTotal - weekendFee + (r.discountAmount || 0);
 
   const rows: { label: string; value: string }[] = [];
-  rows.push({ label: 'Package Price', value: `$${basePrice}` });
+
+  // Bundle sessions show session balance breakdown, not generic "Package Price"
+  if (r.isBundle && r.bundleSessionNumber) {
+    const sn = r.bundleSessionNumber;
+    if (sn === 1) {
+      // Session 1: deposit + session 1 balance = total
+      const s1Balance = basePrice - r.depositAmount;
+      rows.push({ label: 'Booking deposit', value: `$${r.depositAmount}` });
+      rows.push({ label: 'Session 1 balance', value: `+$${s1Balance}` });
+    } else {
+      rows.push({ label: \`Session \${sn} balance\`, value: \`$\${basePrice}\` });
+    }
+  } else {
+    rows.push({ label: 'Package Price', value: \`$\${basePrice}\` });
+  }
+
   // Only show surcharge if non-zero
   if (weekendFee > 0) {
-    rows.push({ label: 'Weekend / PH Surcharge', value: `+$${weekendFee}` });
+    rows.push({ label: 'Weekend / PH Surcharge', value: \`+$\${weekendFee}\` });
   }
   r.addOns.filter(a => a.qty > 0).forEach(a =>
-    rows.push({ label: `${a.name} × ${a.qty}`, value: `+$${a.price * a.qty}` })
+    rows.push({ label: \`\${a.name} × \${a.qty}\`, value: \`+$\${a.price * a.qty}\` })
   );
   if (r.discountCode && r.discountAmount > 0)
-    rows.push({ label: `Discount (${r.discountCode})`, value: `-$${r.discountAmount}` });
+    rows.push({ label: \`Discount (\${r.discountCode})\`, value: \`-$\${r.discountAmount}\` });
 
   // Extra post-session charges
   if (r.extraLineItems?.length) {
     r.extraLineItems.forEach(item =>
-      rows.push({ label: item.description, value: `+$${item.amount}` })
+      rows.push({ label: item.description, value: \`+$\${item.amount}\` })
     );
   }
 
   const grandTotal = r.total + (r.extraLineItems || []).reduce((s, i) => s + i.amount, 0);
-  rows.push({ label: '**Total**', value: `**$${grandTotal}**` });
+  rows.push({ label: '**Total**', value: \`**$\${grandTotal}**\` });
   return rows;
 }
 
@@ -262,6 +286,16 @@ export async function dispatchNotification(
 
   const studio = receipt?.location === 'studio' ? studioRows() : undefined;
 
+  // Bundle payment schedule — shown in all bundle booking and invoice emails
+  const bundleSchedule = receipt?.isBundle ? [
+    'First Year Bundle ($1,088 total)',
+    '',
+    '• Deposit to secure booking:     $100',
+    '• Balance after Session 1:       $330',
+    '• Balance after Session 2:       $330',
+    '• Balance after Session 3:       $328',
+  ].join('\n') : undefined;
+
   // Client setup: notes only (photos shown separately via inlinePhotos/photoUrls)
   const setupForClient: { label: string; value: string }[] = [];
   if (clientDetails?.notes) setupForClient.push({ label: 'Your notes', value: clientDetails.notes });
@@ -285,6 +319,7 @@ export async function dispatchNotification(
     setupDetails: setupForClient.length ? setupForClient : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
     paymentSummary: receipt ? paymentSummaryRows(receipt) : undefined,
+    bundleSchedule: bundleSchedule,
     inlinePhotos: photoUrls.length ? photoUrls : undefined,
     qrApiUrl,
     payNowAmount: payNowAmount || undefined,
@@ -300,6 +335,7 @@ export async function dispatchNotification(
     clientDetails: clientInfoRows.length ? clientInfoRows : undefined,
     receiptDetails: receipt ? receiptRows(receipt) : undefined,
     paymentSummary: receipt ? paymentSummaryRows(receipt) : undefined,
+    bundleSchedule: bundleSchedule,
     inlinePhotos: photoUrls.length ? photoUrls : undefined,
     qrApiUrl,
     payNowAmount: payNowAmount || undefined,
