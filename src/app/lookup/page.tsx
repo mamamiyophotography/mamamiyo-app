@@ -106,7 +106,13 @@ export default function LookupPage() {
                 ) : (
                   <>
                     <div style={{ fontWeight: 600 }}>First Year Bundle</div>
-                    <span style={{ fontSize: 12 }}>{(r.item as Bundle).activated ? 'Sessions ready to book' : 'Awaiting activation'}</span>
+                    <span style={{ fontSize: 12 }}>{(r.item as Bundle).activated ? (() => {
+                      const b = r.item as Bundle;
+                      const redeemed = (bookings || []).filter((bk) => bk.bundleParentId === b.id && bk.status !== 'cancelled').length;
+                      const next = redeemed + 1;
+                      if (next > 3) return 'All sessions completed';
+                      return `Session ${next} of 3 ready to book`;
+                    })() : 'Awaiting activation'}</span>
                   </>
                 )}
               </button>

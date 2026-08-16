@@ -90,11 +90,11 @@ export function bundleSessionConfirmedNotification(
     businessName,
   ].filter(Boolean);
 
-  // Same clean format as bookingConfirmedNotification — no studio line in body,
-  // no repetitive receipt/calendar mention, sections handled by notify.ts
+  const studioLine = b.location === 'studio' ? `\ud83d\udccd Studio: ${studioAddressText()}` : '';
   const emailParts = [
     `Hi ${firstName}!`,
-    `Session ${sessionNum} of 3 of your First Year Bundle is confirmed for ${whenStr}. Balance of $${balanceDue} is due after the session.`,
+    `Session ${sessionNum} of 3 of your First Year Bundle is confirmed for ${whenStr}.`,
+    studioLine,
     prep ? `For ${prep.note}, please visit ${prep.url}\n\nPlease also add this session to your calendar — the invite (.ics) is attached.` : `Please add this session to your calendar — the invite (.ics) is attached.`,
     closingLineFor(b),
   ].filter(Boolean);
@@ -127,7 +127,7 @@ export function balanceReceivedNotification(
       bundleNote = `That completes all 3 sessions of your First Year Bundle — thank you for letting us capture this whole first year with you and your family!`;
     } else {
       const milestone = sessionById('bundle')!.milestones![bundleContext.nextSessionNumber - 1];
-      bundleNote = `Ready for your next milestone? Your ${milestone.label} session (best around ${milestone.age}) is now ready to schedule, whenever suits you — just head to "Look up my booking," no extra deposit needed.`;
+      bundleNote = `Ready for your next milestone? Your ${milestone.label} session (best around ${milestone.age}) is now ready to schedule — no extra deposit needed.\n\nhttps://mamamiyo-app.vercel.app/lookup`;
     }
   }
 
@@ -226,7 +226,7 @@ export function invoiceNotification(
       emailBody: [
         `Hi ${firstName}!`,
         `Thank you for your ${b.sessionLabel} on ${whenStr}.`,
-        `Your invoice and PayNow QR code are below. Please use your email (${b.clientEmail}) as your payment reference.\n\nFor product options (photo albums, canvas, plaques), visit https://www.mamamiyo-photography.com/products`,
+        `Your invoice and PayNow QR code are below. Please use your email (${b.clientEmail}) as your payment reference.`,
       ].join('\n\n'),
       whatsappBody: `Hi ${firstName}! Your balance of $${due} for ${b.sessionLabel} on ${whenStr} is due (ref: ${invoiceRef}). Check your email for the PayNow QR code and invoice. Use your email as payment reference — thank you!`,
     },

@@ -94,7 +94,15 @@ function buildHtml(opts: {
   let bodyHtml = '';
   for (const p of opts.paragraphs) {
     const mentionsCalendar = /calendar|invite|ics/i.test(p);
-    bodyHtml += `<p style="margin:0 0 14px;color:${ink};font-size:15px;line-height:1.6;">${p.replace(/\n/g, '<br>')}</p>`;
+    const lookupUrlMatch = p.match(/https:\/\/mamamiyo-app\.vercel\.app\/lookup/);
+    if (lookupUrlMatch) {
+      // Render the paragraph text without the URL, then show a button
+      const textPart = p.replace(/\n*https:\/\/mamamiyo-app\.vercel\.app\/lookup/, '').trim();
+      if (textPart) bodyHtml += `<p style="margin:0 0 14px;color:${ink};font-size:15px;line-height:1.6;">${textPart.replace(/\n/g, '<br>')}</p>`;
+      bodyHtml += `<div style="text-align:center;margin:16px 0;"><a href="https://mamamiyo-app.vercel.app/lookup" target="_blank" style="display:inline-block;background:${gold};color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:11px 24px;border-radius:9px;font-family:sans-serif;">Book next session →</a></div>`;
+    } else {
+      bodyHtml += `<p style="margin:0 0 14px;color:${ink};font-size:15px;line-height:1.6;">${p.replace(/\n/g, '<br>')}</p>`;
+    }
     if (mentionsCalendar && calBtn) bodyHtml += calBtn;
   }
   if (calBtn && !bodyHtml.includes(calBtn)) bodyHtml += calBtn;
