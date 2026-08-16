@@ -179,47 +179,53 @@ function receiptRows(r: Receipt): { label: string; value: string }[] {
 
   const rows: { label: string; value: string }[] = [];
 
-  // Bundle sessions show session balance breakdown, not generic "Package Price"
   if (r.isBundle && r.bundleSessionNumber) {
     const sn = r.bundleSessionNumber;
     if (sn === 1) {
-      // Session 1: deposit + session 1 balance = total
+      // Deposit already collected at booking — just show session 1 balance
       const s1Balance = basePrice - r.depositAmount;
-      rows.push({ label: 'Booking deposit', value: `$${r.depositAmount}` });
-      rows.push({ label: 'Session 1 balance', value: `+$${s1Balance}` });
+      rows.push({ label: 'Session 1 balance', value: '$' + s1Balance });
     } else {
-      rows.push({ label: \`Session \${sn} balance\`, value: \`$\${basePrice}\` });
+      rows.push({ label: 'Session ' + sn + ' balance', value: '$' + basePrice });
     }
   } else {
-    rows.push({ label: 'Package Price', value: \`$\${basePrice}\` });
+    rows.push({ label: 'Package Price', value: '$' + basePrice });
   }
 
-  // Only show surcharge if non-zero
   if (weekendFee > 0) {
-    rows.push({ label: 'Weekend / PH Surcharge', value: \`+$\${weekendFee}\` });
+    rows.push({ label: 'Weekend / PH Surcharge', value: '+$' + weekendFee });
   }
   r.addOns.filter(a => a.qty > 0).forEach(a =>
-    rows.push({ label: \`\${a.name} × \${a.qty}\`, value: \`+$\${a.price * a.qty}\` })
+    rows.push({ label: a.name + ' × ' + a.qty, value: '+$' + (a.price * a.qty) })
   );
   if (r.discountCode && r.discountAmount > 0)
-    rows.push({ label: \`Discount (\${r.discountCode})\`, value: \`-$\${r.discountAmount}\` });
+    rows.push({ label: 'Discount (' + r.discountCode + ')', value: '-$' + r.discountAmount });
 
-  // Extra post-session charges
   if (r.extraLineItems?.length) {
     r.extraLineItems.forEach(item =>
-      rows.push({ label: item.description, value: \`+$\${item.amount}\` })
+      rows.push({ label: item.description, value: '+$' + item.amount })
     );
   }
 
   const grandTotal = r.total + (r.extraLineItems || []).reduce((s, i) => s + i.amount, 0);
-  rows.push({ label: '**Total**', value: \`**$\${grandTotal}**\` });
+  if (r.isBundle && r.bundleSessionNumber) {
+    const sessionAddOns = addOnsTotal + weekendFee;
+    const sessionBase = r.bundleSessionNumber === 1
+      ? grandTotal - r.depositAmount  // session 1: balance only (deposit already paid)
+      : grandTotal;                   // session 2/3: full amount due
+    rows.push({ label: '**Total due**', value: '**$' + (sessionBase + (r.extraLineItems || []).reduce((s, i) => s + i.amount, 0)) + '**' });
+  } else {
+    rows.push({ label: '**Total**', value: '**$' + grandTotal + '**' });
+  }
   return rows;
 }
 
 function paymentSummaryRows(r: Receipt): { label: string; value: string }[] {
+  // Bundle: payment schedule section already shows the full structure — no need to repeat
+  if (r.isBundle) return [];
   return [
-    { label: 'Deposit Paid', value: `-$${r.depositAmount}` },
-    { label: '**Balance Due**', value: `**$${r.balanceDue}**` },
+    { label: 'Deposit Paid', value: '-$' + r.depositAmount },
+    { label: '**Balance Due**', value: '**$' + r.balanceDue + '**' },
   ];
 }
 
