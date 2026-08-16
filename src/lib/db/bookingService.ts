@@ -452,9 +452,20 @@ export async function redeemBundleSessionAndNotify(
 
   const pair = bundleSessionConfirmedNotification(toNotifyBooking(booking), sessionNumber - 2, balanceDue, settings.businessName);
   const photographer = photographerContacts();
+  const calendarEvent = {
+    uid: booking.ref,
+    summary: `${sessionLabel} — ${settings.businessName}`,
+    description: `Your ${sessionLabel} is confirmed.\n\nRef: ${booking.ref}\nBalance due after session: $${balanceDue}\n\nQuestions? Reply to this email.`,
+    location: 'Home Studio @ K-Lodge, 32 Lorong K Telok Kurau #01-01, Singapore 425641',
+    dateISO: slot.date,
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    organizerName: settings.businessName,
+    organizerEmail: process.env.RESEND_FROM_EMAIL || 'hello@mamamiyo-photography.com',
+  };
   await dispatchNotification(
     pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone,
-    undefined, undefined, undefined, referencePhotoUrls,
+    calendarEvent, undefined, undefined, referencePhotoUrls,
     { name: bundle.clientName, email: bundle.clientEmail, phone: bundle.clientPhone, notes: combinedNotes },
     { date: slot.date, clientName: bundle.clientName, sessionLabel }
   );

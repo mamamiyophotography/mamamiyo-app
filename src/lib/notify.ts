@@ -150,10 +150,7 @@ function buildHtml(opts: {
       bodyHtml += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;margin-bottom:8px;">📋 Bundle Payment Schedule</div>`;
       bodyHtml += `<pre style="margin:0;font-size:13px;color:${ink};font-family:Georgia,serif;white-space:pre-wrap;">${opts.bundleSchedule}</pre>`;
       bodyHtml += `</div>`;
-      // Book next session button on confirmation receipts (not invoices)
-      if (!isInvoice) {
-        bodyHtml += `<div style="text-align:center;margin:20px 0;"><a href="https://mamamiyo-app.vercel.app/lookup" target="_blank" style="display:inline-block;background:${gold};color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:11px 24px;border-radius:9px;font-family:sans-serif;">Book next session →</a></div>`;
-      }
+      // Book next session button only shown in payment received email (via URL detection in paragraphs)
     }
     bodyHtml += `<p style="margin:16px 0 0;color:${soft};font-size:13px;text-align:center;font-style:italic;">Thank you for choosing us! ♡</p>`;
   }
