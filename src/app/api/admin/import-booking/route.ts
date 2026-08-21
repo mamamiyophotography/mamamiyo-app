@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
           ref: bundleRef,
           clientName, clientEmail,
           clientPhone,
+          depositAmount: 100,       // ← fixed: was missing, Prisma requires it
           depositStatus: 'paid',
           activated: true,
         },
@@ -119,3 +120,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
 }
+
