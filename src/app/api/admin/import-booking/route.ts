@@ -26,27 +26,40 @@ export async function POST(req: NextRequest) {
     const clientPhone = phone.startsWith('+') ? phone : `+65${phone}`;
 
     if (st.isBundle) {
-      // Create bundle record
       const bundleRef = refCode('BDL');
       const bundle = await db.bundle.create({
         data: {
           ref: bundleRef,
           clientName, clientEmail,
           clientPhone,
-          depositAmount: 100,       // ← fixed: was missing, Prisma requires it
+          depositAmount: 100,
           depositStatus: 'paid',
           activated: true,
         },
       });
 
-      // Create sessions as completed based on bundleSessionsDone
       const refs: string[] = [];
       for (let i = 0; i < bundleSessionsDone; i++) {
         const sessionNum = i + 1;
+        const isLastSession = i === bundleSessionsDone - 1;
+
+        // All sessions before the last one are always completed.
+        // The last session uses the status selected in the import form.
+        const sessionStatus = isLastSession ? status : 'completed';
+
+        // balanceStatus: last session follows import status, earlier sessions are paid
+        const sessionBalanceStatus = isLastSession
+          ? (status === 'completed' ? 'paid' : status === 'pending_balance' ? 'pending' : 'n/a')
+          : 'paid';
+
         const sessionLabel = `First Year Bundle — session ${sessionNum} of 3`;
         const baseBalance = BUNDLE_SESSION_BALANCES[i] || 330;
         const total = sessionNum === 1 ? baseBalance + 100 + weekendFee : baseBalance + weekendFee;
         const depositAmount = sessionNum === 1 ? 100 : 0;
+
+        // balanceDue: 0 if completed or confirmed, full balance if pending_balance
+        const balanceDue = (sessionStatus === 'completed' || sessionStatus === 'confirmed') ? 0 : baseBalance + weekendFee;
+
         const ref = refCode('MMY');
         await db.booking.create({
           data: {
@@ -65,12 +78,12 @@ export async function POST(req: NextRequest) {
             subtotal: total,
             total,
             depositAmount,
-            balanceDue: 0,
+            balanceDue,
             discountCode: null,
             discountAmount: 0,
-            status: 'completed',
+            status: sessionStatus,
             depositStatus: 'paid',
-            balanceStatus: 'paid',
+            balanceStatus: sessionBalanceStatus,
             bundleParentId: bundle.id,
             bundleSessionNumber: sessionNum,
           },
@@ -120,4 +133,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
 }
-
