@@ -522,7 +522,7 @@ export async function checkAndSendReminders(db: any) {
   let sent = 0;
 
   for (const booking of upcoming) {
-    const sessionStart = new Date(`${booking.date}T${booking.startTime}:00`);
+    const sessionStart = new Date(`${booking.date}T${booking.startTime}:00+08:00`);
     const hoursUntil = (sessionStart.getTime() - now.getTime()) / 3600000;
     if (hoursUntil <= 0) continue;
     const already = (booking.remindersSent as string[]) || [];
