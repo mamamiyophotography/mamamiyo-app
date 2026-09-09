@@ -88,3 +88,57 @@ a { color: inherit; }
 .notice { background: var(--sage-pale); border: 1px solid #d3decA; color: #4b5940; font-size: 13px; padding: 12px 14px; border-radius: 10px; margin-top: 16px; }
 .notice.warn { background: var(--rust-pale); border-color: #e7c3a8; color: var(--rust); }
 .error-text { color: var(--rust); font-size: 13px; margin-top: 8px; }
+
+.admin-shell {
+  min-height: 100vh;
+  padding: 22px;
+  background: radial-gradient(circle at 92% 2%, rgba(142, 183, 203, .36), transparent 28rem), linear-gradient(145deg, #f6d1c4 0%, #f1dcda 50%, #e8e4eb 100%);
+}
+.admin-frame {
+  width: min(1180px, 100%); min-height: calc(100vh - 44px); margin: 0 auto; overflow: hidden;
+  border: 1px solid rgba(255,255,255,.76); border-radius: 30px; background: rgba(255,250,246,.91);
+  box-shadow: 0 24px 70px rgba(93,72,80,.15); backdrop-filter: blur(18px);
+}
+.admin-header { display: flex; align-items: center; justify-content: space-between; padding: 26px 30px 18px; }
+.admin-brand { display: flex; align-items: center; gap: 13px; }
+.admin-brand-mark { width: 46px; height: 46px; border-radius: 14px; }
+.admin-eyebrow { color: #8d7f86; font-size: 11px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+.admin-brand h1 { margin: 1px 0 0; color: #414047; font: 600 25px/1.2 Georgia, serif; }
+.admin-logout { border: 1px solid #ded3d2; border-radius: 999px; padding: 9px 16px; background: rgba(255,255,255,.62); color: #65636b; font-size: 13px; font-weight: 700; }
+.admin-nav { display: flex; gap: 6px; padding: 0 30px 20px; overflow-x: auto; scrollbar-width: none; }
+.admin-nav::-webkit-scrollbar { display: none; }
+.admin-nav-link { flex: 0 0 auto; border-radius: 999px; padding: 10px 16px; color: #6d6870; font-size: 14px; font-weight: 700; text-decoration: none; transition: .18s ease; }
+.admin-nav-link:hover { background: #f1e4e2; transform: translateY(-1px); }
+.admin-nav-link.active { background: #7898aa; color: #fff; box-shadow: 0 7px 18px rgba(92,132,153,.25); }
+.admin-content { min-height: 65vh; padding: 28px 30px 44px; border-top: 1px solid rgba(255,255,255,.92); border-radius: 28px 28px 0 0; background: rgba(255,255,255,.74); }
+.bookings-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 18px; }
+.bookings-kicker { margin-bottom: 3px; color: #7898aa; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.bookings-heading h2 { margin: 0; color: #37363d; font: 600 32px/1.1 Georgia, serif; }
+.bookings-count { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 17px; background: #f5d2c7; color: #855f59; font-size: 17px; font-weight: 800; }
+.status-filter { display: flex; gap: 8px; margin: 0 -4px 16px; padding: 4px 4px 8px; overflow-x: auto; scrollbar-width: none; }
+.status-filter::-webkit-scrollbar { display: none; }
+.status-filter-button { flex: 0 0 auto; border: 1px solid #eadfdd; border-radius: 999px; padding: 9px 14px; background: #fffaf6; color: #716a70; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.status-filter-button.active { border-color: #e8a996; background: #efb8a8; color: #684941; box-shadow: 0 6px 14px rgba(205,132,112,.17); }
+.booking-column-head { display: flex; padding: 6px 14px 10px; color: #989097; font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.booking-list { display: flex; flex-direction: column; gap: 11px; }
+.booking-card { padding: 16px; border: 1px solid #ebe4e2; border-radius: 20px; background: #fff; box-shadow: 0 8px 24px rgba(77,63,69,.06); transition: border .18s ease, box-shadow .18s ease, transform .18s ease; }
+.booking-card:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(77,63,69,.09); }
+.booking-card.open { border-color: #b7ccd6; box-shadow: 0 12px 32px rgba(102,142,162,.13); }
+.booking-open-button { width: 84px; border: 1px solid #a9c0cb; border-radius: 999px; padding: 7px 0; background: #f7fbfc; color: #557788; font-size: 13px; font-weight: 800; text-align: center; }
+.booking-detail { margin-top: 16px; padding: 16px 4px 2px; border-top: 1px solid #eee6e3; font-size: 13px; }
+
+@media (max-width: 680px) {
+  .admin-shell { padding: 0; }
+  .admin-frame { min-height: 100vh; border: 0; border-radius: 0; }
+  .admin-header { padding: 20px 18px 14px; }
+  .admin-brand-mark { width: 42px; height: 42px; }
+  .admin-brand h1 { font-size: 22px; }
+  .admin-nav { padding: 0 18px 16px; }
+  .admin-nav-link { padding: 9px 14px; font-size: 13px; }
+  .admin-content { padding: 22px 16px 36px; border-radius: 22px 22px 0 0; }
+  .admin-logout { padding: 8px 12px; }
+  .bookings-heading h2 { font-size: 28px; }
+  .bookings-count { width: 44px; height: 44px; border-radius: 15px; }
+  .booking-column-head { display: none; }
+  .booking-card { padding: 14px; border-radius: 18px; }
+}

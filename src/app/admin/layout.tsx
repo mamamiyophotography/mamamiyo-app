@@ -8,7 +8,7 @@ const TABS = [
   { href: '/admin/availability', label: 'Availability' },
   { href: '/admin/discounts', label: 'Discounts' },
   { href: '/admin/bundles', label: 'Bundles' },
-  { href: '/admin/import', label: '📥 Import' },
+  { href: '/admin/import', label: 'Import' },
   { href: '/admin/settings', label: 'Settings' },
 ];
 
@@ -27,41 +27,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (pathname === '/admin/login') return <>{children}</>;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#EBE0D5' }}>
-      <div className="wrap" style={{ maxWidth: 860 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
-          <div>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', color: '#7A4D45', fontWeight: 600, fontFamily: "'Inter', sans-serif" }}>Studio dashboard</div>
-            <h1 style={{ fontSize: 24, fontFamily: "'Quicksand', sans-serif", color: '#3A2E28' }}>Mamamiyo Photography</h1>
+    <div className="admin-shell">
+      <div className="admin-frame">
+        <header className="admin-header">
+          <div className="admin-brand">
+            <img src="/icon.svg" alt="" className="admin-brand-mark" />
+            <div>
+              <div className="admin-eyebrow">Studio dashboard</div>
+              <h1>Mamamiyo</h1>
+            </div>
           </div>
-          <button className="btn btn-ghost" onClick={logout}>Log out</button>
-        </div>
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', flexWrap: 'nowrap', marginBottom: 20, paddingBottom: 4 }}>
+          <button className="admin-logout" onClick={logout}>Log out</button>
+        </header>
+        <nav className="admin-nav" aria-label="Admin sections">
           {TABS.map((t) => {
             const active = pathname.startsWith(t.href);
             return (
-              <Link
-                key={t.href}
-                href={t.href}
-                style={{
-                  flex: '0 0 auto',
-                  whiteSpace: 'nowrap',
-                  fontFamily: "'Quicksand', sans-serif",
-                  fontWeight: 600,
-                  fontSize: 14.5,
-                  padding: '10px 18px',
-                  borderRadius: 14,
-                  textDecoration: 'none',
-                  background: active ? '#9D84B7' : '#D0C4DD',
-                  color: active ? '#FFFFFF' : '#5A4B7A',
-                }}
-              >
+              <Link key={t.href} href={t.href} className={`admin-nav-link${active ? ' active' : ''}`}>
                 {t.label}
               </Link>
             );
           })}
-        </div>
-        {children}
+        </nav>
+        <main className="admin-content">{children}</main>
       </div>
     </div>
   );

@@ -100,17 +100,20 @@ export default function AdminBookingsPage() {
   }
 
   return (
-    <div>
+    <div className="bookings-view">
+      <div className="bookings-heading">
+        <div>
+          <div className="bookings-kicker">Booking management</div>
+          <h2>Sessions</h2>
+        </div>
+        <div className="bookings-count">{loading ? '—' : bookings.length}</div>
+      </div>
       {/* Status filter chips — single scrollable row, equal height, no wrap */}
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', flexWrap: 'nowrap', padding: '8px 0 12px', marginBottom: 4 }}>
+      <div className="status-filter" aria-label="Filter bookings by status">
         {STATUS_TABS.map((t) => (
-          <button key={t.key} onClick={() => setFilter(t.key)} style={{
-            flex: '0 0 auto', whiteSpace: 'nowrap',
-            border: 'none', borderRadius: 999, padding: '9px 15px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
-            fontFamily: "'Inter', sans-serif",
-            background: filter === t.key ? '#D97A6E' : '#E8A89D',
-            color: filter === t.key ? '#FFFFFF' : '#7A4D45',
-          }}>{t.label}</button>
+          <button key={t.key} onClick={() => setFilter(t.key)} className={`status-filter-button${filter === t.key ? ' active' : ''}`}>
+            {t.label}
+          </button>
         ))}
       </div>
 
@@ -119,20 +122,20 @@ export default function AdminBookingsPage() {
 
       {/* Column header */}
       {!loading && bookings.length > 0 && (
-        <div style={{ display: 'flex', padding: '8px 12px 12px', fontWeight: 700, fontSize: 11.5, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#9A8C7F' }}>
+        <div className="booking-column-head">
           <div style={{ flex: '0 0 68%' }}>Session</div>
           <div style={{ flex: 1, textAlign: 'right' }}>Status</div>
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="booking-list">
       {bookings.map((b) => {
         const isOpen = expandedId === b.id;
         const isBusy = busyId === b.id;
         const statusStyle = STATUS_LABEL[b.status] || { label: b.status, color: '#3A2E28', bg: '#EDE6DC' };
 
         return (
-          <div key={b.id} style={{ background: '#FFFFFF', borderRadius: 18, padding: 14, boxShadow: '0 2px 10px rgba(58,46,40,0.08)' }}>
+          <div key={b.id} className={`booking-card${isOpen ? ' open' : ''}`}>
             {/* Row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: '0 0 68%', minWidth: 0 }}>
@@ -144,13 +147,7 @@ export default function AdminBookingsPage() {
                 <span style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 999, background: statusStyle.bg, color: statusStyle.color, whiteSpace: 'nowrap' }}>
                   {statusStyle.label}
                 </span>
-                <button
-                  onClick={() => expandBooking(b.id)}
-                  style={{
-                    fontWeight: 700, fontSize: 13, padding: '7px 0', width: 84, textAlign: 'center',
-                    borderRadius: 999, border: '1.5px solid #D9CDBF', background: '#FFFFFF', color: '#3A2E28', cursor: 'pointer',
-                  }}
-                >
+                <button onClick={() => expandBooking(b.id)} className="booking-open-button">
                   {isOpen ? 'Close' : 'Open'}
                 </button>
               </div>
@@ -158,7 +155,7 @@ export default function AdminBookingsPage() {
 
             {/* Expanded detail */}
             {isOpen && (
-              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px dashed var(--line)', fontSize: 13 }}>
+              <div className="booking-detail">
                 {actionError?.id === b.id && <div className="notice warn" style={{ marginTop: 0, marginBottom: 12 }}>{actionError.message}</div>}
 
                 <div className="ticket-row"><span>Reference</span><b style={{ fontFamily: 'monospace' }}>{b.ref}</b></div>
