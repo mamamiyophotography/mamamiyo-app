@@ -15,7 +15,7 @@
 // awkwardly across phases.
 
 import { Db, Settings } from './types';
-import { sessionById, BUNDLE_SESSION_BALANCES } from '../constants';
+import { sessionById, BUNDLE_SESSION_BALANCES, STATUS_ORDER } from '../constants';
 import { computeBookingPricing, currentBalanceDue } from '../pricing';
 import { generateCandidateSlots, CandidateSlot } from '../availability';
 import {
@@ -247,7 +247,7 @@ export async function confirmDepositAndNotify(db: any, bookingId: string) {
   const studioAddress = 'K-Lodge, 32 Lorong K Telok Kurau #01-01, Singapore 425641';
   const calendarEvent = {
     uid: booking.ref,
-    summary: `${booking.sessionLabel} — ${settings.businessName}`,
+    summary: `${booking.clientName} ${booking.sessionLabel} Mamamiyo Photography`,
     description: `Your ${booking.sessionLabel} is confirmed.\n\nRef: ${booking.ref}\nBalance due after session: $${booking.balanceDue}\n\nQuestions? Reply to this email.`,
     location: booking.location === 'home' ? booking.address || 'Your home (address on file)' : studioAddress,
     dateISO: booking.date,
@@ -454,7 +454,7 @@ export async function redeemBundleSessionAndNotify(
   const photographer = photographerContacts();
   const calendarEvent = {
     uid: booking.ref,
-    summary: `${sessionLabel} — ${settings.businessName}`,
+    summary: `${bundle.clientName} ${sessionLabel} Mamamiyo Photography`,
     description: `Your ${sessionLabel} is confirmed.\n\nRef: ${booking.ref}\nBalance due after session: $${balanceDue}\n\nQuestions? Reply to this email.`,
     location: 'Home Studio @ K-Lodge, 32 Lorong K Telok Kurau #01-01, Singapore 425641',
     dateISO: slot.date,
@@ -512,6 +512,22 @@ export async function purgeExpiredHolds(db: any) {
     data: { status: 'cancelled', depositStatus: 'pending' },
   });
   return count;
+}
+
+/** Post-completion editing pipeline only — moving a booking from
+ *  'completed' to 'basic_retouch' to 'further_retouch'. Earlier stages have
+ *  their own dedicated transitions (confirmDepositAndNotify, markCompleted,
+ *  confirmBalanceAndNotify) and are intentionally not reachable here. */
+const ADVANCEABLE_STATUSES = ['completed', 'basic_retouch'];
+
+export async function advanceStage(db: any, bookingId: string) {
+  const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+  if (!ADVANCEABLE_STATUSES.includes(booking.status)) {
+    throw new Error(`Cannot advance stage from status "${booking.status}".`);
+  }
+  const idx = STATUS_ORDER.indexOf(booking.status as (typeof STATUS_ORDER)[number]);
+  const nextStatus = STATUS_ORDER[idx + 1];
+  return db.booking.update({ where: { id: bookingId }, data: { status: nextStatus } });
 }
 
 export async function checkAndSendReminders(db: any) {

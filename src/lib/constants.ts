@@ -181,6 +181,30 @@ export function prepLinkFor(booking: {
   return null;
 }
 
+// Booking status lifecycle, in order. Statuses are plain strings on the
+// Booking model (not a Prisma enum) — this array is the single source of
+// truth for ordering and for admin "advance to next stage" logic.
+export const STATUS_ORDER = [
+  'pending',
+  'confirmed',
+  'pending_balance',
+  'completed',
+  'basic_retouch',
+  'further_retouch',
+] as const;
+
+export type BookingStatusValue = typeof STATUS_ORDER[number] | 'cancelled';
+
+export const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  pending:         { label: '1. Pending deposit',     color: '#8c6d3f', bg: '#f1e6d3' },
+  confirmed:       { label: '2. Booking confirmed',   color: '#2e6b3e', bg: '#d4edda' },
+  pending_balance: { label: '3. Pending balance',     color: '#7a4a00', bg: '#fff3cd' },
+  completed:       { label: '4. Photoshoot complete', color: '#4b5940', bg: '#e4e9dd' },
+  basic_retouch:   { label: '5. Basic retouch',       color: '#5a5568', bg: '#e8e3f0' },
+  further_retouch: { label: '6. Further retouch',     color: '#3f5568', bg: '#dbe8f0' },
+  cancelled:       { label: 'Cancelled',              color: '#6b6152', bg: '#f0ece6' },
+};
+
 export function closingLineFor(booking: { sessionTypeId: string }): string {
   return booking.sessionTypeId === 'maternity'
     ? 'Looking forward to capturing this beautiful chapter with you and your bump.'

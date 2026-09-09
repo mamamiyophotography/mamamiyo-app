@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { fmtDatePretty, fmtTime12, fmtDateYMD } from '@/lib/format';
-import { ADDONS } from '@/lib/constants';
+import { ADDONS, STATUS_LABELS } from '@/lib/constants';
+import BookingSummaryModal from '@/components/BookingSummaryModal';
 
 type Booking = {
   id: string; ref: string; sessionTypeId: string; sessionLabel: string; location: string;
@@ -21,16 +22,12 @@ const STATUS_TABS = [
   { key: 'confirmed', label: '2. Booking confirmed' },
   { key: 'pending_balance', label: '3. Pending balance' },
   { key: 'completed', label: '4. Photoshoot complete' },
+  { key: 'basic_retouch', label: '5. Basic retouch' },
+  { key: 'further_retouch', label: '6. Further retouch' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
-const STATUS_LABEL: Record<string, { label: string; color: string; bg: string }> = {
-  pending:         { label: '1. Pending deposit',    color: '#8c6d3f', bg: '#f1e6d3' },
-  confirmed:       { label: '2. Booking confirmed',  color: '#2e6b3e', bg: '#d4edda' },
-  pending_balance: { label: '3. Pending balance',    color: '#7a4a00', bg: '#fff3cd' },
-  completed:       { label: '4. Photoshoot complete',color: '#4b5940', bg: '#e4e9dd' },
-  cancelled:       { label: 'Cancelled',             color: '#6b6152', bg: '#f0ece6' },
-};
+const STATUS_LABEL = STATUS_LABELS;
 
 export default function AdminBookingsPage() {
   const [filter, setFilter] = useState('active');
@@ -43,12 +40,14 @@ export default function AdminBookingsPage() {
   const [lineAmount, setLineAmount] = useState('');
   const [invoiceQr, setInvoiceQr] = useState<{ bookingId: string; dataUrl: string; due: number } | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
+  const [summaryBooking, setSummaryBooking] = useState<Booking | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    // 'active' = pending + confirmed + pending_balance combined
+    // 'active' = pending + confirmed + pending_balance + basic_retouch + further_retouch
+    // — editing work in progress still counts as active.
     const url = filter === 'active'
-      ? `/api/admin/bookings?statuses=pending,confirmed,pending_balance`
+      ? `/api/admin/bookings?statuses=pending,confirmed,pending_balance,basic_retouch,further_retouch`
       : `/api/admin/bookings?status=${filter}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -83,6 +82,12 @@ export default function AdminBookingsPage() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  async function openSummary(id: string) {
+    const res = await fetch(`/api/admin/bookings/${id}`);
+    const data = await res.json();
+    if (data?.booking) setSummaryBooking(data.booking);
   }
 
   async function generateInvoice(id: string) {
@@ -285,6 +290,14 @@ export default function AdminBookingsPage() {
                   {b.status === 'confirmed' && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Mark session done</button>
                   )}
+                  {b.status === 'confirmed' && (
+                    <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>
+                  )}
+                  {(b.status === 'completed' || b.status === 'basic_retouch') && (
+                    <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
+                      {b.status === 'completed' ? 'Start basic retouch' : 'Move to further retouch'}
+                    </button>
+                  )}
                   {b.status !== 'cancelled' && (
                     <button className="btn btn-ghost" disabled={isBusy} onClick={() => { if (confirm('Cancel this booking?')) runAction(b.id, 'cancel'); }}>Cancel</button>
                   )}
@@ -295,6 +308,10 @@ export default function AdminBookingsPage() {
           </div>
         );
       })}
+
+      {summaryBooking && (
+        <BookingSummaryModal booking={summaryBooking} onClose={() => setSummaryBooking(null)} />
+      )}
     </div>
   );
 }

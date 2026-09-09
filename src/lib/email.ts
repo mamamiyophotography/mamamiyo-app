@@ -35,6 +35,7 @@ export async function sendEmail(
     subject,
     text: body,
     html,
+    replyTo: process.env.PHOTOGRAPHER_EMAIL,
     attachments: attachments?.map((a) => ({
       filename: a.filename,
       content: a.content,

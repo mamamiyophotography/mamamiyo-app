@@ -102,7 +102,7 @@ export default function BookPage() {
   if (!name.trim()) missingFields.push('Your name');
   if (!email.trim()) missingFields.push('Email');
   if (!phone.trim()) missingFields.push('WhatsApp number');
-  if (!babyGender.trim()) missingFields.push("Baby's gender");
+  if (sessionType?.id !== 'maternity' && !babyGender.trim()) missingFields.push("Baby's gender");
   if (sessionType?.location === 'home' && !address.trim()) missingFields.push('Home address');
   if (photos.length === 0) missingFields.push('Reference photos');
   const readyForReview = !!selectedSlot && missingFields.length === 0;
@@ -404,14 +404,16 @@ export default function BookPage() {
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 6 }}>{photos.length}/5 attached</div>
           </div>
-          <div className="field">
-            <label>Baby's gender<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-              {[['boy', '👦 Boy'], ['girl', '👧 Girl']].map(([val, label]) => (
-                <button key={val} type="button" className={`chip ${babyGender === val ? 'selected' : ''}`} onClick={() => setBabyGender(val)}>{label}</button>
-              ))}
+          {sessionType.id !== 'maternity' && (
+            <div className="field">
+              <label>Baby's gender<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                {[['boy', '👦 Boy'], ['girl', '👧 Girl']].map(([val, label]) => (
+                  <button key={val} type="button" className={`chip ${babyGender === val ? 'selected' : ''}`} onClick={() => setBabyGender(val)}>{label}</button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           <div className="field"><label>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything we should know?" /></div>
         </div>
       )}

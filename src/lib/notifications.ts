@@ -227,8 +227,9 @@ export function invoiceNotification(
         `Hi ${firstName}!`,
         `Thank you for your ${b.sessionLabel} on ${whenStr}.`,
         `Your invoice and PayNow QR code are below. Please use your email (${b.clientEmail}) as your payment reference.`,
+        `Once paid, please send your payment screenshot to us on WhatsApp at +65 9760 0798 — that's the fastest way to reach us (replies to this email may not be seen right away).`,
       ].join('\n\n'),
-      whatsappBody: `Hi ${firstName}! Your balance of $${due} for ${b.sessionLabel} on ${whenStr} is due (ref: ${invoiceRef}). Check your email for the PayNow QR code and invoice. Use your email as payment reference — thank you!`,
+      whatsappBody: `Hi ${firstName}! Your balance of $${due} for ${b.sessionLabel} on ${whenStr} is due (ref: ${invoiceRef}). Check your email for the PayNow QR code and invoice. Use your email as payment reference, then send your payment screenshot here on WhatsApp at +65 9760 0798 — thank you!`,
     },
     photographer: {
       emailSubject: `Invoice for balance payment sent — ${b.clientName}`,
