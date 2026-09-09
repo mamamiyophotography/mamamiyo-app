@@ -196,13 +196,13 @@ export const STATUS_ORDER = [
 export type BookingStatusValue = typeof STATUS_ORDER[number] | 'cancelled';
 
 export const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  pending:         { label: '1. Pending deposit',     color: '#8c6d3f', bg: '#f1e6d3' },
-  confirmed:       { label: '2. Booking confirmed',   color: '#2e6b3e', bg: '#d4edda' },
-  pending_balance: { label: '3. Pending balance',     color: '#7a4a00', bg: '#fff3cd' },
-  completed:       { label: '4. Photoshoot complete', color: '#4b5940', bg: '#e4e9dd' },
-  basic_retouch:   { label: '5. Basic retouch',       color: '#5a5568', bg: '#e8e3f0' },
-  further_retouch: { label: '6. Further retouch',     color: '#3f5568', bg: '#dbe8f0' },
-  cancelled:       { label: 'Cancelled',              color: '#6b6152', bg: '#f0ece6' },
+  pending:         { label: '1. Pending deposit',     color: '#8A7F2F', bg: '#F4E4C1' },
+  confirmed:       { label: '2. Booking confirmed',   color: '#FFFFFF', bg: '#7A9D8F' },
+  pending_balance: { label: '3. Pending balance',     color: '#7A4D45', bg: '#E8A89D' },
+  completed:       { label: '4. Photoshoot complete', color: '#5A4B7A', bg: '#D0C4DD' },
+  basic_retouch:   { label: '5. Basic retouch',       color: '#FFFFFF', bg: '#8FB4D4' },
+  further_retouch: { label: '6. Further retouch',     color: '#FFFFFF', bg: '#5FA89A' },
+  cancelled:       { label: 'Cancelled',              color: '#7A6F62', bg: '#E4DED6' },
 };
 
 export function closingLineFor(booking: { sessionTypeId: string }): string {

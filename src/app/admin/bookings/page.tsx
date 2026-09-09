@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { fmtDatePretty, fmtTime12, fmtDateYMD } from '@/lib/format';
+import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { ADDONS, STATUS_LABELS } from '@/lib/constants';
 import BookingSummaryModal from '@/components/BookingSummaryModal';
 
@@ -101,14 +101,15 @@ export default function AdminBookingsPage() {
 
   return (
     <div>
-      {/* Status filter tabs */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+      {/* Status filter chips — single scrollable row, equal height, no wrap */}
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', flexWrap: 'nowrap', padding: '8px 0 12px', marginBottom: 4 }}>
         {STATUS_TABS.map((t) => (
           <button key={t.key} onClick={() => setFilter(t.key)} style={{
-            border: 'none', borderRadius: 20, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-            background: filter === t.key ? 'var(--ink)' : 'var(--paper)',
-            color: filter === t.key ? 'var(--cream)' : 'var(--ink-soft)',
-            outline: filter === t.key ? 'none' : '1.5px solid var(--line)',
+            flex: '0 0 auto', whiteSpace: 'nowrap',
+            border: 'none', borderRadius: 999, padding: '9px 15px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+            fontFamily: "'Inter', sans-serif",
+            background: filter === t.key ? '#D97A6E' : '#E8A89D',
+            color: filter === t.key ? '#FFFFFF' : '#7A4D45',
           }}>{t.label}</button>
         ))}
       </div>
@@ -116,36 +117,43 @@ export default function AdminBookingsPage() {
       {loading && <div style={{ color: 'var(--ink-faint)', fontSize: 13 }}>Loading…</div>}
       {!loading && bookings.length === 0 && <div className="notice">No bookings in this category.</div>}
 
-      {/* 3-column table header */}
+      {/* Column header */}
       {!loading && bookings.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 70px', gap: '0 12px', padding: '6px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--ink-faint)', letterSpacing: 1 }}>
-          <span>Session</span>
-          <span>Status</span>
-          <span></span>
+        <div style={{ display: 'flex', padding: '8px 12px 12px', fontWeight: 700, fontSize: 11.5, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#9A8C7F' }}>
+          <div style={{ flex: '0 0 68%' }}>Session</div>
+          <div style={{ flex: 1, textAlign: 'right' }}>Status</div>
         </div>
       )}
 
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {bookings.map((b) => {
         const isOpen = expandedId === b.id;
         const isBusy = busyId === b.id;
-        const statusStyle = STATUS_LABEL[b.status] || { label: b.status, color: 'var(--ink)', bg: 'var(--line)' };
+        const statusStyle = STATUS_LABEL[b.status] || { label: b.status, color: '#3A2E28', bg: '#EDE6DC' };
 
         return (
-          <div key={b.id} className="card" style={{ padding: '10px 12px', marginTop: 6 }}>
-            {/* Row — 5 columns */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 70px', gap: '0 12px', alignItems: 'center' }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>
-                {fmtDateYMD(b.date)} {b.clientName}
-                <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-soft)' }}>{b.sessionLabel} · {fmtDatePretty(b.date)} {fmtTime12(b.startTime)}</div>
+          <div key={b.id} style={{ background: '#FFFFFF', borderRadius: 18, padding: 14, boxShadow: '0 2px 10px rgba(58,46,40,0.08)' }}>
+            {/* Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: '0 0 68%', minWidth: 0 }}>
+                <div style={{ fontFamily: "'Quicksand', sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: '#3A2E28' }}>{b.clientName}</div>
+                <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>
+                <div style={{ fontWeight: 600, fontSize: 12.5, color: '#3A2E28', marginTop: 4, lineHeight: 1.35 }}>{fmtDatePretty(b.date)} · {fmtTime12(b.startTime)}</div>
               </div>
-              <div>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: statusStyle.bg, color: statusStyle.color }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, minWidth: 92 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 999, background: statusStyle.bg, color: statusStyle.color, whiteSpace: 'nowrap' }}>
                   {statusStyle.label}
                 </span>
+                <button
+                  onClick={() => expandBooking(b.id)}
+                  style={{
+                    fontWeight: 700, fontSize: 13, padding: '7px 0', width: 84, textAlign: 'center',
+                    borderRadius: 999, border: '1.5px solid #D9CDBF', background: '#FFFFFF', color: '#3A2E28', cursor: 'pointer',
+                  }}
+                >
+                  {isOpen ? 'Close' : 'Open'}
+                </button>
               </div>
-              <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => expandBooking(b.id)}>
-                {isOpen ? 'Close' : 'Open'}
-              </button>
             </div>
 
             {/* Expanded detail */}
@@ -308,6 +316,7 @@ export default function AdminBookingsPage() {
           </div>
         );
       })}
+      </div>
 
       {summaryBooking && (
         <BookingSummaryModal booking={summaryBooking} onClose={() => setSummaryBooking(null)} />
