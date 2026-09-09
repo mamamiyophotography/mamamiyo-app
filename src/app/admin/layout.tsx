@@ -27,7 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (pathname === '/admin/login') return <>{children}</>;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#E5BFA8' }}>
+    <div style={{ minHeight: '100vh', background: '#EBE0D5' }}>
       <div className="wrap" style={{ maxWidth: 860 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
           <div>
