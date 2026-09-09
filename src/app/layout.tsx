@@ -4,6 +4,12 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Mamamiyo Photography — Booking',
   description: 'Book your newborn, maternity, or family photoshoot with Mamamiyo Photography.',
+  applicationName: 'Mamamiyo Booking',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Mamamiyo',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

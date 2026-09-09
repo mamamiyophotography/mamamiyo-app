@@ -59,19 +59,19 @@ export default function AdminAvailabilityPage() {
         Add a date and time window — clients will only see slots that fit within it.
         A full day would be 8:00am to 8:00pm.
       </p>
-      <div className="card" style={{ maxWidth: 480 }}>
+      <div className="card admin-form-card" style={{ maxWidth: 480 }}>
         <div className="field">
           <label>Date</label>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div className="field" style={{ flex: 1 }}>
+        <div className="admin-form-pair">
+          <div className="field">
             <label>From</label>
             <select value={startTime} onChange={(e) => { setStartTime(e.target.value); if (e.target.value >= endTime) setEndTime(TIME_OPTIONS.find(t => t.value > e.target.value)?.value || '17:00'); }}>
               {TIME_OPTIONS.slice(0, -1).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
-          <div className="field" style={{ flex: 1 }}>
+          <div className="field">
             <label>To</label>
             <select value={endTime} onChange={(e) => setEndTime(e.target.value)}>
               {endOptions.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -92,7 +92,7 @@ export default function AdminAvailabilityPage() {
       {blocks.length === 0 && <div className="notice" style={{ maxWidth: 480 }}>No availability added yet — clients won't see any bookable dates until you add some.</div>}
 
       {blocks.map((b) => (
-        <div key={b.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', maxWidth: 480 }}>
+        <div key={b.id} className="card availability-row" style={{ maxWidth: 480 }}>
           <div style={{ fontSize: 13.5 }}>
             <b>{fmtDatePretty(b.date)}</b>
             <span style={{ color: 'var(--ink-soft)', marginLeft: 10 }}>

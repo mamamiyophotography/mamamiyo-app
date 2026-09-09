@@ -64,19 +64,19 @@ export default function ImportPage() {
       <p style={{ color: 'var(--ink-soft)', fontSize: 13.5, marginBottom: 16 }}>
         Import existing bookings silently — <b>no emails sent</b>. For customers booked before this system.
       </p>
-      <div className="card">
+      <div className="card admin-form-card">
         <div className="field">
           <label>Package</label>
           <select value={form.sessionTypeId} onChange={e => f('sessionTypeId', e.target.value)}>
             {SESSION_TYPES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div className="field" style={{ flex: 1 }}>
+        <div className="admin-form-pair">
+          <div className="field">
             <label>Date</label>
             <input type="date" value={form.date} onChange={e => f('date', e.target.value)} />
           </div>
-          <div className="field" style={{ flex: 1 }}>
+          <div className="field">
             <label>Start time</label>
             <input type="time" value={form.startTime} onChange={e => f('startTime', e.target.value)} />
           </div>

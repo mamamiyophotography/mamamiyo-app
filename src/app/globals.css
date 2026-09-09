@@ -80,8 +80,23 @@ a { color: inherit; }
 }
 .chip.selected { border-color: var(--gold-deep); background: var(--gold); color: var(--paper); }
 
-.ticket-row { display: flex; justify-content: space-between; font-size: 13.5px; padding: 5px 0; color: var(--ink-soft); }
-.ticket-row b { color: var(--ink); font-weight: 600; }
+.ticket-row {
+  display: grid;
+  grid-template-columns: minmax(92px, .34fr) minmax(0, 1fr);
+  gap: 8px 14px;
+  align-items: start;
+  padding: 6px 0;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+}
+.ticket-row b {
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
 .ticket-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .ticket-total .amt { font-family: Georgia, serif; font-size: 24px; color: var(--gold-deep); }
 
@@ -126,6 +141,20 @@ a { color: inherit; }
 .booking-card.open { border-color: #b7ccd6; box-shadow: 0 12px 32px rgba(102,142,162,.13); }
 .booking-open-button { width: 84px; border: 1px solid #a9c0cb; border-radius: 999px; padding: 7px 0; background: #f7fbfc; color: #557788; font-size: 13px; font-weight: 800; text-align: center; }
 .booking-detail { margin-top: 16px; padding: 16px 4px 2px; border-top: 1px solid #eee6e3; font-size: 13px; }
+.admin-form-card { width: 100%; min-width: 0; }
+.admin-form-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.admin-form-pair .field { min-width: 0; }
+.admin-form-pair input,
+.admin-form-pair select,
+.admin-form-card input[type='date'],
+.admin-form-card input[type='time'] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.availability-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 16px; }
+.availability-row > div { min-width: 0; }
 
 @media (max-width: 680px) {
   .admin-shell { padding: 0; }
@@ -141,4 +170,8 @@ a { color: inherit; }
   .bookings-count { width: 44px; height: 44px; border-radius: 15px; }
   .booking-column-head { display: none; }
   .booking-card { padding: 14px; border-radius: 18px; }
+  .ticket-row { grid-template-columns: 88px minmax(0, 1fr); gap: 5px 10px; }
+  .admin-form-pair { grid-template-columns: 1fr; gap: 0; }
+  .availability-row { align-items: flex-start; }
+  .availability-row > div span { display: block; margin: 3px 0 0 !important; }
 }
