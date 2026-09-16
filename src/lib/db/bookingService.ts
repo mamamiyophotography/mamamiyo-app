@@ -16,10 +16,11 @@
 
 import { Db, Settings } from './types';
 import { sessionById, BUNDLE_SESSION_BALANCES, STATUS_ORDER } from '../constants';
-import { computeBookingPricing, currentBalanceDue } from '../pricing';
+import { computeAddOnsTotal, computeBookingPricing, currentBalanceDue } from '../pricing';
 import { generateCandidateSlots, CandidateSlot } from '../availability';
 import {
   bookingConfirmedNotification,
+  bookingUpdatedNotification,
   bundleSessionConfirmedNotification,
   balanceReceivedNotification,
   bundleContextAfterBalance,
@@ -63,7 +64,7 @@ export async function getSettings(db: any): Promise<Settings> {
   return s;
 }
 
-export async function getAvailableSlots(db: any, sessionTypeId: string): Promise<CandidateSlot[]> {
+export async function getAvailableSlots(db: any, sessionTypeId: string, excludeBookingId?: string): Promise<CandidateSlot[]> {
   const st = sessionById(sessionTypeId);
   if (!st) throw new Error(`Unknown session type: ${sessionTypeId}`);
   const settings = await getSettings(db);
@@ -73,11 +74,14 @@ export async function getAvailableSlots(db: any, sessionTypeId: string): Promise
     db.availabilityBlock.findMany(),
     db.booking.findMany({
       where: { status: { not: 'cancelled' } },
-      select: { date: true, startTime: true, endTime: true, status: true, holdExpiresAt: true },
+      select: { id: true, date: true, startTime: true, endTime: true, status: true, holdExpiresAt: true },
     }),
     db.publicHoliday.findMany(),
   ]);
-  return generateCandidateSlots(st, settings, blocks, bookings, holidays);
+  const blockingBookings = excludeBookingId
+    ? bookings.filter((booking: { id: string }) => booking.id !== excludeBookingId)
+    : bookings;
+  return generateCandidateSlots(st, settings, blocks, blockingBookings, holidays);
 }
 
 export type CreateBookingInput = {
@@ -89,6 +93,7 @@ export type CreateBookingInput = {
   addOns: Record<string, number>;
   notes: string;
   babyGender?: string;  // 'boy' | 'girl' | 'prefer_not_to_say' | ''
+  siblingJoining?: string; // 'yes' | 'no' | ''
   referencePhotoUrls: string[];
   address: string;
   discountCode?: string | null;
@@ -168,6 +173,7 @@ export async function createBooking(db: any, input: CreateBookingInput) {
         addOns: input.addOns,
         notes: [
           input.babyGender ? `Baby gender: ${input.babyGender}` : '',
+          input.siblingJoining ? `Sibling joining: ${input.siblingJoining}` : '',
           input.notes,
         ].filter(Boolean).join('\n'),
         referencePhotoUrls: input.referencePhotoUrls,
@@ -286,6 +292,232 @@ export async function confirmDepositAndNotify(db: any, bookingId: string) {
   return booking;
 }
 
+export type UpdateBookingInput = {
+  sessionTypeId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  addOns: Record<string, number>;
+  address?: string;
+  notes?: string;
+};
+
+/** Admin-only edit flow for pre-shoot bookings. Revalidates availability,
+ * recalculates pricing, resets reminders, and sends an updated confirmation. */
+export async function updateBookingAndNotify(db: any, bookingId: string, input: UpdateBookingInput) {
+  const existing = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+  if (!['pending', 'confirmed'].includes(existing.status)) {
+    throw new Error('Only pending or confirmed bookings can be edited.');
+  }
+
+  const sessionType = sessionById(input.sessionTypeId);
+  if (!sessionType) throw new Error('Unknown session type.');
+  if (existing.bundleSessionNumber && existing.bundleSessionNumber > 1 && input.sessionTypeId !== 'bundle') {
+    throw new Error('Bundle sessions 2 and 3 cannot be changed to another package.');
+  }
+  if (sessionType.location === 'home' && !input.address?.trim()) {
+    throw new Error('A home address is required for the Newborn package.');
+  }
+
+  const sameSlot = existing.sessionTypeId === input.sessionTypeId
+    && existing.date === input.date
+    && existing.startTime === input.startTime
+    && existing.endTime === input.endTime;
+  let selectedSlot: CandidateSlot | undefined;
+  if (!sameSlot) {
+    const slots = await getAvailableSlots(db, input.sessionTypeId, bookingId);
+    selectedSlot = slots.find((slot) => slot.date === input.date
+      && slot.startTime === input.startTime
+      && slot.endTime === input.endTime);
+    if (!selectedSlot) throw new Error('SLOT_NOT_AVAILABLE');
+  }
+
+  if (existing.bundleParentId && existing.bundleSessionNumber === 1 && input.sessionTypeId !== 'bundle') {
+    const linkedSessions = await db.booking.count({
+      where: { bundleParentId: existing.bundleParentId, status: { not: 'cancelled' } },
+    });
+    if (linkedSessions > 1) {
+      throw new Error('This bundle already has later sessions and cannot be changed to another package.');
+    }
+  }
+
+  const settings = await getSettings(db);
+  const isWeekend = sameSlot ? existing.isWeekend : selectedSlot!.isWeekend;
+  const cleanedAddOns = Object.fromEntries(
+    Object.entries(input.addOns || {})
+      .filter(([id, qty]) => sessionType.addOns.includes(id) && Number.isFinite(qty) && qty > 0)
+      .map(([id, qty]) => [id, Math.floor(qty)]),
+  );
+
+  let subtotal: number;
+  let total: number;
+  let balanceDue: number;
+  let discountAmount = existing.discountAmount;
+  if (input.sessionTypeId === 'bundle' && existing.bundleSessionNumber && existing.bundleSessionNumber > 1) {
+    const baseBalance = BUNDLE_SESSION_BALANCES[existing.bundleSessionNumber - 1] || 0;
+    balanceDue = baseBalance + computeAddOnsTotal(cleanedAddOns) + (isWeekend ? settings.weekendSurcharge : 0);
+    subtotal = balanceDue;
+    total = balanceDue;
+    discountAmount = 0;
+  } else {
+    let discount: { code: string; amount: number } | null = null;
+    if (existing.discountCode) {
+      const savedDiscount = await db.discountCode.findUnique({ where: { code: existing.discountCode } });
+      discount = savedDiscount
+        ? { code: savedDiscount.code, amount: savedDiscount.amount }
+        : { code: existing.discountCode, amount: existing.discountAmount };
+    }
+    const pricing = computeBookingPricing({
+      sessionType,
+      addOns: cleanedAddOns,
+      isWeekend,
+      weekendSurchargeAmount: settings.weekendSurcharge,
+      depositAmount: existing.depositAmount,
+      discount,
+    });
+    subtotal = pricing.subtotal;
+    total = pricing.total;
+    balanceDue = pricing.balanceDue;
+    discountAmount = pricing.discountAmount;
+  }
+
+  const sessionNumber = input.sessionTypeId === 'bundle' ? (existing.bundleSessionNumber || 1) : null;
+  const sessionLabel = sessionNumber
+    ? `First Year Bundle — session ${sessionNumber} of 3`
+    : sessionType.name;
+  const previous = {
+    date: existing.date,
+    startTime: existing.startTime,
+    sessionTypeId: existing.sessionTypeId,
+    addOns: (existing.addOns || {}) as Record<string, number>,
+    address: existing.address,
+    notes: existing.notes,
+  };
+
+  const updated = await db.$transaction(async (tx: any) => {
+    if (!sameSlot) {
+      const now = new Date();
+      const clash = await tx.booking.findFirst({
+        where: {
+          id: { not: bookingId },
+          date: input.date,
+          startTime: { lt: input.endTime },
+          endTime: { gt: input.startTime },
+          status: { not: 'cancelled' },
+          OR: [{ status: { not: 'pending' } }, { holdExpiresAt: { gt: now } }],
+        },
+      });
+      if (clash) throw new Error('SLOT_NOT_AVAILABLE');
+    }
+
+    let bundleParentId = existing.bundleParentId;
+    if (input.sessionTypeId === 'bundle' && !bundleParentId) {
+      const bundle = await tx.bundle.create({
+        data: {
+          ref: refCode('MMYB'),
+          clientName: existing.clientName,
+          clientEmail: existing.clientEmail,
+          clientPhone: existing.clientPhone,
+          depositAmount: existing.depositAmount,
+          depositStatus: existing.depositStatus,
+        },
+      });
+      bundleParentId = bundle.id;
+    }
+
+    const booking = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        sessionTypeId: input.sessionTypeId,
+        sessionLabel,
+        location: sessionType.location,
+        date: input.date,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        isWeekend,
+        addOns: cleanedAddOns,
+        notes: input.notes?.trim() || '',
+        address: sessionType.location === 'home' ? input.address!.trim() : '',
+        subtotal,
+        total,
+        balanceDue,
+        discountAmount,
+        balanceStatus: balanceDue > 0 ? 'pending' : 'n/a',
+        bundleParentId: input.sessionTypeId === 'bundle' ? bundleParentId : null,
+        bundleSessionNumber: sessionNumber,
+        remindersSent: [],
+      },
+    });
+
+    if (existing.bundleParentId && input.sessionTypeId !== 'bundle') {
+      await tx.bundle.delete({ where: { id: existing.bundleParentId } });
+    }
+    return booking;
+  });
+
+  const changedFields: string[] = [];
+  if (previous.sessionTypeId !== updated.sessionTypeId) changedFields.push('package');
+  if (previous.date !== updated.date || previous.startTime !== updated.startTime) changedFields.push('date and time');
+  if (JSON.stringify(previous.addOns) !== JSON.stringify(cleanedAddOns)) changedFields.push('add-ons');
+  if (previous.address !== updated.address) changedFields.push('address');
+  if (previous.notes !== updated.notes) changedFields.push('notes');
+
+  const pair = bookingUpdatedNotification(
+    toNotifyBooking(updated),
+    { date: previous.date, startTime: previous.startTime },
+    changedFields,
+    settings.businessName,
+  );
+  const photographer = photographerContacts();
+  const calendarEvent = {
+    uid: updated.ref,
+    summary: `${updated.clientName} ${updated.sessionLabel} Mamamiyo Photography`,
+    description: `Your updated ${updated.sessionLabel} booking is confirmed.\n\nRef: ${updated.ref}\nBalance due after session: $${updated.balanceDue}`,
+    location: updated.location === 'home'
+      ? updated.address || 'Your home (address on file)'
+      : 'K-Lodge, 32 Lorong K Telok Kurau #01-01, Singapore 425641',
+    dateISO: updated.date,
+    startTime: updated.startTime,
+    endTime: updated.endTime,
+    organizerName: settings.businessName,
+    organizerEmail: process.env.RESEND_FROM_EMAIL || 'hello@mamamiyo-photography.com',
+  };
+  const { ADDONS } = await import('../constants');
+  const receipt: Receipt = {
+    sessionLabel: updated.sessionLabel,
+    date: updated.date,
+    startTime: updated.startTime,
+    location: updated.location,
+    address: updated.address,
+    isWeekend: updated.isWeekend,
+    weekendSurcharge: settings.weekendSurcharge,
+    addOns: Object.entries(cleanedAddOns).map(([id, qty]) => ({
+      name: ADDONS[id]?.name || id,
+      qty,
+      price: ADDONS[id]?.price || 0,
+    })),
+    discountCode: updated.discountCode,
+    discountAmount: updated.discountAmount,
+    total: updated.total,
+    depositAmount: updated.depositAmount,
+    balanceDue: updated.balanceDue,
+    isBundle: updated.sessionTypeId === 'bundle',
+    bundleSessionNumber: updated.bundleSessionNumber,
+  };
+
+  try {
+    await dispatchNotification(
+      pair, updated.clientEmail, updated.clientPhone, photographer.email, photographer.phone,
+      calendarEvent, receipt, undefined, (updated.referencePhotoUrls as string[]) || [],
+      { name: updated.clientName, email: updated.clientEmail, phone: updated.clientPhone, address: updated.address, notes: updated.notes },
+      { date: updated.date, clientName: updated.clientName, sessionLabel: updated.sessionLabel },
+    );
+  } catch (err) {
+    throw new Error(`Booking was updated, but the confirmation email failed: ${(err as Error).message}`);
+  }
+  return updated;
+}
+
 export async function markCompleted(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
   const due = currentBalanceDue({ balanceDue: booking.balanceDue, extraLineItems: booking.extraLineItems as { description: string; amount: number }[] });
@@ -401,6 +633,7 @@ export async function redeemBundleSessionAndNotify(
   referencePhotoUrls: string[] = [],
   notes: string = '',
   babyGender: string = '',
+  siblingJoining: string = '',
 ) {
   const settings = await getSettings(db);
   const bundle = await db.bundle.findUniqueOrThrow({ where: { id: bundleId } });
@@ -417,6 +650,7 @@ export async function redeemBundleSessionAndNotify(
 
   const combinedNotes = [
     babyGender ? `Baby gender: ${babyGender}` : '',
+    siblingJoining ? `Sibling joining: ${siblingJoining}` : '',
     notes,
   ].filter(Boolean).join('\n');
 

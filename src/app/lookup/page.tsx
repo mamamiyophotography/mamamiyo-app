@@ -139,6 +139,7 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
   const [selectedSlot, setSelectedSlot] = useState<CandidateSlot | null>(null);
   const [addOns, setAddOns] = useState<Record<string, number>>({});
   const [babyGender, setBabyGender] = useState('');
+  const [siblingJoining, setSiblingJoining] = useState('');
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<{ file: File; previewUrl: string }[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -162,6 +163,7 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
   async function confirmRedeem() {
     if (!selectedSlot) return;
     if (!babyGender) { setError('Please select baby\'s gender.'); return; }
+    if (!siblingJoining) { setError('Please tell us whether a sibling will be joining.'); return; }
     if (!photos.length) { setError('Please attach at least one reference photo.'); return; }
     setSubmitting(true);
     setError(null);
@@ -172,7 +174,7 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
       const res = await fetch(`/api/bundles/${bundle.id}/redeem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slot: selectedSlot, addOns, referencePhotoUrls, notes, babyGender }),
+        body: JSON.stringify({ slot: selectedSlot, addOns, referencePhotoUrls, notes, babyGender, siblingJoining }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Redemption failed'); return; }
@@ -251,6 +253,15 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
                       <button key={val} type="button" className={`chip ${babyGender === val ? 'selected' : ''}`} onClick={() => setBabyGender(val)}>{label}</button>
                     ))}
                   </div>
+                </div>
+                <div className="field">
+                  <label>Will a sibling be joining the photoshoot?</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                    {[['yes', 'Yes'], ['no', 'No']].map(([val, label]) => (
+                      <button key={val} type="button" className={`chip ${siblingJoining === val ? 'selected' : ''}`} onClick={() => setSiblingJoining(val)}>{label}</button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 6 }}>Sibling participation is free. The additional family / grandparents add-on is charged separately.</div>
                 </div>
                 <div className="field">
                   <label>Reference photos — required</label>

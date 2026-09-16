@@ -26,7 +26,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         style={{ maxWidth: 420, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>Booking Summary</div>
+        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Booking Summary</div>
         <div className="ticket-row"><span>Client</span><b>{booking.clientName}</b></div>
         <div className="ticket-row"><span>Session</span><b>{booking.sessionLabel}</b></div>
         <div className="ticket-row"><span>Date</span><b>{fmtDatePretty(booking.date)}</b></div>

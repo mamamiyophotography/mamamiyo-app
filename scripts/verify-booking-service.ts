@@ -20,6 +20,7 @@ import {
   redeemBundleSessionAndNotify,
   lookupByPhone,
   purgeExpiredHolds,
+  updateBookingAndNotify,
 } from '../src/lib/db/bookingService';
 
 let failures = 0;
@@ -60,6 +61,7 @@ async function run() {
     isWeekend: slot.isWeekend,
     addOns: {},
     notes: '',
+    siblingJoining: 'yes',
     referencePhotoUrls: ['https://example.com/photo1.jpg'],
     address: '',
     clientName: 'Jane Tan',
@@ -69,6 +71,18 @@ async function run() {
   });
   check('booking created with status pending', booking.status === 'pending');
   check('booking phone combined correctly', booking.clientPhone === '+65 91234567');
+  check('booking stores sibling attendance', booking.notes.includes('Sibling joining: yes'));
+
+  const maternityDb = createMockDb({ settings: {}, availability: [{ date: futureDateStr(13), startTime: '09:00', endTime: '12:00', location: 'studio' }] });
+  const maternitySlot = (await getAvailableSlots(maternityDb, 'maternity'))[0];
+  const maternityBooking = await createBooking(maternityDb, {
+    sessionTypeId: 'maternity', date: maternitySlot.date, startTime: maternitySlot.startTime,
+    endTime: maternitySlot.endTime, isWeekend: maternitySlot.isWeekend, addOns: {}, notes: '',
+    siblingJoining: 'no', referencePhotoUrls: ['https://example.com/maternity.jpg'], address: '',
+    clientName: 'Maternity Client', clientEmail: 'maternity@example.com', countryCode: '+65', phone: '90001111',
+  });
+  check('maternity booking does not require or store baby gender', !maternityBooking.notes.includes('Baby gender:'));
+  check('maternity booking still stores sibling attendance', maternityBooking.notes.includes('Sibling joining: no'));
 
   let clashRejected = false;
   try {
@@ -91,6 +105,45 @@ async function run() {
     clashRejected = (e as Error).message === 'SLOT_TAKEN';
   }
   check('a second booking for the exact same slot is rejected (race-condition guard)', clashRejected);
+
+  // ---- 2b. Admin can change package/date/add-ons and pricing follows ----
+  const editDate = futureDateStr(12);
+  const dbEdit = createMockDb({
+    settings: {},
+    availability: [
+      { date: futureDateStr(11), startTime: '09:00', endTime: '13:00', location: 'studio' },
+      { date: editDate, startTime: '09:00', endTime: '13:00', location: 'studio' },
+    ],
+  });
+  const editSlots = await getAvailableSlots(dbEdit, 'baby');
+  const originalEditSlot = editSlots.find((s) => s.date !== editDate)!;
+  const editable = await createBooking(dbEdit, {
+    sessionTypeId: 'baby', date: originalEditSlot.date, startTime: originalEditSlot.startTime,
+    endTime: originalEditSlot.endTime, isWeekend: originalEditSlot.isWeekend,
+    addOns: { headcount: 2 }, notes: 'Original note', referencePhotoUrls: ['https://example.com/edit.jpg'],
+    address: '', clientName: 'Edit Client', clientEmail: 'edit@example.com', countryCode: '+65', phone: '91112222',
+  });
+  await confirmDepositAndNotify(dbEdit, editable.id);
+  await dbEdit.booking.update({ where: { id: editable.id }, data: { remindersSent: ['3day'] } });
+  const newEditSlot = (await getAvailableSlots(dbEdit, 'maternity', editable.id)).find((s) => s.date === editDate)!;
+  const edited = await updateBookingAndNotify(dbEdit, editable.id, {
+    sessionTypeId: 'maternity', date: newEditSlot.date, startTime: newEditSlot.startTime,
+    endTime: newEditSlot.endTime, addOns: { headcount: 1 }, address: '', notes: 'Updated note',
+  });
+  check('admin edit changes the package', edited.sessionTypeId === 'maternity');
+  check('admin edit changes the session date', edited.date === editDate);
+  check('admin edit removes the extra headcount charge', edited.balanceDue === 318 + (newEditSlot.isWeekend ? 50 : 0));
+  check('admin edit resets reminder history for the new schedule', edited.remindersSent.length === 0);
+  const changedToBundle = await updateBookingAndNotify(dbEdit, editable.id, {
+    sessionTypeId: 'bundle', date: newEditSlot.date, startTime: newEditSlot.startTime,
+    endTime: newEditSlot.endTime, addOns: {}, address: '', notes: 'Bundle note',
+  });
+  check('changing a standalone booking to a bundle creates the bundle link', !!changedToBundle.bundleParentId && changedToBundle.bundleSessionNumber === 1);
+  const changedBack = await updateBookingAndNotify(dbEdit, editable.id, {
+    sessionTypeId: 'maternity', date: newEditSlot.date, startTime: newEditSlot.startTime,
+    endTime: newEditSlot.endTime, addOns: {}, address: '', notes: 'Changed back',
+  });
+  check('changing bundle session 1 back to standalone removes the bundle link', !changedBack.bundleParentId && !changedBack.bundleSessionNumber);
 
   let missingPhotoRejected = false;
   try {

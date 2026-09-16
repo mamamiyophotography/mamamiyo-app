@@ -41,6 +41,7 @@ export function createMockDb(seed: {
   const bundles: Bundle[] = [];
 
   function matchOverlap(where: any, b: Booking): boolean {
+    if (where?.id?.not !== undefined && b.id === where.id.not) return false;
     if (where?.date !== undefined && b.date !== where.date) return false;
     if (where?.startTime?.lt !== undefined && !(b.startTime < where.startTime.lt)) return false;
     if (where?.endTime?.gt !== undefined && !(b.endTime > where.endTime.gt)) return false;
@@ -177,6 +178,11 @@ export function createMockDb(seed: {
         const bd = bundles.find((x) => x.id === args.where.id);
         if (!bd) throw new Error('Bundle not found');
         return bd;
+      },
+      async delete(args) {
+        const idx = bundles.findIndex((x) => x.id === args.where.id);
+        if (idx < 0) throw new Error('Bundle not found');
+        bundles.splice(idx, 1);
       },
       async findMany(args) {
         const where = args?.where as any;

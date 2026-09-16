@@ -4,16 +4,17 @@ import { useEffect, useState, useCallback } from 'react';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { ADDONS, STATUS_LABELS } from '@/lib/constants';
 import BookingSummaryModal from '@/components/BookingSummaryModal';
+import EditBookingModal from '@/components/EditBookingModal';
 
 type Booking = {
   id: string; ref: string; sessionTypeId: string; sessionLabel: string; location: string;
-  date: string; startTime: string; isWeekend: boolean; addOns: Record<string, number>;
+  date: string; startTime: string; endTime: string; isWeekend: boolean; addOns: Record<string, number>;
   notes: string; address: string; discountCode: string | null; discountAmount: number;
   clientName: string; clientEmail: string; clientPhone: string;
   subtotal: number; total: number; depositAmount: number; balanceDue: number;
   extraLineItems: { description: string; amount: number }[]; invoiceRef: string | null;
   status: string; depositStatus: string; balanceStatus: string;
-  referencePhotoUrls: string[]; remindersSent: string[];
+  referencePhotoUrls: string[]; remindersSent: string[]; bundleSessionNumber: number | null;
 };
 
 const STATUS_TABS = [
@@ -41,6 +42,7 @@ export default function AdminBookingsPage() {
   const [invoiceQr, setInvoiceQr] = useState<{ bookingId: string; dataUrl: string; due: number } | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
   const [summaryBooking, setSummaryBooking] = useState<Booking | null>(null);
+  const [editBooking, setEditBooking] = useState<Booking | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -289,6 +291,9 @@ export default function AdminBookingsPage() {
 
                 {/* Action buttons */}
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+                  {(b.status === 'pending' || b.status === 'confirmed') && (
+                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => setEditBooking(b)}>Edit booking</button>
+                  )}
                   {b.status === 'pending' && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-deposit')}>Confirm deposit received</button>
                   )}
@@ -317,6 +322,16 @@ export default function AdminBookingsPage() {
 
       {summaryBooking && (
         <BookingSummaryModal booking={summaryBooking} onClose={() => setSummaryBooking(null)} />
+      )}
+      {editBooking && (
+        <EditBookingModal
+          booking={editBooking}
+          onClose={() => setEditBooking(null)}
+          onSaved={async () => {
+            setEditBooking(null);
+            await load();
+          }}
+        />
       )}
     </div>
   );

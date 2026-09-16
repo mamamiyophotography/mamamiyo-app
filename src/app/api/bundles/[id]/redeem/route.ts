@@ -10,6 +10,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     referencePhotoUrls?: string[];
     notes?: string;
     babyGender?: string;
+    siblingJoining?: string;
   };
   try {
     body = await req.json();
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const booking = await redeemBundleSessionAndNotify(
       db, id, body.slot, body.addOns || {},
-      body.referencePhotoUrls || [], body.notes || '', body.babyGender || ''
+      body.referencePhotoUrls || [], body.notes || '', body.babyGender || '', body.siblingJoining || ''
     );
     return NextResponse.json({ booking }, { status: 201 });
   } catch (err) {

@@ -72,6 +72,45 @@ export function bookingConfirmedNotification(b: NotifyBooking, businessName: str
   };
 }
 
+/** Sent after an administrator moves an existing booking to a new slot. */
+export function bookingUpdatedNotification(
+  b: NotifyBooking,
+  previous: { date: string; startTime: string },
+  changedFields: string[],
+  businessName: string,
+): NotificationPair {
+  const firstName = firstNameOf(b.clientName);
+  const previousWhen = `${fmtDatePretty(previous.date)} at ${fmtTime12(previous.startTime)}`;
+  const newWhen = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
+  const studioLine = b.location === 'studio' ? `📍 Studio: ${studioAddressText()}` : '';
+
+  const scheduleChanged = previous.date !== b.date || previous.startTime !== b.startTime;
+  const clientParts = [
+    `Hi ${firstName}!`,
+    `Your booking has been updated successfully.`,
+    scheduleChanged ? `Previous date and time: ${previousWhen}\nNew date and time: ${newWhen}` : `Session: ${b.sessionLabel}\nDate and time: ${newWhen}`,
+    changedFields.length ? `Updated: ${changedFields.join(', ')}.` : '',
+    studioLine,
+    `Your updated booking details and calendar invitation are included below.`,
+    closingLineFor(b),
+  ].filter(Boolean);
+
+  return {
+    client: {
+      emailSubject: `Booking Updated\n${b.sessionLabel} — ${fmtDatePretty(b.date)}, ${fmtTime12(b.startTime)}`,
+      emailBody: clientParts.join('\n\n'),
+      whatsappBody: scheduleChanged
+        ? `Hi ${firstName}! Your booking has been updated from ${previousWhen} to ${newWhen}. An updated confirmation has been emailed to you. — ${businessName}`
+        : `Hi ${firstName}! Your ${b.sessionLabel} booking details have been updated. The new confirmation has been emailed to you. — ${businessName}`,
+    },
+    photographer: {
+      emailSubject: `Booking updated — ${b.clientName}`,
+      emailBody: `Booking updated successfully.\n\nClient: ${b.clientName}\nSession: ${b.sessionLabel}\nPrevious date/time: ${previousWhen}\nNew date/time: ${newWhen}\nUpdated fields: ${changedFields.join(', ') || 'booking details'}\nRef: ${b.ref}`,
+      whatsappBody: `Updated booking: ${b.clientName}, ${b.sessionLabel}, ${newWhen}. Ref ${b.ref}.`,
+    },
+  };
+}
+
 /** Bundle session 2 or 3 being redeemed (sessionIndex is 0-based: 0 = session 2). */
 export function bundleSessionConfirmedNotification(
   b: NotifyBooking,

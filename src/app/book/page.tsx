@@ -27,6 +27,7 @@ export default function BookPage() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [babyGender, setBabyGender] = useState('');
+  const [siblingJoining, setSiblingJoining] = useState('');
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<{ file: File; previewUrl: string }[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -103,6 +104,7 @@ export default function BookPage() {
   if (!email.trim()) missingFields.push('Email');
   if (!phone.trim()) missingFields.push('WhatsApp number');
   if (sessionType?.id !== 'maternity' && !babyGender.trim()) missingFields.push("Baby's gender");
+  if (!siblingJoining) missingFields.push('Sibling attendance');
   if (sessionType?.location === 'home' && !address.trim()) missingFields.push('Home address');
   if (photos.length === 0) missingFields.push('Reference photos');
   const readyForReview = !!selectedSlot && missingFields.length === 0;
@@ -144,6 +146,7 @@ export default function BookPage() {
           addOns,
           notes,
           babyGender,
+          siblingJoining,
           referencePhotoUrls: referencePhotoUrls,
           address,
           discountCode: appliedDiscount?.code || null,
@@ -414,6 +417,15 @@ export default function BookPage() {
               </div>
             </div>
           )}
+          <div className="field">
+            <label>Will a sibling be joining the photoshoot?<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+              {[['yes', 'Yes'], ['no', 'No']].map(([val, label]) => (
+                <button key={val} type="button" className={`chip ${siblingJoining === val ? 'selected' : ''}`} onClick={() => setSiblingJoining(val)}>{label}</button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 6 }}>Sibling participation is free. The additional family / grandparents add-on is charged separately.</div>
+          </div>
           <div className="field"><label>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything we should know?" /></div>
         </div>
       )}
@@ -440,6 +452,7 @@ export default function BookPage() {
             {/* Session details */}
             <div className="ticket-row"><span>Date</span><b>{fmtDatePretty(selectedSlot.date)}, {fmtTime12(selectedSlot.startTime)}</b></div>
             <div className="ticket-row"><span>Session</span><b>{sessionType.name}</b></div>
+            <div className="ticket-row"><span>Sibling joining</span><b>{siblingJoining === 'yes' ? 'Yes' : 'No'}</b></div>
 
             {sessionType.isBundle ? (<>
               {/* Bundle: deposit due now — surcharge on session balance, shown in schedule */}
