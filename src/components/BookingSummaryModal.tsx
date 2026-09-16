@@ -35,7 +35,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         <div className="ticket-row"><span>Email</span><b>{booking.clientEmail}</b></div>
         <div className="ticket-row"><span>Phone</span><b>{booking.clientPhone}</b></div>
         {booking.address && <div className="ticket-row"><span>Address</span><b>{booking.address}</b></div>}
-        <div className="ticket-row"><span>Notes</span><b>{booking.notes || '—'}</b></div>
+        <div className="ticket-row"><span>Notes</span><b style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>{booking.notes || '—'}</b></div>
 
         {booking.referencePhotoUrls.length > 0 && (
           <div style={{ marginTop: 10 }}>

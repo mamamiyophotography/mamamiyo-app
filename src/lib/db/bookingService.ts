@@ -172,8 +172,8 @@ export async function createBooking(db: any, input: CreateBookingInput) {
         isWeekend: input.isWeekend,
         addOns: input.addOns,
         notes: [
-          input.babyGender ? `Baby gender: ${input.babyGender}` : '',
           input.siblingJoining ? `Sibling joining: ${input.siblingJoining}` : '',
+          input.babyGender ? `Baby gender: ${input.babyGender}` : '',
           input.notes,
         ].filter(Boolean).join('\n'),
         referencePhotoUrls: input.referencePhotoUrls,
@@ -649,8 +649,8 @@ export async function redeemBundleSessionAndNotify(
   const balanceDue = baseBalance + addOnsTotal + weekendFee;
 
   const combinedNotes = [
-    babyGender ? `Baby gender: ${babyGender}` : '',
     siblingJoining ? `Sibling joining: ${siblingJoining}` : '',
+    babyGender ? `Baby gender: ${babyGender}` : '',
     notes,
   ].filter(Boolean).join('\n');
 

@@ -168,7 +168,7 @@ export default function AdminBookingsPage() {
                 <div className="ticket-row"><span>Add-ons</span><b>{Object.entries(b.addOns).filter(([, q]) => q > 0).map(([id, q]) => `${ADDONS[id]?.name} ×${q}`).join(', ') || '—'}</b></div>
                 {b.isWeekend && <div className="ticket-row"><span>Weekend surcharge</span><b>+$50</b></div>}
                 {b.discountCode && <div className="ticket-row"><span>Discount</span><b>−${b.discountAmount} ({b.discountCode})</b></div>}
-                <div className="ticket-row"><span>Notes</span><b>{b.notes || '—'}</b></div>
+                <div className="ticket-row"><span>Notes</span><b style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>{b.notes || '—'}</b></div>
 
                 {expandedPhotos.length > 0 && (
                   <div style={{ marginTop: 10 }}>
