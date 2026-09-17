@@ -188,9 +188,9 @@ export const STATUS_ORDER = [
   'pending',
   'confirmed',
   'pending_balance',
-  'completed',
   'basic_retouch',
   'further_retouch',
+  'completed',
 ] as const;
 
 export type BookingStatusValue = typeof STATUS_ORDER[number] | 'cancelled';
@@ -199,9 +199,9 @@ export const STATUS_LABELS: Record<string, { label: string; color: string; bg: s
   pending:         { label: '1. Pending deposit',     color: '#8A7F2F', bg: '#F4E4C1' },
   confirmed:       { label: '2. Booking confirmed',   color: '#FFFFFF', bg: '#7A9D8F' },
   pending_balance: { label: '3. Pending balance',     color: '#7A4D45', bg: '#E8A89D' },
-  completed:       { label: '4. Photoshoot complete', color: '#5A4B7A', bg: '#D0C4DD' },
-  basic_retouch:   { label: '5. Basic retouch',       color: '#FFFFFF', bg: '#8FB4D4' },
-  further_retouch: { label: '6. Further retouch',     color: '#FFFFFF', bg: '#5FA89A' },
+  basic_retouch:   { label: '4. Basic retouch',       color: '#FFFFFF', bg: '#8FB4D4' },
+  further_retouch: { label: '5. Further retouch',     color: '#FFFFFF', bg: '#5FA89A' },
+  completed:       { label: '6. Photoshoot complete', color: '#5A4B7A', bg: '#D0C4DD' },
   cancelled:       { label: 'Cancelled',              color: '#7A6F62', bg: '#E4DED6' },
 };
 

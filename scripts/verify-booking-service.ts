@@ -168,10 +168,16 @@ async function run() {
   const invoiced = await generateInvoiceAndNotify(db, booking.id);
   check('invoice ref generated', !!invoiced.invoiceRef);
 
-  // ---- 6. Confirm balance -> completed ----
+  // ---- 6. Confirm balance -> basic retouch ----
   const settled = await confirmBalanceAndNotify(db, booking.id);
-  check('balance confirmation moves status to completed', settled.status === 'completed');
+  check('balance confirmation starts basic retouch', settled.status === 'basic_retouch');
   check('balance status is paid', settled.balanceStatus === 'paid');
+
+  const { advanceStage } = await import('../src/lib/db/bookingService');
+  const furtherRetouch = await advanceStage(db, booking.id);
+  check('basic retouch advances to further retouch', furtherRetouch.status === 'further_retouch');
+  const fullyCompleted = await advanceStage(db, booking.id);
+  check('further retouch advances to photoshoot complete', fullyCompleted.status === 'completed');
 
   // ---- 7. Phone lookup finds the booking ----
   const found = await lookupByPhone(db, '91234567');
@@ -213,7 +219,8 @@ async function run() {
 
   await markCompleted(db2, session1.id);
   const s1BalanceResult = await confirmBalanceAndNotify(db2, session1.id);
-  check('session 1 completed after balance confirmed', s1BalanceResult.status === 'completed');
+  check('balance can be confirmed without first generating an invoice', !s1BalanceResult.invoiceRef);
+  check('session 1 starts basic retouch after balance confirmed', s1BalanceResult.status === 'basic_retouch');
   const bundleAfterS1Balance = await db2.bundle.findUnique({ where: { id: session1.bundleParentId! } });
   check('bundle auto-activates once session 1 balance is confirmed', bundleAfterS1Balance?.activated === true);
 

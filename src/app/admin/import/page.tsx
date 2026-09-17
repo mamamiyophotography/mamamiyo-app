@@ -9,7 +9,7 @@ const STATUSES: { key: Status; label: string }[] = [
   { key: 'pending', label: '1. Pending deposit' },
   { key: 'confirmed', label: '2. Booking confirmed' },
   { key: 'pending_balance', label: '3. Pending balance' },
-  { key: 'completed', label: '4. Photoshoot complete' },
+  { key: 'completed', label: '6. Photoshoot complete' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
 

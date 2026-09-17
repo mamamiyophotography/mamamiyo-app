@@ -22,9 +22,9 @@ const STATUS_TABS = [
   { key: 'pending', label: '1. Pending deposit' },
   { key: 'confirmed', label: '2. Booking confirmed' },
   { key: 'pending_balance', label: '3. Pending balance' },
-  { key: 'completed', label: '4. Photoshoot complete' },
-  { key: 'basic_retouch', label: '5. Basic retouch' },
-  { key: 'further_retouch', label: '6. Further retouch' },
+  { key: 'basic_retouch', label: '4. Basic retouch' },
+  { key: 'further_retouch', label: '5. Further retouch' },
+  { key: 'completed', label: '6. Photoshoot complete' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
@@ -278,8 +278,12 @@ export default function AdminBookingsPage() {
                       <button className="btn btn-primary" disabled={isBusy} onClick={() => generateInvoice(b.id)}>
                         Generate &amp; send invoice to client
                       </button>
-                      <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-balance')}>
-                        Confirm balance received
+                      <button className="btn btn-ghost" disabled={isBusy} onClick={() => {
+                        if (confirm('Confirm that the balance has already been received? This will skip sending an invoice.')) {
+                          runAction(b.id, 'confirm-balance');
+                        }
+                      }}>
+                        Payment received — skip invoice
                       </button>
                     </div>
                     {invoiceQr?.bookingId === b.id && (
@@ -303,9 +307,9 @@ export default function AdminBookingsPage() {
                   {b.status === 'confirmed' && (
                     <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>
                   )}
-                  {(b.status === 'completed' || b.status === 'basic_retouch') && (
+                  {(b.status === 'basic_retouch' || b.status === 'further_retouch') && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
-                      {b.status === 'completed' ? 'Start basic retouch' : 'Move to further retouch'}
+                      {b.status === 'basic_retouch' ? 'Move to further retouch' : 'Mark photoshoot complete'}
                     </button>
                   )}
                   {b.status !== 'cancelled' && (

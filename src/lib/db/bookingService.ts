@@ -522,7 +522,7 @@ export async function markCompleted(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
   const due = currentBalanceDue({ balanceDue: booking.balanceDue, extraLineItems: booking.extraLineItems as { description: string; amount: number }[] });
   if (due <= 0) {
-    return db.booking.update({ where: { id: bookingId }, data: { status: 'completed', balanceStatus: 'n/a' } });
+    return db.booking.update({ where: { id: bookingId }, data: { status: 'basic_retouch', balanceStatus: 'n/a' } });
   }
   return db.booking.update({ where: { id: bookingId }, data: { status: 'pending_balance' } });
 }
@@ -576,7 +576,7 @@ export async function confirmBalanceAndNotify(db: any, bookingId: string) {
   const settings = await getSettings(db);
   const booking = await db.booking.update({
     where: { id: bookingId },
-    data: { balanceStatus: 'paid', status: 'completed' },
+    data: { balanceStatus: 'paid', status: 'basic_retouch' },
   });
 
   const bundleContext = bundleContextAfterBalance(booking.bundleSessionNumber);
@@ -748,11 +748,11 @@ export async function purgeExpiredHolds(db: any) {
   return count;
 }
 
-/** Post-completion editing pipeline only — moving a booking from
- *  'completed' to 'basic_retouch' to 'further_retouch'. Earlier stages have
+/** Editing pipeline only — moving a booking from 'basic_retouch' to
+ *  'further_retouch' to final 'completed'. Earlier stages have
  *  their own dedicated transitions (confirmDepositAndNotify, markCompleted,
  *  confirmBalanceAndNotify) and are intentionally not reachable here. */
-const ADVANCEABLE_STATUSES = ['completed', 'basic_retouch'];
+const ADVANCEABLE_STATUSES = ['basic_retouch', 'further_retouch'];
 
 export async function advanceStage(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
