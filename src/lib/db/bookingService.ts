@@ -780,6 +780,16 @@ export async function revertStage(db: any, bookingId: string) {
   return db.booking.update({ where: { id: bookingId }, data: { status: previousStatus } });
 }
 
+/** Completes post-processing directly from basic retouch when the client does
+ * not require a further-retouch round. */
+export async function skipFurtherRetouch(db: any, bookingId: string) {
+  const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+  if (booking.status !== 'basic_retouch') {
+    throw new Error(`Cannot skip further retouch from status "${booking.status}".`);
+  }
+  return db.booking.update({ where: { id: bookingId }, data: { status: 'completed' } });
+}
+
 export async function checkAndSendReminders(db: any) {
   const settings = await getSettings(db);
   const now = new Date();

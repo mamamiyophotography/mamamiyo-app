@@ -143,7 +143,7 @@ export default function AdminBookingsPage() {
           </div>
         </>
       )}
-      {bookings.map((b) => {
+      {[...bookings].sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`)).map((b) => {
         const isOpen = expandedId === b.id;
         const isBusy = busyId === b.id;
         const statusStyle = STATUS_LABEL[b.status] || { label: b.status, color: '#3A2E28', bg: '#EDE6DC' };
@@ -322,6 +322,15 @@ export default function AdminBookingsPage() {
                   {(b.status === 'basic_retouch' || b.status === 'further_retouch') && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
                       {b.status === 'basic_retouch' ? 'Move to further retouch' : 'Mark photoshoot complete'}
+                    </button>
+                  )}
+                  {b.status === 'basic_retouch' && (
+                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => {
+                      if (confirm('Skip further retouch and mark this photoshoot complete?')) {
+                        runAction(b.id, 'skip-further-retouch');
+                      }
+                    }}>
+                      Skip further retouch &amp; complete
                     </button>
                   )}
                   {(b.status === 'further_retouch' || b.status === 'completed') && (
