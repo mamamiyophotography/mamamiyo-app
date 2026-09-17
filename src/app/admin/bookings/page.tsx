@@ -101,49 +101,7 @@ export default function AdminBookingsPage() {
     }
   }
 
-  return (
-    <div className="bookings-view">
-      <div className="bookings-heading">
-        <div>
-          <div className="bookings-kicker">Booking management</div>
-          <h2>Sessions</h2>
-        </div>
-        <div className="bookings-count">{loading ? '—' : bookings.length}</div>
-      </div>
-      {/* Status filter chips — single scrollable row, equal height, no wrap */}
-      <div className="status-filter" aria-label="Filter bookings by status">
-        {STATUS_TABS.map((t) => (
-          <button key={t.key} onClick={() => setFilter(t.key)} className={`status-filter-button${filter === t.key ? ' active' : ''}`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {loading && <div style={{ color: 'var(--ink-faint)', fontSize: 13 }}>Loading…</div>}
-      {!loading && bookings.length === 0 && <div className="notice">No bookings in this category.</div>}
-
-      {/* Column header */}
-      {!loading && bookings.length > 0 && filter !== 'active' && (
-        <div className="booking-column-head">
-          <div style={{ flex: '0 0 68%' }}>Session</div>
-          <div style={{ flex: 1, textAlign: 'right' }}>Status</div>
-        </div>
-      )}
-
-      <div className={`booking-list${filter === 'active' ? ' active-columns' : ''}`}>
-      {filter === 'active' && (
-        <>
-          <div className="booking-group-heading pre-shoot-heading">
-            <span>Before photoshoot</span>
-            <b>{bookings.filter((booking) => booking.status === 'pending' || booking.status === 'confirmed').length}</b>
-          </div>
-          <div className="booking-group-heading post-shoot-heading">
-            <span>Photoshoot done · Post-processing</span>
-            <b>{bookings.filter((booking) => ['pending_balance', 'basic_retouch', 'further_retouch'].includes(booking.status)).length}</b>
-          </div>
-        </>
-      )}
-      {[...bookings].sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`)).map((b) => {
+  function renderBookingCard(b: Booking) {
         const isOpen = expandedId === b.id;
         const isBusy = busyId === b.id;
         const statusStyle = STATUS_LABEL[b.status] || { label: b.status, color: '#3A2E28', bg: '#EDE6DC' };
@@ -347,8 +305,71 @@ export default function AdminBookingsPage() {
             )}
           </div>
         );
-      })}
+  }
+
+  return (
+    <div className="bookings-view">
+      <div className="bookings-heading">
+        <div>
+          <div className="bookings-kicker">Booking management</div>
+          <h2>Sessions</h2>
+        </div>
+        <div className="bookings-count">{loading ? '—' : bookings.length}</div>
       </div>
+      {/* Status filter chips — single scrollable row, equal height, no wrap */}
+      <div className="status-filter" aria-label="Filter bookings by status">
+        {STATUS_TABS.map((t) => (
+          <button key={t.key} onClick={() => setFilter(t.key)} className={`status-filter-button${filter === t.key ? ' active' : ''}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div style={{ color: 'var(--ink-faint)', fontSize: 13 }}>Loading…</div>}
+      {!loading && bookings.length === 0 && <div className="notice">No bookings in this category.</div>}
+
+      {/* Column header */}
+      {!loading && bookings.length > 0 && filter !== 'active' && (
+        <div className="booking-column-head">
+          <div style={{ flex: '0 0 68%' }}>Session</div>
+          <div style={{ flex: 1, textAlign: 'right' }}>Status</div>
+        </div>
+      )}
+
+      {filter === 'active' ? (
+        <div className="booking-active-groups">
+          <section className="booking-group">
+            <div className="booking-group-heading pre-shoot-heading">
+              <span>Before photoshoot</span>
+              <b>{bookings.filter((booking) => booking.status === 'pending' || booking.status === 'confirmed').length}</b>
+            </div>
+            <div className="booking-list">
+              {[...bookings]
+                .filter((booking) => booking.status === 'pending' || booking.status === 'confirmed')
+                .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`))
+                .map(renderBookingCard)}
+            </div>
+          </section>
+          <section className="booking-group">
+            <div className="booking-group-heading post-shoot-heading">
+              <span>Photoshoot done · Post-processing</span>
+              <b>{bookings.filter((booking) => ['pending_balance', 'basic_retouch', 'further_retouch'].includes(booking.status)).length}</b>
+            </div>
+            <div className="booking-list">
+              {[...bookings]
+                .filter((booking) => ['pending_balance', 'basic_retouch', 'further_retouch'].includes(booking.status))
+                .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`))
+                .map(renderBookingCard)}
+            </div>
+          </section>
+        </div>
+      ) : (
+        <div className="booking-list">
+          {[...bookings]
+            .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`))
+            .map(renderBookingCard)}
+        </div>
+      )}
 
       {summaryBooking && (
         <BookingSummaryModal booking={summaryBooking} onClose={() => setSummaryBooking(null)} />

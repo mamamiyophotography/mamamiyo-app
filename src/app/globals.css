@@ -136,7 +136,9 @@ a { color: inherit; }
 .status-filter-button.active { border-color: #e8a996; background: #efb8a8; color: #684941; box-shadow: 0 6px 14px rgba(205,132,112,.17); }
 .booking-column-head { display: flex; padding: 6px 14px 10px; color: #989097; font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .booking-list { display: flex; flex-direction: column; gap: 11px; }
-.booking-list.active-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row dense; gap: 11px 16px; align-items: start; }
+.booking-active-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.booking-group { min-width: 0; }
+.booking-group .booking-list { margin-top: 11px; }
 .booking-group-heading { display: flex; align-items: center; justify-content: space-between; min-width: 0; padding: 9px 13px; border-radius: 14px; color: #5f5960; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .booking-group-heading b { display: grid; min-width: 25px; height: 25px; padding: 0 7px; place-items: center; border-radius: 999px; background: rgba(255,255,255,.72); font-size: 12px; }
 .pre-shoot-heading { grid-column: 1; background: #f5dfd7; }
@@ -177,12 +179,8 @@ a { color: inherit; }
   .bookings-heading h2 { font-size: 28px; }
   .bookings-count { width: 44px; height: 44px; border-radius: 15px; }
   .booking-column-head { display: none; }
-  .booking-list.active-columns { grid-template-columns: 1fr; gap: 11px; }
-  .pre-shoot-heading, .post-shoot-heading, .pre-shoot-card, .post-shoot-card { grid-column: 1; }
-  .pre-shoot-heading { order: 1; }
-  .pre-shoot-card { order: 2; }
-  .post-shoot-heading { order: 3; margin-top: 8px; }
-  .post-shoot-card { order: 4; }
+  .booking-active-groups { grid-template-columns: 1fr; gap: 19px; }
+  .pre-shoot-heading, .post-shoot-heading { grid-column: auto; }
   .booking-card { padding: 14px; border-radius: 18px; }
   .ticket-row { grid-template-columns: 88px minmax(0, 1fr); gap: 5px 10px; }
   .admin-form-pair { grid-template-columns: 1fr; gap: 0; }
