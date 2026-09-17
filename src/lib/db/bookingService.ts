@@ -753,6 +753,10 @@ export async function purgeExpiredHolds(db: any) {
  *  their own dedicated transitions (confirmDepositAndNotify, markCompleted,
  *  confirmBalanceAndNotify) and are intentionally not reachable here. */
 const ADVANCEABLE_STATUSES = ['basic_retouch', 'further_retouch'];
+const REVERSIBLE_POST_PROCESSING_STATUSES: Record<string, string> = {
+  further_retouch: 'basic_retouch',
+  completed: 'further_retouch',
+};
 
 export async function advanceStage(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
@@ -762,6 +766,18 @@ export async function advanceStage(db: any, bookingId: string) {
   const idx = STATUS_ORDER.indexOf(booking.status as (typeof STATUS_ORDER)[number]);
   const nextStatus = STATUS_ORDER[idx + 1];
   return db.booking.update({ where: { id: bookingId }, data: { status: nextStatus } });
+}
+
+/** Rolls back only the manual post-processing buttons. Payment and deposit
+ * transitions are excluded because reversing them would also require undoing
+ * financial records and customer notifications. */
+export async function revertStage(db: any, bookingId: string) {
+  const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+  const previousStatus = REVERSIBLE_POST_PROCESSING_STATUSES[booking.status];
+  if (!previousStatus) {
+    throw new Error(`Cannot go back from status "${booking.status}".`);
+  }
+  return db.booking.update({ where: { id: bookingId }, data: { status: previousStatus } });
 }
 
 export async function checkAndSendReminders(db: any) {

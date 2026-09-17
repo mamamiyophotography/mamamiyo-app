@@ -123,21 +123,33 @@ export default function AdminBookingsPage() {
       {!loading && bookings.length === 0 && <div className="notice">No bookings in this category.</div>}
 
       {/* Column header */}
-      {!loading && bookings.length > 0 && (
+      {!loading && bookings.length > 0 && filter !== 'active' && (
         <div className="booking-column-head">
           <div style={{ flex: '0 0 68%' }}>Session</div>
           <div style={{ flex: 1, textAlign: 'right' }}>Status</div>
         </div>
       )}
 
-      <div className="booking-list">
+      <div className={`booking-list${filter === 'active' ? ' active-columns' : ''}`}>
+      {filter === 'active' && (
+        <>
+          <div className="booking-group-heading pre-shoot-heading">
+            <span>Before photoshoot</span>
+            <b>{bookings.filter((booking) => booking.status === 'pending' || booking.status === 'confirmed').length}</b>
+          </div>
+          <div className="booking-group-heading post-shoot-heading">
+            <span>Photoshoot done · Post-processing</span>
+            <b>{bookings.filter((booking) => ['pending_balance', 'basic_retouch', 'further_retouch'].includes(booking.status)).length}</b>
+          </div>
+        </>
+      )}
       {bookings.map((b) => {
         const isOpen = expandedId === b.id;
         const isBusy = busyId === b.id;
         const statusStyle = STATUS_LABEL[b.status] || { label: b.status, color: '#3A2E28', bg: '#EDE6DC' };
 
         return (
-          <div key={b.id} className={`booking-card${isOpen ? ' open' : ''}`}>
+          <div key={b.id} className={`booking-card${isOpen ? ' open' : ''}${filter === 'active' ? ((b.status === 'pending' || b.status === 'confirmed') ? ' pre-shoot-card' : ' post-shoot-card') : ''}`}>
             {/* Row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: '0 0 68%', minWidth: 0 }}>
@@ -310,6 +322,11 @@ export default function AdminBookingsPage() {
                   {(b.status === 'basic_retouch' || b.status === 'further_retouch') && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
                       {b.status === 'basic_retouch' ? 'Move to further retouch' : 'Mark photoshoot complete'}
+                    </button>
+                  )}
+                  {(b.status === 'further_retouch' || b.status === 'completed') && (
+                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'revert-stage')}>
+                      {b.status === 'completed' ? 'Go back to further retouch' : 'Go back to basic retouch'}
                     </button>
                   )}
                   {b.status !== 'cancelled' && (

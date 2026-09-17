@@ -173,11 +173,15 @@ async function run() {
   check('balance confirmation starts basic retouch', settled.status === 'basic_retouch');
   check('balance status is paid', settled.balanceStatus === 'paid');
 
-  const { advanceStage } = await import('../src/lib/db/bookingService');
+  const { advanceStage, revertStage } = await import('../src/lib/db/bookingService');
   const furtherRetouch = await advanceStage(db, booking.id);
   check('basic retouch advances to further retouch', furtherRetouch.status === 'further_retouch');
   const fullyCompleted = await advanceStage(db, booking.id);
   check('further retouch advances to photoshoot complete', fullyCompleted.status === 'completed');
+  const reopenedRetouch = await revertStage(db, booking.id);
+  check('photoshoot complete can go back to further retouch', reopenedRetouch.status === 'further_retouch');
+  const backToBasic = await revertStage(db, booking.id);
+  check('further retouch can go back to basic retouch', backToBasic.status === 'basic_retouch');
 
   // ---- 7. Phone lookup finds the booking ----
   const found = await lookupByPhone(db, '91234567');
