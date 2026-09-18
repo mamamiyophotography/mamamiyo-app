@@ -21,10 +21,9 @@ const STATUS_TABS = [
   { key: 'active', label: 'Active' },
   { key: 'pending', label: '1. Pending deposit' },
   { key: 'confirmed', label: '2. Booking confirmed' },
-  { key: 'pending_balance', label: '3. Pending balance' },
-  { key: 'basic_retouch', label: '4. Basic retouch' },
-  { key: 'further_retouch', label: '5. Further retouch' },
-  { key: 'completed', label: '6. Photoshoot complete' },
+  { key: 'basic_retouch', label: '3. Basic retouch' },
+  { key: 'further_retouch', label: '4. Further retouch' },
+  { key: 'completed', label: '5. Photoshoot complete' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
@@ -46,10 +45,8 @@ export default function AdminBookingsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    // 'active' = pending + confirmed + pending_balance + basic_retouch + further_retouch
-    // — editing work in progress still counts as active.
     const url = filter === 'active'
-      ? `/api/admin/bookings?statuses=pending,confirmed,pending_balance,basic_retouch,further_retouch`
+      ? `/api/admin/bookings?active=1`
       : `/api/admin/bookings?status=${filter}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -105,6 +102,7 @@ export default function AdminBookingsPage() {
         const isOpen = expandedId === b.id;
         const isBusy = busyId === b.id;
         const statusStyle = STATUS_LABEL[b.status] || { label: b.status, color: '#3A2E28', bg: '#EDE6DC' };
+        const isPostProcessing = ['pending_balance', 'basic_retouch', 'further_retouch', 'completed'].includes(b.status);
 
         return (
           <div key={b.id} className={`booking-card${isOpen ? ' open' : ''}${filter === 'active' ? ((b.status === 'pending' || b.status === 'confirmed') ? ' pre-shoot-card' : ' post-shoot-card') : ''}`}>
@@ -119,6 +117,11 @@ export default function AdminBookingsPage() {
                 <span style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 999, background: statusStyle.bg, color: statusStyle.color, whiteSpace: 'nowrap' }}>
                   {statusStyle.label}
                 </span>
+                {isPostProcessing && b.balanceStatus !== 'n/a' && (
+                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: '4px 9px', borderRadius: 999, background: b.balanceStatus === 'paid' ? '#E4E9DD' : '#F4E4C1', color: b.balanceStatus === 'paid' ? '#4B5940' : '#7A5F2F', whiteSpace: 'nowrap' }}>
+                    {b.balanceStatus === 'paid' ? 'Balance paid' : 'Balance pending'}
+                  </span>
+                )}
                 <button onClick={() => expandBooking(b.id)} className="booking-open-button">
                   {isOpen ? 'Close' : 'Open'}
                 </button>
@@ -158,7 +161,7 @@ export default function AdminBookingsPage() {
                 )}
 
                 {/* Final bill panel */}
-                {b.status === 'pending_balance' && (() => {
+                {isPostProcessing && b.balanceStatus === 'pending' && (() => {
                   const addOnsRecord = (b.addOns || {}) as Record<string, number>;
                   const addOnsTotal = Object.entries(addOnsRecord).filter(([,q]) => q > 0).reduce((s, [id, q]) => s + (ADDONS[id]?.price || 0) * q, 0);
                   const weekendFee = b.isWeekend ? 50 : 0;
@@ -277,12 +280,12 @@ export default function AdminBookingsPage() {
                   {b.status === 'confirmed' && (
                     <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>
                   )}
-                  {(b.status === 'basic_retouch' || b.status === 'further_retouch') && (
+                  {(b.status === 'pending_balance' || b.status === 'basic_retouch' || b.status === 'further_retouch') && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
-                      {b.status === 'basic_retouch' ? 'Move to further retouch' : 'Mark photoshoot complete'}
+                      {(b.status === 'pending_balance' || b.status === 'basic_retouch') ? 'Move to further retouch' : 'Mark photoshoot complete'}
                     </button>
                   )}
-                  {b.status === 'basic_retouch' && (
+                  {(b.status === 'pending_balance' || b.status === 'basic_retouch') && (
                     <button className="btn btn-ghost" disabled={isBusy} onClick={() => {
                       if (confirm('Skip further retouch and mark this photoshoot complete?')) {
                         runAction(b.id, 'skip-further-retouch');
@@ -291,13 +294,9 @@ export default function AdminBookingsPage() {
                       Skip further retouch &amp; complete
                     </button>
                   )}
-                  {(b.status === 'basic_retouch' || b.status === 'further_retouch' || b.status === 'completed') && (
+                  {(b.status === 'further_retouch' || b.status === 'completed') && (
                     <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'revert-stage')}>
-                      {b.status === 'completed'
-                        ? 'Go back to further retouch'
-                        : b.status === 'further_retouch'
-                          ? 'Go back to basic retouch'
-                          : 'Go back to pending balance'}
+                      {b.status === 'completed' ? 'Go back to further retouch' : 'Go back to basic retouch'}
                     </button>
                   )}
                   {b.status !== 'cancelled' && (
@@ -357,11 +356,11 @@ export default function AdminBookingsPage() {
           <section className="booking-group">
             <div className="booking-group-heading post-shoot-heading">
               <span>Photoshoot done · Post-processing</span>
-              <b>{bookings.filter((booking) => ['pending_balance', 'basic_retouch', 'further_retouch'].includes(booking.status)).length}</b>
+              <b>{bookings.filter((booking) => ['pending_balance', 'basic_retouch', 'further_retouch', 'completed'].includes(booking.status)).length}</b>
             </div>
             <div className="booking-list">
               {[...bookings]
-                .filter((booking) => ['pending_balance', 'basic_retouch', 'further_retouch'].includes(booking.status))
+                .filter((booking) => ['pending_balance', 'basic_retouch', 'further_retouch', 'completed'].includes(booking.status))
                 .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`))
                 .map(renderBookingCard)}
             </div>

@@ -4,9 +4,17 @@ import { db } from '@/lib/db/client';
 export async function GET(req: NextRequest) {
   const status = req.nextUrl.searchParams.get('status');
   const statuses = req.nextUrl.searchParams.get('statuses'); // comma-separated
+  const active = req.nextUrl.searchParams.get('active');
 
   let where: unknown;
-  if (statuses) {
+  if (active === '1') {
+    where = {
+      OR: [
+        { status: { in: ['pending', 'confirmed', 'pending_balance', 'basic_retouch', 'further_retouch'] } },
+        { status: 'completed', balanceStatus: 'pending' },
+      ],
+    };
+  } else if (statuses) {
     where = { status: { in: statuses.split(',') } };
   } else if (status) {
     where = { status };

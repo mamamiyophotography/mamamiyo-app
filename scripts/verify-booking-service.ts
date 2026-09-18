@@ -158,9 +158,10 @@ async function run() {
   check('deposit confirmation moves status to confirmed', confirmed.status === 'confirmed');
   check('deposit status is paid', confirmed.depositStatus === 'paid');
 
-  // ---- 4. Complete session with a balance owed -> pending_balance, not completed ----
+  // ---- 4. Complete session -> basic retouch while payment remains independent ----
   const afterComplete = await markCompleted(db, booking.id);
-  check('session with balance owed goes to pending_balance, not completed', afterComplete.status === 'pending_balance');
+  check('session moves directly to basic retouch', afterComplete.status === 'basic_retouch');
+  check('balance remains pending during basic retouch', afterComplete.balanceStatus === 'pending');
 
   // ---- 5. Add an extra line item, generate invoice ----
   const { addExtraLineItem } = await import('../src/lib/db/bookingService');
@@ -174,10 +175,6 @@ async function run() {
   check('balance status is paid', settled.balanceStatus === 'paid');
 
   const { advanceStage, revertStage, skipFurtherRetouch } = await import('../src/lib/db/bookingService');
-  const reopenedBalance = await revertStage(db, booking.id);
-  check('basic retouch can go back to pending balance', reopenedBalance.status === 'pending_balance');
-  check('returning to pending balance reopens payment', reopenedBalance.balanceStatus === 'pending');
-  await confirmBalanceAndNotify(db, booking.id);
   const furtherRetouch = await advanceStage(db, booking.id);
   check('basic retouch advances to further retouch', furtherRetouch.status === 'further_retouch');
   const fullyCompleted = await advanceStage(db, booking.id);
