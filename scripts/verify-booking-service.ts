@@ -21,6 +21,8 @@ import {
   lookupByPhone,
   purgeExpiredHolds,
   updateBookingAndNotify,
+  checkAndSendFurtherRetouchReminders,
+  sendShootDayBalanceInvoices,
 } from '../src/lib/db/bookingService';
 
 let failures = 0;
@@ -334,6 +336,40 @@ async function run() {
   check('an expired hold gets purged', purgedCount === 1);
   const afterPurge = await db5.booking.findUniqueOrThrow({ where: { id: heldBooking.id } });
   check('purged booking is cancelled', afterPurge.status === 'cancelled');
+
+  // ---- 12. Monthly further-retouch selection reminders ----
+  const reminderDb = createMockDb({ settings: {}, availability: [{ date: futureDateStr(18), startTime: '09:00', endTime: '13:00', location: 'studio' }] });
+  const reminderSlot = (await getAvailableSlots(reminderDb, 'baby'))[0];
+  const reminderBooking = await createBooking(reminderDb, {
+    sessionTypeId: 'baby', date: reminderSlot.date, startTime: reminderSlot.startTime, endTime: reminderSlot.endTime, isWeekend: reminderSlot.isWeekend,
+    addOns: {}, notes: '', referencePhotoUrls: ['https://example.com/reminder.jpg'], address: '',
+    clientName: 'Reminder Client', clientEmail: 'reminder@example.com', countryCode: '+65', phone: '97778888',
+  });
+  await confirmDepositAndNotify(reminderDb, reminderBooking.id);
+  await markCompleted(reminderDb, reminderBooking.id);
+  await confirmBalanceAndNotify(reminderDb, reminderBooking.id);
+  const reminderNow = new Date('2026-09-18T10:00:00Z');
+  await reminderDb.booking.update({ where: { id: reminderBooking.id }, data: { balancePaidAt: new Date('2026-08-18T10:00:00Z') } });
+  check('one-month further-retouch reminder is sent', await checkAndSendFurtherRetouchReminders(reminderDb, reminderNow) === 1);
+  check('further-retouch reminder is not duplicated on the same day', await checkAndSendFurtherRetouchReminders(reminderDb, reminderNow) === 0);
+  check('further-retouch reminder repeats after another month', await checkAndSendFurtherRetouchReminders(reminderDb, new Date('2026-10-18T10:00:00Z')) === 1);
+  await advanceStage(reminderDb, reminderBooking.id);
+  check('further-retouch reminders stop at the next stage', await checkAndSendFurtherRetouchReminders(reminderDb, new Date('2026-11-18T10:00:00Z')) === 0);
+
+  // ---- 13. 6pm shoot-day invoice is sent once only ----
+  const invoiceDb = createMockDb({ settings: {}, availability: [{ date: futureDateStr(19), startTime: '09:00', endTime: '13:00', location: 'studio' }] });
+  const invoiceSlot = (await getAvailableSlots(invoiceDb, 'baby'))[0];
+  const autoInvoiceBooking = await createBooking(invoiceDb, {
+    sessionTypeId: 'baby', date: invoiceSlot.date, startTime: invoiceSlot.startTime, endTime: invoiceSlot.endTime, isWeekend: invoiceSlot.isWeekend,
+    addOns: {}, notes: '', referencePhotoUrls: ['https://example.com/invoice.jpg'], address: '',
+    clientName: 'Invoice Client', clientEmail: 'invoice@example.com', countryCode: '+65', phone: '98889999',
+  });
+  await confirmDepositAndNotify(invoiceDb, autoInvoiceBooking.id);
+  const invoiceRunAt = new Date('2026-09-18T10:00:00Z');
+  const singaporeToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Singapore', year: 'numeric', month: '2-digit', day: '2-digit' }).format(invoiceRunAt);
+  await invoiceDb.booking.update({ where: { id: autoInvoiceBooking.id }, data: { date: singaporeToday } });
+  check('shoot-day balance invoice is sent automatically', await sendShootDayBalanceInvoices(invoiceDb, invoiceRunAt) === 1);
+  check('shoot-day balance invoice is not sent twice', await sendShootDayBalanceInvoices(invoiceDb, invoiceRunAt) === 0);
 
   console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'}`);
   process.exit(failures === 0 ? 0 : 1);

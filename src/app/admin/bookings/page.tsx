@@ -119,7 +119,11 @@ export default function AdminBookingsPage() {
                 </span>
                 {isPostProcessing && b.balanceStatus !== 'n/a' && (
                   <span style={{ fontSize: 10.5, fontWeight: 700, padding: '4px 9px', borderRadius: 999, background: b.balanceStatus === 'paid' ? '#E4E9DD' : '#F4E4C1', color: b.balanceStatus === 'paid' ? '#4B5940' : '#7A5F2F', whiteSpace: 'nowrap' }}>
-                    {b.balanceStatus === 'paid' ? 'Balance paid' : 'Balance pending'}
+                    {b.balanceStatus !== 'paid'
+                      ? 'Balance pending'
+                      : (b.status === 'basic_retouch' || b.status === 'pending_balance')
+                        ? 'Pending selection for further retouch'
+                        : 'Balance paid'}
                   </span>
                 )}
                 <button onClick={() => expandBooking(b.id)} className="booking-open-button">

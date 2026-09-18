@@ -32,8 +32,9 @@ import {
   NotifyBooking,
 } from '../notifications';
 import { dispatchNotification, Receipt, ClientDetails } from '../notify';
-import { sendEmail } from '../email';
+import { buildEmailHtml, sendEmail } from '../email';
 import { generateIcs, icsToBase64 } from '../ics';
+import { fmtDatePretty } from '../format';
 
 const PHOTOGRAPHER_EMAIL_ENV = 'PHOTOGRAPHER_EMAIL';
 const PHOTOGRAPHER_PHONE_ENV = 'PHOTOGRAPHER_PHONE';
@@ -579,6 +580,8 @@ export async function confirmBalanceAndNotify(db: any, bookingId: string) {
     where: { id: bookingId },
     data: {
       balanceStatus: 'paid',
+      balancePaidAt: new Date(),
+      furtherRetouchReminderSentAt: null,
       // Convert old pending_balance records to the merged Basic Retouch stage.
       status: current.status === 'pending_balance' ? 'basic_retouch' : current.status,
     },
@@ -610,7 +613,11 @@ export async function reopenBalance(db: any, bookingId: string) {
   if (booking.balanceStatus !== 'paid') throw new Error('This balance is not marked as paid.');
   return db.booking.update({
     where: { id: bookingId },
-    data: { balanceStatus: 'pending' },
+    data: {
+      balanceStatus: 'pending',
+      balancePaidAt: null,
+      furtherRetouchReminderSentAt: null,
+    },
   });
 }
 
@@ -809,6 +816,99 @@ export async function skipFurtherRetouch(db: any, bookingId: string) {
     throw new Error(`Cannot skip further retouch from status "${booking.status}".`);
   }
   return db.booking.update({ where: { id: bookingId }, data: { status: 'completed' } });
+}
+
+function oneCalendarMonthAfter(value: Date): Date {
+  const source = new Date(value);
+  const year = source.getUTCFullYear();
+  const month = source.getUTCMonth() + 1;
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(
+    year,
+    month,
+    Math.min(source.getUTCDate(), lastDay),
+    source.getUTCHours(),
+    source.getUTCMinutes(),
+    source.getUTCSeconds(),
+    source.getUTCMilliseconds(),
+  ));
+}
+
+/** Sends one email a month after balance payment and then monthly while the
+ * booking is still awaiting the client's further-retouch selection. */
+export async function checkAndSendFurtherRetouchReminders(db: any, now = new Date()) {
+  const settings = await getSettings(db);
+  const awaitingSelection = await db.booking.findMany({
+    where: {
+      status: { in: ['basic_retouch', 'pending_balance'] },
+      balanceStatus: 'paid',
+    },
+  });
+  let sent = 0;
+
+  for (const booking of awaitingSelection) {
+    if (!booking.balancePaidAt) continue;
+    const reminderAnchor = booking.furtherRetouchReminderSentAt || booking.balancePaidAt;
+    if (oneCalendarMonthAfter(new Date(reminderAnchor)) > now) continue;
+
+    const firstName = booking.clientName.split(' ')[0] || booking.clientName;
+    const body = [
+      `Hi ${firstName}!`,
+      `It has been a month since your balance payment for ${booking.sessionLabel}.`,
+      `When you are ready, please send us your selected photos for further retouch via WhatsApp at +65 9760 0798. If you do not require further retouch, just let us know.`,
+      settings.businessName,
+    ].join('\n\n');
+    const html = buildEmailHtml({
+      title: 'Further Retouch Selection Reminder',
+      paragraphs: body.split('\n\n'),
+      details: [
+        { label: 'Session', value: booking.sessionLabel },
+        { label: 'Photoshoot date', value: fmtDatePretty(booking.date) },
+      ],
+      businessName: settings.businessName,
+    });
+    await sendEmail(
+      booking.clientEmail,
+      `Reminder: Select photos for further retouch — ${booking.sessionLabel}`,
+      body,
+      undefined,
+      html,
+    );
+    await db.booking.update({
+      where: { id: booking.id },
+      data: { furtherRetouchReminderSentAt: now },
+    });
+    sent++;
+  }
+  return sent;
+}
+
+function singaporeDateString(now: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Singapore',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+/** Sends the balance invoice at 6pm SGT on the photoshoot date. The cron
+ * route controls the time; this function protects against duplicates. */
+export async function sendShootDayBalanceInvoices(db: any, now = new Date()) {
+  const bookings = await db.booking.findMany({
+    where: {
+      date: singaporeDateString(now),
+      status: { in: ['confirmed', 'pending_balance', 'basic_retouch', 'further_retouch', 'completed'] },
+      balanceStatus: 'pending',
+      invoiceGeneratedAt: null,
+    },
+  });
+  let sent = 0;
+  for (const booking of bookings) {
+    await generateInvoiceAndNotify(db, booking.id);
+    sent++;
+  }
+  return sent;
 }
 
 export async function checkAndSendReminders(db: any) {

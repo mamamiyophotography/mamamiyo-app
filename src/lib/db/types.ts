@@ -51,6 +51,8 @@ export type Booking = {
   depositRef: string | null;
   depositStatus: string;
   balanceStatus: string;
+  balancePaidAt: Date | null;
+  furtherRetouchReminderSentAt: Date | null;
   bundleParentId: string | null;
   bundleSessionNumber: number | null;
   remindersSent: string[];

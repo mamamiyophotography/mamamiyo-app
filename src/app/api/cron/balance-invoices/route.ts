@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/client';
-import { checkAndSendFurtherRetouchReminders, checkAndSendReminders } from '@/lib/db/bookingService';
+import { sendShootDayBalanceInvoices } from '@/lib/db/bookingService';
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization');
@@ -9,9 +9,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
-    const sent = await checkAndSendReminders(db);
-    const furtherRetouchSent = await checkAndSendFurtherRetouchReminders(db);
-    return NextResponse.json({ ok: true, remindersSent: sent, furtherRetouchRemindersSent: furtherRetouchSent });
+    const sent = await sendShootDayBalanceInvoices(db);
+    return NextResponse.json({ ok: true, invoicesSent: sent });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }

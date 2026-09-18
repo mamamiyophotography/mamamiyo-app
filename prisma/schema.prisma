@@ -93,6 +93,8 @@ model Booking {
   depositRef          String?
   depositStatus       String    @default("pending")
   balanceStatus       String    @default("pending")
+  balancePaidAt       DateTime?
+  furtherRetouchReminderSentAt DateTime?
   bundleParentId      String?
   bundle              Bundle?   @relation(fields: [bundleParentId], references: [id])
   bundleSessionNumber Int?

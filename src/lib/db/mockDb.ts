@@ -55,7 +55,10 @@ export function createMockDb(seed: {
       if (!ok) return false;
     }
     if (where?.status !== undefined && typeof where.status === 'string' && b.status !== where.status) return false;
+    if (where?.status?.in !== undefined && !where.status.in.includes(b.status)) return false;
     if (where?.status?.not !== undefined && b.status === where.status.not) return false;
+    if (where?.balanceStatus !== undefined && b.balanceStatus !== where.balanceStatus) return false;
+    if (where?.invoiceGeneratedAt === null && b.invoiceGeneratedAt !== null) return false;
     if (where?.bundleParentId !== undefined && b.bundleParentId !== where.bundleParentId) return false;
     if (where?.holdExpiresAt?.lt !== undefined && (!b.holdExpiresAt || !(b.holdExpiresAt < where.holdExpiresAt.lt))) return false;
     return true;
@@ -146,6 +149,8 @@ export function createMockDb(seed: {
           extraLineItems: [],
           invoiceRef: null,
           invoiceGeneratedAt: null,
+          balancePaidAt: null,
+          furtherRetouchReminderSentAt: null,
           holdExpiresAt: null,
           depositRef: null,
           remindersSent: [],
