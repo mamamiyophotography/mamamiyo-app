@@ -174,7 +174,11 @@ async function run() {
   check('balance confirmation starts basic retouch', settled.status === 'basic_retouch');
   check('balance status is paid', settled.balanceStatus === 'paid');
 
-  const { advanceStage, revertStage, skipFurtherRetouch } = await import('../src/lib/db/bookingService');
+  const { advanceStage, revertStage, skipFurtherRetouch, reopenBalance } = await import('../src/lib/db/bookingService');
+  const reopenedPayment = await reopenBalance(db, booking.id);
+  check('paid balance can be corrected back to pending', reopenedPayment.balanceStatus === 'pending');
+  check('reopening balance keeps the basic retouch stage', reopenedPayment.status === 'basic_retouch');
+  await confirmBalanceAndNotify(db, booking.id);
   const furtherRetouch = await advanceStage(db, booking.id);
   check('basic retouch advances to further retouch', furtherRetouch.status === 'further_retouch');
   const fullyCompleted = await advanceStage(db, booking.id);

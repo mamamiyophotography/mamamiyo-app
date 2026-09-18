@@ -299,6 +299,15 @@ export default function AdminBookingsPage() {
                       {b.status === 'completed' ? 'Go back to further retouch' : 'Go back to basic retouch'}
                     </button>
                   )}
+                  {isPostProcessing && b.balanceStatus === 'paid' && (
+                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => {
+                      if (confirm('Mark this balance as unpaid? The editing stage will stay the same and no customer message will be sent.')) {
+                        runAction(b.id, 'reopen-balance');
+                      }
+                    }}>
+                      Mark balance as unpaid
+                    </button>
+                  )}
                   {b.status !== 'cancelled' && (
                     <button className="btn btn-ghost" disabled={isBusy} onClick={() => { if (confirm('Cancel this booking?')) runAction(b.id, 'cancel'); }}>Cancel</button>
                   )}

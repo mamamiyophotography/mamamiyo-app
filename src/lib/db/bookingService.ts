@@ -598,6 +598,22 @@ export async function confirmBalanceAndNotify(db: any, bookingId: string) {
   return booking;
 }
 
+/** Corrects an accidentally confirmed balance without changing the editing
+ * stage or sending a customer notification. */
+export async function reopenBalance(db: any, bookingId: string) {
+  const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+  const due = currentBalanceDue({
+    balanceDue: booking.balanceDue,
+    extraLineItems: booking.extraLineItems as { description: string; amount: number }[],
+  });
+  if (due <= 0) throw new Error('This booking has no balance to reopen.');
+  if (booking.balanceStatus !== 'paid') throw new Error('This balance is not marked as paid.');
+  return db.booking.update({
+    where: { id: bookingId },
+    data: { balanceStatus: 'pending' },
+  });
+}
+
 /** requesterPhone is required on the public client-facing route (so a
  *  client can only cancel their own booking) and omitted on the admin
  *  route (already trusted via the session middleware — see
