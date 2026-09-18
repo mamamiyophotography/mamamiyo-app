@@ -291,9 +291,13 @@ export default function AdminBookingsPage() {
                       Skip further retouch &amp; complete
                     </button>
                   )}
-                  {(b.status === 'further_retouch' || b.status === 'completed') && (
+                  {(b.status === 'basic_retouch' || b.status === 'further_retouch' || b.status === 'completed') && (
                     <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'revert-stage')}>
-                      {b.status === 'completed' ? 'Go back to further retouch' : 'Go back to basic retouch'}
+                      {b.status === 'completed'
+                        ? 'Go back to further retouch'
+                        : b.status === 'further_retouch'
+                          ? 'Go back to basic retouch'
+                          : 'Go back to pending balance'}
                     </button>
                   )}
                   {b.status !== 'cancelled' && (

@@ -754,6 +754,7 @@ export async function purgeExpiredHolds(db: any) {
  *  confirmBalanceAndNotify) and are intentionally not reachable here. */
 const ADVANCEABLE_STATUSES = ['basic_retouch', 'further_retouch'];
 const REVERSIBLE_POST_PROCESSING_STATUSES: Record<string, string> = {
+  basic_retouch: 'pending_balance',
   further_retouch: 'basic_retouch',
   completed: 'further_retouch',
 };
@@ -768,14 +769,24 @@ export async function advanceStage(db: any, bookingId: string) {
   return db.booking.update({ where: { id: bookingId }, data: { status: nextStatus } });
 }
 
-/** Rolls back only the manual post-processing buttons. Payment and deposit
- * transitions are excluded because reversing them would also require undoing
- * financial records and customer notifications. */
+/** Rolls back a post-processing stage without sending customer notifications.
+ * Returning to pending balance also reopens the recorded balance payment. */
 export async function revertStage(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
   const previousStatus = REVERSIBLE_POST_PROCESSING_STATUSES[booking.status];
   if (!previousStatus) {
     throw new Error(`Cannot go back from status "${booking.status}".`);
+  }
+  if (previousStatus === 'pending_balance') {
+    const due = currentBalanceDue({
+      balanceDue: booking.balanceDue,
+      extraLineItems: booking.extraLineItems as { description: string; amount: number }[],
+    });
+    if (due <= 0) throw new Error('This booking has no outstanding balance to reopen.');
+    return db.booking.update({
+      where: { id: bookingId },
+      data: { status: previousStatus, balanceStatus: 'pending' },
+    });
   }
   return db.booking.update({ where: { id: bookingId }, data: { status: previousStatus } });
 }
