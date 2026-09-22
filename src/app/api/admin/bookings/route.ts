@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   });
 
   const inbox = await new PrismaClient().galleryInbox.findMany({where:{bookingId:{in:(bookings as any[]).map(b=>b.id)}}});
-  const orders = await new PrismaClient().additionalOrder.findMany({where:{bookingId:{in:(bookings as any[]).map(b=>b.id)}},orderBy:{createdAt:'desc'}});
+  const orders = await new PrismaClient().additionalOrder.findMany({where:{bookingId:{in:(bookings as any[]).map(b=>b.id)},status:{not:'superseded'}},orderBy:{createdAt:'desc'}});
   const slim = (bookings as any[]).map((b) => ({ ...b, referencePhotoUrls: [], gallerySelections: inbox.filter(g=>g.bookingId===b.id), additionalOrders:orders.filter(o=>o.bookingId===b.id) }));
   return NextResponse.json({ bookings: slim });
 }

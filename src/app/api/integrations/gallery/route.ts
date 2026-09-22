@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
     const total = items.reduce((sum:number,item:any)=>sum+item.amount,0);
     const bonusRetouches = items.reduce((sum:number,item:any)=>sum+item.bonusRetouches,0);
     const invoiceRef = `ADD-${p.galleryId.slice(0,6).toUpperCase()}-${p.version}`;
+    await prisma.additionalOrder.updateMany({where:{galleryId:p.galleryId,status:'pending',version:{lt:p.version}},data:{status:'superseded'}});
     const order = await prisma.additionalOrder.upsert({
       where:{galleryId_version:{galleryId:p.galleryId,version:p.version}},
       create:{bookingId:booking.id,galleryId:p.galleryId,version:p.version,items,total,bonusRetouches,invoiceRef},
