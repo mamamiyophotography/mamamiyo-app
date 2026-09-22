@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { timingSafeEqual } from 'node:crypto';
 import { Resend } from 'resend';
+import { buildPayNowPayload } from '@/lib/paynow';
+import QRCode from 'qrcode';
 
 const prisma = new PrismaClient();
 function authorized(req: NextRequest) {
@@ -24,6 +26,43 @@ export async function POST(req: NextRequest) {
   if (raw.length > 150000) return NextResponse.json({error:'Too large'}, {status:413});
   let p: any;
   try { p = JSON.parse(raw); } catch { return NextResponse.json({error:'Invalid JSON'}, {status:400}); }
+  if (p.kind === 'additional_order') {
+    const catalog: Record<string, {name:string;price:number;bonus:number}> = {
+      album8x8:{name:'Photo Album · 8in × 8in · 20 pages',price:108,bonus:20},
+      album10x10:{name:'Photo Album · 10in × 10in · 20 pages',price:138,bonus:20},
+      album12x12:{name:'Photo Album · 12in × 12in · 20 pages',price:158,bonus:20},
+      canvas11x14:{name:'Canvas · 11in × 14in',price:88,bonus:1},
+      canvas16x24:{name:'Canvas · 16in × 24in',price:128,bonus:1},
+      plaque5x7:{name:'Wooden / Crystal Plaque · 5in × 7in',price:58,bonus:1},
+      plaque6x8:{name:'Wooden / Crystal Plaque · 6in × 8in',price:68,bonus:1},
+      extraRetouch:{name:'Additional Further Retouch',price:5,bonus:1},
+    };
+    if (!/^[a-f0-9]{32}$/.test(p.galleryId || '') || typeof p.bookingRef !== 'string' ||
+        !Number.isSafeInteger(p.version) || p.version < 1 || !Array.isArray(p.items) || !p.items.length || p.items.length > 20) {
+      return NextResponse.json({error:'Invalid order'}, {status:400});
+    }
+    const booking = await prisma.booking.findUnique({where:{ref:p.bookingRef}});
+    if (!booking || booking.status === 'cancelled') return NextResponse.json({error:'Booking not available'}, {status:409});
+    const items = p.items.map((item:any) => {
+      const product = catalog[item?.id]; const quantity = Number(item?.quantity);
+      if (!product || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 20) throw new Error('Invalid product quantity');
+      return {id:item.id,name:product.name,quantity,unitPrice:product.price,amount:product.price*quantity,bonusRetouches:product.bonus*quantity};
+    });
+    const total = items.reduce((sum:number,item:any)=>sum+item.amount,0);
+    const bonusRetouches = items.reduce((sum:number,item:any)=>sum+item.bonusRetouches,0);
+    const invoiceRef = `ADD-${p.galleryId.slice(0,6).toUpperCase()}-${p.version}`;
+    const order = await prisma.additionalOrder.upsert({
+      where:{galleryId_version:{galleryId:p.galleryId,version:p.version}},
+      create:{bookingId:booking.id,galleryId:p.galleryId,version:p.version,items,total,bonusRetouches,invoiceRef},
+      update:{items,total,bonusRetouches},
+    });
+    const settings = await prisma.settings.findUnique({where:{id:1}});
+    const mobile = (settings?.paynowMobile || '').replace(/\D/g,'').slice(-8);
+    if (mobile.length !== 8) return NextResponse.json({error:'PayNow is not configured; order saved',order}, {status:503});
+    const payNowPayload = buildPayNowPayload({mobile8:mobile,amount:total,refNumber:invoiceRef,merchantName:settings?.businessName || 'Mamamiyo Photography'});
+    const qrDataUrl = await QRCode.toDataURL(payNowPayload,{margin:1,width:420});
+    return NextResponse.json({ok:true,order:{id:order.id,status:order.status,items,total,bonusRetouches,invoiceRef},payNowPayload,qrDataUrl});
+  }
   if (!/^[a-f0-9]{32}$/.test(p.galleryId || '') || typeof p.bookingRef !== 'string' || p.bookingRef.length > 100 ||
       !Number.isSafeInteger(p.version) || p.version < 0 || typeof p.submitted !== 'boolean' || typeof p.locked !== 'boolean' ||
       !Array.isArray(p.items) || p.items.length > 60 || p.items.some((i:any) => typeof i.filename !== 'string' || i.filename.length > 255 || typeof i.note !== 'string' || i.note.length > 1000) ||

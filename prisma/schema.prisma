@@ -143,3 +143,22 @@ model GalleryInbox {
   updatedAt DateTime @updatedAt
   @@index([bookingId])
 }
+
+model AdditionalOrder {
+  id               String   @id @default(cuid())
+  bookingId        String
+  galleryId        String
+  version          Int
+  items            Json
+  total            Int
+  bonusRetouches   Int      @default(0)
+  status           String   @default("pending")
+  invoiceRef       String   @unique
+  invoiceGeneratedAt DateTime @default(now())
+  paidAt           DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([galleryId, version])
+  @@index([bookingId, createdAt])
+}

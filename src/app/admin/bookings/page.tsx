@@ -8,6 +8,7 @@ import EditBookingModal from '@/components/EditBookingModal';
 import EditAddOnsModal from '@/components/EditAddOnsModal';
 
 type Booking = {
+  additionalOrders?: {id:string;galleryId:string;version:number;items:{name:string;quantity:number;amount:number;bonusRetouches:number}[];total:number;bonusRetouches:number;status:string;invoiceRef:string;createdAt:string;paidAt:string|null}[];
   gallerySelections?: {galleryId:string;version:number;submitted:boolean;locked:boolean;deliveredAt:string|null;emailSentAt:string|null;items:{filename:string;note:string}[]}[];
   id: string; ref: string; sessionTypeId: string; sessionLabel: string; location: string;
   date: string; startTime: string; endTime: string; isWeekend: boolean; addOns: Record<string, number>;
@@ -185,6 +186,7 @@ export default function AdminBookingsPage() {
                   <span>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : g.submitted ? 'Client selection received' : 'Awaiting client selection'}</span>
                   <a href={`http://127.0.0.1:8766/?gallery=${encodeURIComponent(g.galleryId)}`} target="_blank" rel="noopener noreferrer" title="Open in PhotoSelect Pro on your studio computer" style={{color:'#415e58',fontWeight:700,whiteSpace:'nowrap'}}>Open Gallery</a>
                 </div>)}
+                {b.additionalOrders?.map(order=><div key={order.id} style={{marginTop:8,padding:'10px 12px',background:order.status==='paid'?'#e4eadf':'#fff0d8',borderRadius:7,fontSize:13}}><div style={{display:'flex',justifyContent:'space-between',gap:8,fontWeight:700}}><span>Additional Order · {order.status==='paid'?'Paid':'Payment pending'}</span><span>${order.total}</span></div><div style={{marginTop:5,color:'#6f6258'}}>{order.items.map(item=>`${item.name} ×${item.quantity}`).join(' · ')}</div><div style={{marginTop:4}}>Ref: {order.invoiceRef} · +{order.bonusRetouches} complimentary retouch{order.bonusRetouches===1?'':'es'}</div>{order.status!=='paid'&&<button className="btn btn-sm" style={{marginTop:8}} disabled={busyId===b.id} onClick={()=>runAction(b.id,'confirm-additional-order',{orderId:order.id})}>Payment received</button>}</div>)}
                 <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>
                 <div style={{ fontWeight: 600, fontSize: 12.5, color: '#3A2E28', marginTop: 4, lineHeight: 1.35 }}>{fmtDatePretty(b.date)} · {fmtTime12(b.startTime)}</div>
               </div>
