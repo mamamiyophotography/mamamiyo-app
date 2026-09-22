@@ -12,11 +12,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   try {
+    const current = await db.booking.findUniqueOrThrow({ where: { id } });
+    if (current.balanceStatus === 'paid') throw new Error('The balance is already confirmed. Charges can no longer be changed.');
+    if (current.status === 'cancelled') throw new Error('Cancelled bookings cannot be changed.');
     // Full replacement — used for edit and delete operations
     if (body.replace !== undefined) {
       const booking = await db.booking.update({
         where: { id },
-        data: { extraLineItems: body.replace as never },
+        data: { extraLineItems: body.replace as never, invoiceStale: Boolean(current.invoiceRef), version: { increment: 1 } as never },
       });
       return NextResponse.json({ booking });
     }

@@ -28,7 +28,6 @@ import {
   REMINDER_THRESHOLDS,
   bundleActivatedNotification,
   invoiceNotification,
-  newBookingRequestNotification,
   NotifyBooking,
 } from '../notifications';
 import { dispatchNotification, Receipt, ClientDetails } from '../notify';
@@ -200,33 +199,6 @@ export async function createBooking(db: any, input: CreateBookingInput) {
 
     return booking;
   });
-
-  // Notify photographer immediately — client sees the PayNow QR on screen already
-  const photographer = photographerContacts();
-  const notifyBooking = {
-    ref: result.ref, sessionTypeId: result.sessionTypeId, sessionLabel: result.sessionLabel,
-    location: result.location, date: result.date, startTime: result.startTime,
-    clientName: result.clientName, bundleSessionNumber: result.bundleSessionNumber,
-    clientEmail: result.clientEmail, clientPhone: result.clientPhone,
-    address: result.address, notes: result.notes,
-  };
-  const newRequestPair = newBookingRequestNotification(notifyBooking, 'Mamamiyo Photography');
-  const photoUrls = (result.referencePhotoUrls as string[]) || [];
-  const photoLines = photoUrls.length
-    ? `\n\nReference photos (${photoUrls.length}):\n` + photoUrls.map((u, i) => `Photo ${i + 1}: ${u}`).join('\n')
-    : '';
-  // Only send to photographer — client gets nothing until deposit is confirmed
-  try {
-    await sendEmail(
-      photographer.email,
-      newRequestPair.photographer.emailSubject,
-      newRequestPair.photographer.emailBody + photoLines,
-    );
-    console.log('[createBooking] Photographer notification sent to', photographer.email);
-  } catch (err) {
-    // Log but don't block — booking is already created
-    console.error('[createBooking] Photographer notification failed:', (err as Error).message);
-  }
 
   return result;
 }
@@ -530,6 +502,8 @@ export async function markCompleted(db: any, bookingId: string) {
 
 export async function addExtraLineItem(db: any, bookingId: string, description: string, amount: number) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+  if (booking.balanceStatus === 'paid') throw new Error('The balance is already confirmed. Charges can no longer be changed.');
+  if (booking.status === 'cancelled') throw new Error('Cancelled bookings cannot be changed.');
   const items = (booking.extraLineItems as { description: string; amount: number }[]) || [];
   items.push({ description, amount });
   const due = currentBalanceDue({ balanceDue: booking.balanceDue, extraLineItems: items });
@@ -538,6 +512,8 @@ export async function addExtraLineItem(db: any, bookingId: string, description: 
     data: {
       extraLineItems: items,
       balanceStatus: booking.balanceStatus === 'n/a' && due > 0 ? 'pending' : booking.balanceStatus,
+      invoiceStale: Boolean(booking.invoiceRef),
+      version: { increment: 1 },
     },
   });
 }
@@ -576,16 +552,22 @@ export async function generateInvoiceAndNotify(db: any, bookingId: string) {
 export async function confirmBalanceAndNotify(db: any, bookingId: string) {
   const settings = await getSettings(db);
   const current = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
-  const booking = await db.booking.update({
-    where: { id: bookingId },
+  if (current.balanceStatus === 'paid') throw new Error('The balance has already been confirmed.');
+  const result = await db.booking.updateMany({
+    where: { id: bookingId, version: current.version, balanceStatus: { not: 'paid' } },
     data: {
       balanceStatus: 'paid',
       balancePaidAt: new Date(),
       furtherRetouchReminderSentAt: null,
+      version: { increment: 1 },
       // Convert old pending_balance records to the merged Basic Retouch stage.
       status: current.status === 'pending_balance' ? 'basic_retouch' : current.status,
     },
   });
+  if (result.count !== 1) {
+    throw new Error('This booking changed in another window. Refresh it before confirming the balance.');
+  }
+  const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
 
   const bundleContext = bundleContextAfterBalance(booking.bundleSessionNumber);
   if (booking.bundleParentId && bundleContext && 'nextSessionNumber' in bundleContext) {

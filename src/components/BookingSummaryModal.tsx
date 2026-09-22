@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 
 type SummaryBooking = {
@@ -13,9 +14,48 @@ type SummaryBooking = {
   clientPhone: string;
   referencePhotoUrls: string[];
   notes: string;
+  ref?: string;
 };
 
 export default function BookingSummaryModal({ booking, onClose }: { booking: SummaryBooking; onClose: () => void }) {
+  const [imageDataUrl, setImageDataUrl] = useState('');
+
+  useEffect(() => {
+    const entries = [
+      ['Client', booking.clientName],
+      ['Session', booking.sessionLabel],
+      ['Date', fmtDatePretty(booking.date)],
+      ['Time', fmtTime12(booking.startTime)],
+      ['Location', booking.location === 'home' ? "Client's home" : 'Studio'],
+      ['Email', booking.clientEmail],
+      ['Phone', booking.clientPhone],
+      ...(booking.address ? [['Address', booking.address]] : []),
+      ['Notes', booking.notes || '—'],
+      ['Reference photos', String(booking.referencePhotoUrls.length)],
+    ];
+    const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
+      const words = text.split(/\s+/); const lines: string[] = []; let line = '';
+      words.forEach((word) => { const next = line ? `${line} ${word}` : word; if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = word; } else line = next; });
+      if (line) lines.push(line); return lines;
+    };
+    const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 1800;
+    const ctx = canvas.getContext('2d'); if (!ctx) return;
+    ctx.fillStyle = '#f5f0e8'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#2e2a22'; ctx.fillRect(54, 54, 972, 230);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#c5a87c'; ctx.font = '700 26px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY', 540, 125);
+    ctx.fillStyle = '#b08d57'; ctx.font = '52px Georgia'; ctx.fillText('Booking Summary', 540, 205);
+    let y = 350;
+    entries.forEach(([label, value]) => {
+      ctx.textAlign = 'left'; ctx.fillStyle = '#6b6152'; ctx.font = '25px Arial'; ctx.fillText(label, 100, y);
+      ctx.fillStyle = '#2e2a22'; ctx.font = '700 27px Arial';
+      const lines = wrap(ctx, value, 610); lines.forEach((line, index) => ctx.fillText(line, 370, y + index * 36));
+      const height = Math.max(58, lines.length * 36 + 18); y += height;
+      ctx.strokeStyle = '#e6decb'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(100, y - 20); ctx.lineTo(980, y - 20); ctx.stroke();
+    });
+    if (booking.ref) { ctx.textAlign = 'center'; ctx.fillStyle = '#8c6d3f'; ctx.font = '23px Arial'; ctx.fillText(`Booking reference: ${booking.ref}`, 540, Math.min(canvas.height - 70, y + 45)); }
+    setImageDataUrl(canvas.toDataURL('image/png'));
+  }, [booking]);
+
   return (
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(46,42,34,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
@@ -27,6 +67,12 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Booking Summary</div>
+        {imageDataUrl && <>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 8 }}>Long-press the image to save it on your phone.</div>
+          <img className="invoice-image-preview" src={imageDataUrl} alt={`Booking summary for ${booking.clientName}`} />
+          <a className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', textDecoration: 'none', marginTop: 10 }} href={imageDataUrl} download={`Mamamiyo-Booking-${booking.ref || booking.clientName}.png`}>Download booking summary</a>
+        </>}
+        <div style={{ fontWeight: 700, fontSize: 13, margin: '20px 0 8px' }}>Details</div>
         <div className="ticket-row"><span>Client</span><b>{booking.clientName}</b></div>
         <div className="ticket-row"><span>Session</span><b>{booking.sessionLabel}</b></div>
         <div className="ticket-row"><span>Date</span><b>{fmtDatePretty(booking.date)}</b></div>

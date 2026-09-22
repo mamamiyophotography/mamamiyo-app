@@ -5,14 +5,17 @@ import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { ADDONS, STATUS_LABELS } from '@/lib/constants';
 import BookingSummaryModal from '@/components/BookingSummaryModal';
 import EditBookingModal from '@/components/EditBookingModal';
+import EditAddOnsModal from '@/components/EditAddOnsModal';
 
 type Booking = {
+  gallerySelections?: {galleryId:string;version:number;submitted:boolean;locked:boolean;deliveredAt:string|null;emailSentAt:string|null;items:{filename:string;note:string}[]}[];
   id: string; ref: string; sessionTypeId: string; sessionLabel: string; location: string;
   date: string; startTime: string; endTime: string; isWeekend: boolean; addOns: Record<string, number>;
   notes: string; address: string; discountCode: string | null; discountAmount: number;
   clientName: string; clientEmail: string; clientPhone: string;
   subtotal: number; total: number; depositAmount: number; balanceDue: number;
   extraLineItems: { description: string; amount: number }[]; invoiceRef: string | null;
+  invoiceStale: boolean; version: number;
   status: string; depositStatus: string; balanceStatus: string;
   referencePhotoUrls: string[]; remindersSent: string[]; bundleSessionNumber: number | null;
 };
@@ -38,10 +41,12 @@ export default function AdminBookingsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [lineDesc, setLineDesc] = useState('');
   const [lineAmount, setLineAmount] = useState('');
-  const [invoiceQr, setInvoiceQr] = useState<{ bookingId: string; dataUrl: string; due: number } | null>(null);
+  const [invoiceQr, setInvoiceQr] = useState<{ bookingId: string; qrDataUrl: string; imageDataUrl: string; due: number; emailed: boolean } | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
   const [summaryBooking, setSummaryBooking] = useState<Booking | null>(null);
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
+  const [editAddOnsBooking, setEditAddOnsBooking] = useState<Booking | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<{ id: string; message: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,6 +73,7 @@ export default function AdminBookingsPage() {
   async function runAction(id: string, path: string, body?: unknown) {
     setBusyId(id);
     setActionError(null);
+    setActionSuccess(null);
     try {
       const res = await fetch(`/api/admin/bookings/${id}/${path}`, {
         method: 'POST',
@@ -89,12 +95,56 @@ export default function AdminBookingsPage() {
     if (data?.booking) setSummaryBooking(data.booking);
   }
 
-  async function generateInvoice(id: string) {
-    const data = await runAction(id, 'generate-invoice');
+  async function createInvoiceImage(booking: Booking, qrDataUrl: string, due: number, invoiceRef: string) {
+    const rows: { label: string; amount: string }[] = [];
+    const addOnsTotal = Object.entries(booking.addOns || {}).filter(([, q]) => q > 0).reduce((sum, [id, q]) => sum + (ADDONS[id]?.price || 0) * q, 0);
+    const weekendFee = booking.isWeekend ? 50 : 0;
+    const basePrice = booking.sessionTypeId === 'bundle' ? booking.balanceDue - addOnsTotal - weekendFee : booking.total - addOnsTotal - weekendFee + booking.discountAmount;
+    rows.push({ label: booking.sessionTypeId === 'bundle' ? `Session ${booking.bundleSessionNumber || 1} balance` : 'Package price', amount: `$${basePrice}` });
+    Object.entries(booking.addOns || {}).filter(([, q]) => q > 0).forEach(([id, q]) => rows.push({ label: `${ADDONS[id]?.name || id} ×${q}`, amount: `+$${(ADDONS[id]?.price || 0) * q}` }));
+    if (weekendFee) rows.push({ label: 'Weekend / PH surcharge', amount: `+$${weekendFee}` });
+    if (booking.discountAmount) rows.push({ label: `Discount (${booking.discountCode || ''})`, amount: `−$${booking.discountAmount}` });
+    booking.extraLineItems.forEach((item) => rows.push({ label: item.description, amount: `+$${item.amount}` }));
+
+    const rowHeight = (label: string) => 48 + (label.split('\n').length - 1) * 34;
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = Math.max(1450, 1080 + rows.reduce((sum, row) => sum + rowHeight(row.label), 0));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Unable to create invoice image.');
+    ctx.fillStyle = '#f5f0e8'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#2e2a22'; ctx.fillRect(54, 54, 972, 230);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#c5a87c'; ctx.font = '700 26px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY', 540, 125);
+    ctx.fillStyle = '#b08d57'; ctx.font = '52px Georgia'; ctx.fillText('Invoice', 540, 205);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 34px Arial'; ctx.fillText(booking.clientName, 100, 350);
+    ctx.font = '25px Arial'; ctx.fillStyle = '#6b6152'; ctx.fillText(`${booking.sessionLabel} · ${fmtDatePretty(booking.date)} at ${fmtTime12(booking.startTime)}`, 100, 400);
+    ctx.fillText(`Reference: ${invoiceRef}`, 100, 444);
+    let y = 525;
+    ctx.strokeStyle = '#2e2a22'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(100, y); ctx.lineTo(980, y); ctx.stroke(); y += 54;
+    for (const row of rows) {
+      const lines = row.label.split('\n');
+      ctx.textAlign = 'left'; ctx.fillStyle = '#6b6152'; ctx.font = '27px Arial';
+      lines.forEach((line, index) => ctx.fillText(line, 100, y + index * 34));
+      ctx.textAlign = 'right'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 29px Arial'; ctx.fillText(row.amount, 980, y);
+      y += rowHeight(row.label);
+      ctx.strokeStyle = '#e6decb'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(100, y - 20); ctx.lineTo(980, y - 20); ctx.stroke();
+    }
+    y += 10; ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 36px Arial'; ctx.fillText('Balance due', 100, y + 20);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#8c6d3f'; ctx.font = '60px Georgia'; ctx.fillText(`$${due}`, 980, y + 25);
+    const qr = new Image(); qr.src = qrDataUrl; await new Promise<void>((resolve, reject) => { qr.onload = () => resolve(); qr.onerror = () => reject(new Error('Unable to render QR code.')); });
+    const qrY = y + 90; ctx.drawImage(qr, 390, qrY, 300, 300);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#6b6152'; ctx.font = '24px Arial'; ctx.fillText('Scan with your banking app to pay', 540, qrY + 345);
+    ctx.font = '22px Arial'; ctx.fillText(`PayNow reference: ${invoiceRef}`, 540, qrY + 385);
+    return canvas.toDataURL('image/png');
+  }
+
+  async function generateInvoice(booking: Booking, sendEmail: boolean) {
+    const data = await runAction(booking.id, 'generate-invoice', { sendEmail });
     if (data?.payNowPayload) {
       const QRCode = (await import('qrcode')).default;
-      const dataUrl = await QRCode.toDataURL(data.payNowPayload, { margin: 1, width: 200 });
-      setInvoiceQr({ bookingId: id, dataUrl, due: data.due });
+      const qrDataUrl = await QRCode.toDataURL(data.payNowPayload, { margin: 1, width: 320 });
+      const imageDataUrl = await createInvoiceImage(booking, qrDataUrl, data.due, data.booking.invoiceRef);
+      setInvoiceQr({ bookingId: booking.id, qrDataUrl, imageDataUrl, due: data.due, emailed: data.emailed });
     }
   }
 
@@ -110,6 +160,11 @@ export default function AdminBookingsPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: '0 0 68%', minWidth: 0 }}>
                 <div style={{ fontFamily: "'Quicksand', sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: '#3A2E28' }}>{b.clientName}</div>
+                {(b.status === 'basic_retouch' || b.status === 'pending_balance') && <a href={`http://127.0.0.1:8766/?action=create&booking=${encodeURIComponent(b.ref)}`} target="_blank" rel="noopener noreferrer" title="Create a Gallery in PhotoSelect Pro on your studio computer" style={{display:'inline-block',marginTop:8,padding:'8px 12px',background:'#657e76',color:'#fff',borderRadius:7,textDecoration:'none',fontSize:13,fontWeight:600}}>Create New Gallery</a>}
+                {b.gallerySelections?.map(g => <div key={g.galleryId} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginTop:8,padding:'8px 10px',background:'#e3eee9',borderRadius:6,fontSize:13}}>
+                  <span>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : g.submitted ? 'Client selection received' : 'Awaiting client selection'}</span>
+                  <a href={`http://127.0.0.1:8766/?gallery=${encodeURIComponent(g.galleryId)}`} target="_blank" rel="noopener noreferrer" title="Open in PhotoSelect Pro on your studio computer" style={{color:'#415e58',fontWeight:700,whiteSpace:'nowrap'}}>Open Gallery</a>
+                </div>)}
                 <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>
                 <div style={{ fontWeight: 600, fontSize: 12.5, color: '#3A2E28', marginTop: 4, lineHeight: 1.35 }}>{fmtDatePretty(b.date)} · {fmtTime12(b.startTime)}</div>
               </div>
@@ -179,8 +234,10 @@ export default function AdminBookingsPage() {
                   const extraTotal = b.extraLineItems.reduce((s, i) => s + i.amount, 0);
                   const totalDue = b.balanceDue + extraTotal;
                   return (
-                  <div style={{ marginTop: 14, background: 'var(--gold-pale)', borderRadius: 10, padding: 14 }}>
+                  <div className="final-bill-panel">
                     <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Final bill</div>
+                    <button className="btn btn-ghost" style={{ marginBottom: 10 }} disabled={isBusy} onClick={() => setEditAddOnsBooking(b)}>Edit Add-ons</button>
+                    {b.invoiceStale && <div className="notice" style={{ marginBottom: 10 }}>Add-ons changed after invoice {b.invoiceRef}. Please generate and send a new invoice.</div>}
 
                     {/* Full breakdown */}
                     <div className="ticket-row"><span>{baseLabel}</span><b>${basePrice}</b></div>
@@ -242,7 +299,7 @@ export default function AdminBookingsPage() {
                     </div>
 
                     {/* Add extra line items */}
-                    <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                    <div className="final-bill-add-charge">
                       <input placeholder="Description" value={lineDesc} onChange={(e) => setLineDesc(e.target.value)} style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontSize: 12.5 }} />
                       <input placeholder="$" type="number" value={lineAmount} onChange={(e) => setLineAmount(e.target.value)} style={{ width: 70, border: '1.5px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontSize: 12.5 }} />
                       <button className="btn btn-ghost" onClick={async () => {
@@ -251,21 +308,29 @@ export default function AdminBookingsPage() {
                         setLineDesc(''); setLineAmount('');
                       }}>Add</button>
                     </div>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                      <button className="btn btn-primary" disabled={isBusy} onClick={() => generateInvoice(b.id)}>
-                        Generate &amp; send invoice to client
+                    <div className="final-bill-actions">
+                      <button className="btn btn-primary" disabled={isBusy} onClick={() => generateInvoice(b, true)}>
+                        Send invoice by email
+                      </button>
+                      <button className="btn btn-ghost" disabled={isBusy} onClick={() => generateInvoice(b, false)}>
+                        Create image for WhatsApp
                       </button>
                       <button className="btn btn-ghost" disabled={isBusy} onClick={() => {
-                        if (confirm('Confirm that the balance has already been received? This will skip sending an invoice.')) {
+                        if (confirm('Confirm that the balance payment has been received? A payment receipt will be emailed to the client.')) {
                           runAction(b.id, 'confirm-balance');
                         }
                       }}>
-                        Payment received — skip invoice
+                        Payment Received
                       </button>
                     </div>
-                    {invoiceQr?.bookingId === b.id && (
-                      <div className="notice" style={{ marginTop: 8 }}>Invoice sent to {b.clientEmail} — PayNow QR included in email.</div>
-                    )}
+                    {invoiceQr?.bookingId === b.id && <div style={{ marginTop: 10 }}>
+                      <div className="notice" style={{ marginTop: 0 }}>{invoiceQr.emailed ? `Invoice emailed to ${b.clientEmail}. The image below is ready to save.` : 'Invoice image ready. No email was sent.'}</div>
+                      <img className="invoice-image-preview" src={invoiceQr.imageDataUrl} alt={`Invoice for ${b.clientName}`} />
+                      <div className="invoice-image-actions">
+                        <a className="btn btn-primary" href={invoiceQr.imageDataUrl} download={`Mamamiyo-Invoice-${b.ref}.png`}>Download invoice image</a>
+                        <a className="btn btn-ghost" href={invoiceQr.qrDataUrl} download={`Mamamiyo-PayNow-QR-${b.ref}.png`}>Download QR code only</a>
+                      </div>
+                    </div>}
                   </div>
                   );
                 })()}
@@ -274,6 +339,9 @@ export default function AdminBookingsPage() {
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
                   {(b.status === 'pending' || b.status === 'confirmed') && (
                     <button className="btn btn-ghost" disabled={isBusy} onClick={() => setEditBooking(b)}>Edit booking</button>
+                  )}
+                  {b.status !== 'cancelled' && b.balanceStatus !== 'paid' && (
+                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => setEditAddOnsBooking(b)}>Edit Add-ons</button>
                   )}
                   {b.status === 'pending' && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-deposit')}>Confirm deposit received</button>
@@ -317,6 +385,7 @@ export default function AdminBookingsPage() {
                   )}
                   <button className="btn btn-ghost" style={{ color: 'var(--rust)' }} disabled={isBusy} onClick={() => { if (confirm('Permanently DELETE this booking? Cannot be undone.')) runAction(b.id, 'delete'); }}>Delete</button>
                 </div>
+                {actionSuccess?.id === b.id && <div className="notice" style={{ marginTop: 10 }}>{actionSuccess.message}</div>}
               </div>
             )}
           </div>
@@ -396,6 +465,19 @@ export default function AdminBookingsPage() {
           onClose={() => setEditBooking(null)}
           onSaved={async () => {
             setEditBooking(null);
+            await load();
+          }}
+        />
+      )}
+      {editAddOnsBooking && (
+        <EditAddOnsModal
+          booking={editAddOnsBooking}
+          onClose={() => setEditAddOnsBooking(null)}
+          onSaved={async (invoiceNeedsRegeneration) => {
+            const id = editAddOnsBooking.id;
+            setEditAddOnsBooking(null);
+            setInvoiceQr((current) => current?.bookingId === id ? null : current);
+            setActionSuccess({ id, message: invoiceNeedsRegeneration ? 'Changes saved. Please generate and send a new invoice.' : 'Changes saved.' });
             await load();
           }}
         />

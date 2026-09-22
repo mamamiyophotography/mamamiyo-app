@@ -29,9 +29,12 @@ export async function sendEmail(
   }
   const from = process.env.RESEND_FROM_EMAIL;
   if (!from) throw new Error('RESEND_FROM_EMAIL is not set — add it to .env.');
+  const adminEmail = process.env.PHOTOGRAPHER_EMAIL?.trim();
+  const bcc = adminEmail && adminEmail.toLowerCase() !== to.trim().toLowerCase() ? adminEmail : undefined;
   const { error } = await getClient().emails.send({
     from,
     to,
+    bcc,
     subject,
     text: body,
     html,

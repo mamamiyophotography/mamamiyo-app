@@ -20,6 +20,19 @@ export function currentBalanceDue(booking: {
   return booking.balanceDue + extra;
 }
 
+export function recalculateForAddOns(booking: {
+  subtotal: number; total: number; balanceDue: number;
+  addOns: Record<string, number> | null | undefined;
+}, nextAddOns: Record<string, number>) {
+  const difference = computeAddOnsTotal(nextAddOns) - computeAddOnsTotal(booking.addOns);
+  return {
+    difference,
+    subtotal: booking.subtotal + difference,
+    total: booking.total + difference,
+    balanceDue: Math.max(0, booking.balanceDue + difference),
+  };
+}
+
 export type PricingInput = {
   sessionType: SessionType;
   addOns: Record<string, number>;

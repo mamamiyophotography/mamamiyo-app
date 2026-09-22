@@ -57,7 +57,9 @@ export function createMockDb(seed: {
     if (where?.status !== undefined && typeof where.status === 'string' && b.status !== where.status) return false;
     if (where?.status?.in !== undefined && !where.status.in.includes(b.status)) return false;
     if (where?.status?.not !== undefined && b.status === where.status.not) return false;
-    if (where?.balanceStatus !== undefined && b.balanceStatus !== where.balanceStatus) return false;
+    if (where?.balanceStatus !== undefined && typeof where.balanceStatus === 'string' && b.balanceStatus !== where.balanceStatus) return false;
+    if (where?.balanceStatus?.not !== undefined && b.balanceStatus === where.balanceStatus.not) return false;
+    if (where?.version !== undefined && b.version !== where.version) return false;
     if (where?.invoiceGeneratedAt === null && b.invoiceGeneratedAt !== null) return false;
     if (where?.bundleParentId !== undefined && b.bundleParentId !== where.bundleParentId) return false;
     if (where?.holdExpiresAt?.lt !== undefined && (!b.holdExpiresAt || !(b.holdExpiresAt < where.holdExpiresAt.lt))) return false;
@@ -149,12 +151,15 @@ export function createMockDb(seed: {
           extraLineItems: [],
           invoiceRef: null,
           invoiceGeneratedAt: null,
+          invoiceStale: false,
+          version: 0,
           balancePaidAt: null,
           furtherRetouchReminderSentAt: null,
           holdExpiresAt: null,
           depositRef: null,
           remindersSent: [],
           createdAt: new Date(),
+          updatedAt: new Date(),
           ...data,
         };
         bookings.push(booking);
@@ -163,12 +168,18 @@ export function createMockDb(seed: {
       async update(args) {
         const b = bookings.find((x) => x.id === args.where.id);
         if (!b) throw new Error('Booking not found');
-        Object.assign(b, args.data);
+        const data = { ...args.data } as any;
+        if (data.version?.increment) data.version = b.version + data.version.increment;
+        Object.assign(b, data, { updatedAt: new Date() });
         return b;
       },
       async updateMany(args) {
         const matched = bookings.filter((b) => matchOverlap(args.where, b));
-        matched.forEach((b) => Object.assign(b, args.data));
+        matched.forEach((b) => {
+          const data = { ...args.data } as any;
+          if (data.version?.increment) data.version = b.version + data.version.increment;
+          Object.assign(b, data, { updatedAt: new Date() });
+        });
         return { count: matched.length };
       },
       async count(args) {

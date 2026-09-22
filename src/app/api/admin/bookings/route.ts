@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
 import { db } from '@/lib/db/client';
 
 export async function GET(req: NextRequest) {
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
     orderBy: { date: 'asc' }, // always sorted by photoshoot date
   });
 
-  const slim = (bookings as any[]).map((b) => ({ ...b, referencePhotoUrls: [] }));
+  const inbox = await new PrismaClient().galleryInbox.findMany({where:{bookingId:{in:(bookings as any[]).map(b=>b.id)}}});
+  const slim = (bookings as any[]).map((b) => ({ ...b, referencePhotoUrls: [], gallerySelections: inbox.filter(g=>g.bookingId===b.id) }));
   return NextResponse.json({ bookings: slim });
 }

@@ -3,7 +3,6 @@ import { sendWhatsApp } from './whatsapp';
 import { NotificationPair } from './notifications';
 import { generateIcs, icsToBase64, IcsEvent } from './ics';
 import { STUDIO_INFO } from './constants';
-import { fmtBookingTitle } from './format';
 
 export type Receipt = {
   sessionLabel: string;
@@ -71,18 +70,22 @@ function buildHtml(opts: {
     ? `<div style="margin:16px 0 20px;"><a href="${opts.calendarUrl}" target="_blank" style="display:inline-block;background:${gold};color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:10px 20px;border-radius:8px;font-family:sans-serif;">📅 Add to Google Calendar</a></div>`
     : '';
 
-  function sectionTable(header: string, rows: { label: string; value: string }[], emoji = ''): string {
+  function sectionTable(header: string, rows: { label: string; value: string }[], emoji = '', alignValues = false): string {
     const rowsHtml = rows.map(d => {
       const isBoldLabel = d.label.startsWith('**') && d.label.endsWith('**');
       const isBoldValue = d.value.startsWith('**') && d.value.endsWith('**');
-      const label = isBoldLabel ? `<strong>${d.label.slice(2, -2)}</strong>` : d.label;
+      const rawLabel = isBoldLabel ? d.label.slice(2, -2) : d.label;
+      const label = (isBoldLabel ? `<strong>${rawLabel}</strong>` : rawLabel).replace(/\n/g, '<br>');
       const valueFormatted = d.value.replace(/\n\*\*(.*?)\*\*/g, '<br><strong>$1</strong>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
       const rowStyle = isBoldLabel || isBoldValue
         ? `padding:8px 0;color:#2e2a22;font-size:14px;vertical-align:top;border-top:1.5px solid #2e2a22;`
         : `padding:6px 0;color:#6b6152;font-size:13px;vertical-align:top;border-bottom:1px solid #e6decb;`;
+      const valueStyle = alignValues
+        ? 'font-weight:600;text-align:right;white-space:nowrap;width:1%;padding-left:12px;'
+        : 'font-weight:600;overflow-wrap:anywhere;';
       return `<tr>` +
-        `<td style="${rowStyle}width:120px;min-width:120px;padding-right:16px;white-space:nowrap;">${label}</td>` +
-        `<td style="${rowStyle}font-weight:600;word-break:break-word;">${valueFormatted}</td>` +
+        `<td style="${rowStyle}padding-right:12px;overflow-wrap:anywhere;">${label}</td>` +
+        `<td style="${rowStyle}${valueStyle}">${valueFormatted}</td>` +
         `</tr>`;
     }).join('');
     return `<div style="margin:20px 0 0;">` +
@@ -141,9 +144,9 @@ function buildHtml(opts: {
   // Receipt with Payment Summary
   if (opts.receiptDetails?.length) {
     const isInvoice = !!(opts.inlineQrDataUrl || opts.qrApiUrl || opts.payNowRef);
-    bodyHtml += sectionTable(isInvoice ? 'Invoice' : 'Receipt', opts.receiptDetails, '🧾');
+    bodyHtml += sectionTable(isInvoice ? 'Invoice' : 'Receipt', opts.receiptDetails, '🧾', true);
     if (opts.paymentSummary?.length) {
-      bodyHtml += sectionTable('Payment Summary', opts.paymentSummary, '💰');
+      bodyHtml += sectionTable('Payment Summary', opts.paymentSummary, '💰', true);
     }
     if (opts.bundleSchedule) {
       bodyHtml += `<div style="margin:16px 0 0;padding:14px;background:${cream};border-radius:8px;border:1px solid ${line};">`;
@@ -167,16 +170,16 @@ function buildHtml(opts: {
       `<div style="font-size:12px;color:${soft};margin-top:8px;font-family:sans-serif;">Scan with your banking app to pay</div></div>`;
   }
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f5f0e8;font-family:Georgia,serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f0e8;padding:32px 16px;"><tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:14px;overflow:hidden;border:1px solid ${line};">
-<tr><td style="background:${ink};padding:24px 36px;text-align:center;">
+<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:#f5f0e8;padding:24px 10px;"><tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#fff;border-radius:14px;overflow:hidden;border:1px solid ${line};">
+<tr><td style="background:${ink};padding:24px 20px;text-align:center;">
   <div style="color:#c5a87c;font-size:9px;letter-spacing:4px;text-transform:uppercase;margin-bottom:8px;">Mamamiyo Photography</div>
   ${titleHtml}
 </td></tr>
-<tr><td style="padding:28px 36px;">${bodyHtml}</td></tr>
-<tr><td style="padding:14px 36px;border-top:1px solid ${line};text-align:center;">
+<tr><td style="padding:26px 20px;">${bodyHtml}</td></tr>
+<tr><td style="padding:14px 20px;border-top:1px solid ${line};text-align:center;">
   <div style="color:${soft};font-size:11px;font-family:sans-serif;">Mamamiyo Photography &nbsp;·&nbsp; <a href="https://www.mamamiyo-photography.com" style="color:${gold};text-decoration:none;">mamamiyo-photography.com</a></div>
 </td></tr>
 </table></td></tr></table></body></html>`;
@@ -250,8 +253,8 @@ export async function dispatchNotification(
   clientDetails?: ClientDetails,
   bookingMeta?: { date: string; clientName: string; sessionLabel: string },
 ): Promise<void> {
-  if (!clientEmail || !photographerEmail) {
-    console.warn('dispatchNotification: missing email address, skipping');
+  if (!clientEmail) {
+    console.warn('dispatchNotification: missing client email address, skipping email');
     return;
   }
 
@@ -294,7 +297,7 @@ export async function dispatchNotification(
   const studio = !isInvoiceEmail && receipt?.location === 'studio' ? studioRows() : undefined;
 
   // Bundle payment schedule — fixed reference, never changes regardless of surcharge
-  const isBundle = receipt?.isBundle || pair.client.emailSubject.toLowerCase().includes('bundle') || pair.photographer.emailSubject.toLowerCase().includes('bundle');
+  const isBundle = receipt?.isBundle || pair.client.emailSubject.toLowerCase().includes('bundle');
   const bundleSchedule = isBundle ? [
     'First Year Bundle ($1,088 total)',
     '',
@@ -307,16 +310,6 @@ export async function dispatchNotification(
   // Client setup: notes only (photos shown separately via inlinePhotos/photoUrls)
   const setupForClient: { label: string; value: string }[] = [];
   if (clientDetails?.notes) setupForClient.push({ label: 'Your notes', value: clientDetails.notes });
-
-  // Photographer client info
-  const clientInfoRows: { label: string; value: string }[] = [];
-  if (clientDetails) {
-    clientInfoRows.push({ label: 'Name', value: clientDetails.name });
-    clientInfoRows.push({ label: 'Email', value: clientDetails.email });
-    clientInfoRows.push({ label: 'Phone', value: clientDetails.phone });
-    if (clientDetails.address) clientInfoRows.push({ label: 'Address', value: clientDetails.address });
-    if (clientDetails.notes) clientInfoRows.push({ label: 'Notes', value: clientDetails.notes });
-  }
 
   const clientParagraphs = pair.client.emailBody.split('\n\n').filter(Boolean);
   const clientHtml = buildHtml({
@@ -334,33 +327,11 @@ export async function dispatchNotification(
     payNowRef: payNowRef || undefined,
   });
 
-  const photographerParagraphs = pair.photographer.emailBody.split('\n\n').filter(Boolean);
-  const photographerHtml = buildHtml({
-    subject: pair.photographer.emailSubject,
-    paragraphs: photographerParagraphs,
-    calendarUrl: gcalUrl || undefined,
-    studioDetails: studio,
-    clientDetails: clientInfoRows.length ? clientInfoRows : undefined,
-    receiptDetails: receipt ? receiptRows(receipt) : undefined,
-    paymentSummary: receipt ? paymentSummaryRows(receipt) : undefined,
-    bundleSchedule: bundleSchedule,
-    inlinePhotos: photoUrls.length ? photoUrls : undefined,
-    qrApiUrl,
-    payNowAmount: payNowAmount || undefined,
-    payNowRef: payNowRef || undefined,
-  });
-
   const sends: Promise<void>[] = [];
   if (pair.client.emailSubject && clientEmail) {
     sends.push(sendEmail(clientEmail, pair.client.emailSubject.replace('\n', ' — '), pair.client.emailBody, att, clientHtml));
   }
   if (clientPhoneE164) sends.push(sendWhatsApp(clientPhoneE164, pair.client.whatsappBody));
-  if (pair.photographer.emailSubject && photographerEmail) {
-    const photographerSubject = bookingMeta
-      ? fmtBookingTitle(bookingMeta.date, bookingMeta.clientName, bookingMeta.sessionLabel)
-      : pair.photographer.emailSubject;
-    sends.push(sendEmail(photographerEmail, photographerSubject, pair.photographer.emailBody, att, photographerHtml));
-  }
   if (photographerPhoneE164) sends.push(sendWhatsApp(photographerPhoneE164, pair.photographer.whatsappBody));
 
   const results = await Promise.allSettled(sends);

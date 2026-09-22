@@ -99,6 +99,17 @@ a { color: inherit; }
 }
 .ticket-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .ticket-total .amt { font-family: Georgia, serif; font-size: 24px; color: var(--gold-deep); }
+.final-bill-panel { margin-top: 14px; padding: 14px; border-radius: 10px; background: var(--gold-pale); }
+.final-bill-panel .ticket-row { grid-template-columns: minmax(0, 1fr) auto; }
+.final-bill-panel .ticket-row b { text-align: right; white-space: nowrap; overflow-wrap: normal; }
+.final-bill-panel .ticket-row span { white-space: pre-line; }
+.invoice-image-preview { width: 100%; height: auto; display: block; margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 20px rgba(46,42,34,.1); }
+.invoice-image-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
+.invoice-image-actions .btn { justify-content: center; text-align: center; text-decoration: none; }
+.final-bill-add-charge { display: grid; grid-template-columns: minmax(0, 1fr) 70px auto; gap: 6px; margin-top: 10px; }
+.final-bill-add-charge input { min-width: 0; width: 100% !important; }
+.final-bill-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.final-bill-actions .btn { justify-content: center; text-align: center; }
 
 .notice { background: var(--sage-pale); border: 1px solid #d3decA; color: #4b5940; font-size: 13px; padding: 12px 14px; border-radius: 10px; margin-top: 16px; }
 .notice.warn { background: var(--rust-pale); border-color: #e7c3a8; color: var(--rust); }
@@ -183,6 +194,10 @@ a { color: inherit; }
   .pre-shoot-heading, .post-shoot-heading { grid-column: auto; }
   .booking-card { padding: 14px; border-radius: 18px; }
   .ticket-row { grid-template-columns: 88px minmax(0, 1fr); gap: 5px 10px; }
+  .final-bill-panel .ticket-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .final-bill-add-charge { grid-template-columns: minmax(0, 1fr) 76px; }
+  .final-bill-add-charge .btn { grid-column: 1 / -1; justify-content: center; }
+  .final-bill-actions { grid-template-columns: 1fr; }
   .admin-form-pair { grid-template-columns: 1fr; gap: 0; }
   .availability-row { align-items: flex-start; }
   .availability-row > div span { display: block; margin: 3px 0 0 !important; }

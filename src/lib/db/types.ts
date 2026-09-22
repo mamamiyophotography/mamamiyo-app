@@ -46,6 +46,8 @@ export type Booking = {
   extraLineItems: { description: string; amount: number }[];
   invoiceRef: string | null;
   invoiceGeneratedAt: Date | null;
+  invoiceStale: boolean;
+  version: number;
   status: string;
   holdExpiresAt: Date | null;
   depositRef: string | null;
@@ -57,6 +59,7 @@ export type Booking = {
   bundleSessionNumber: number | null;
   remindersSent: string[];
   createdAt: Date;
+  updatedAt: Date;
 };
 
 export type Bundle = {

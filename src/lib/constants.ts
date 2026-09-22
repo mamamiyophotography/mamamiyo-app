@@ -125,9 +125,9 @@ export const ADDONS: Record<string, { name: string; price: number }> = {
   extraOutfit: { name: 'Additional Outfit', price: 100 },
   headcount: { name: 'Additional Family / Grandparents', price: 30 },
   // Photo Album (layflat, rigid paper)
-  album8x8: { name: 'Photo Album 8×8in / 20×20cm (20 pages, up to 30 images)', price: 108 },
-  album10x10: { name: 'Photo Album 10×10in / 25×25cm (20 pages, up to 30 images)', price: 138 },
-  album12x12: { name: 'Photo Album 12×12in / 30×30cm (20 pages, up to 30 images)', price: 158 },
+  album8x8: { name: 'Photo Album\n8in × 8in / 20cm × 20cm\n20 pages, up to 30 images', price: 108 },
+  album10x10: { name: 'Photo Album\n10in × 10in / 25cm × 25cm\n20 pages, up to 30 images', price: 138 },
+  album12x12: { name: 'Photo Album\n12in × 12in / 30cm × 30cm\n20 pages, up to 30 images', price: 158 },
   // Canvas
   canvas11x14: { name: 'Canvas 11×14in / 28×35cm', price: 88 },
   canvas16x24: { name: 'Canvas 16×24in / 40×60cm', price: 128 },
