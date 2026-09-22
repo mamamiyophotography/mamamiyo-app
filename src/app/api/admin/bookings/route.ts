@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (active === '1') {
     where = {
       OR: [
-        { status: { in: ['pending', 'confirmed', 'pending_balance', 'basic_retouch', 'further_retouch'] } },
+        { status: { in: ['pending', 'confirmed', 'pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch'] } },
         { status: 'completed', balanceStatus: 'pending' },
       ],
     };

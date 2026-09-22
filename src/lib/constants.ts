@@ -188,6 +188,7 @@ export const STATUS_ORDER = [
   'pending',
   'confirmed',
   'pending_balance',
+  'pending_basic_retouch',
   'basic_retouch',
   'further_retouch',
   'completed',
@@ -198,10 +199,11 @@ export type BookingStatusValue = typeof STATUS_ORDER[number] | 'cancelled';
 export const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   pending:         { label: '1. Pending deposit',     color: '#8A7F2F', bg: '#F4E4C1' },
   confirmed:       { label: '2. Booking confirmed',   color: '#FFFFFF', bg: '#7A9D8F' },
-  pending_balance: { label: '3. Basic retouch',       color: '#FFFFFF', bg: '#8FB4D4' }, // legacy records
-  basic_retouch:   { label: '3. Basic retouch',       color: '#FFFFFF', bg: '#8FB4D4' },
-  further_retouch: { label: '4. Further retouch',     color: '#FFFFFF', bg: '#5FA89A' },
-  completed:       { label: '5. Photoshoot complete', color: '#5A4B7A', bg: '#D0C4DD' },
+  pending_balance:      { label: '3. Pending basic retouch',  color: '#FFFFFF', bg: '#8FB4D4' }, // legacy records
+  pending_basic_retouch:{ label: '3. Pending basic retouch',  color: '#FFFFFF', bg: '#8FB4D4' },
+  basic_retouch:        { label: '4. Awaiting client selection', color: '#FFFFFF', bg: '#7898AA' },
+  further_retouch:      { label: '5. Further retouch',        color: '#FFFFFF', bg: '#5FA89A' },
+  completed:            { label: '6. Photoshoot complete',    color: '#5A4B7A', bg: '#D0C4DD' },
   cancelled:       { label: 'Cancelled',              color: '#7A6F62', bg: '#E4DED6' },
 };
 

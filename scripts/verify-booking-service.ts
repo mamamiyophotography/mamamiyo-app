@@ -162,7 +162,7 @@ async function run() {
 
   // ---- 4. Complete session -> basic retouch while payment remains independent ----
   const afterComplete = await markCompleted(db, booking.id);
-  check('session moves directly to basic retouch', afterComplete.status === 'basic_retouch');
+  check('session moves to pending basic retouch', afterComplete.status === 'pending_basic_retouch');
   check('balance remains pending during basic retouch', afterComplete.balanceStatus === 'pending');
 
   // ---- 5. Add an extra line item, generate invoice ----
@@ -173,22 +173,27 @@ async function run() {
 
   // ---- 6. Confirm balance -> basic retouch ----
   const settled = await confirmBalanceAndNotify(db, booking.id);
-  check('balance confirmation starts basic retouch', settled.status === 'basic_retouch');
+  check('balance confirmation keeps pending basic retouch', settled.status === 'pending_basic_retouch');
   check('balance status is paid', settled.balanceStatus === 'paid');
 
   const { advanceStage, revertStage, skipFurtherRetouch, reopenBalance } = await import('../src/lib/db/bookingService');
   const reopenedPayment = await reopenBalance(db, booking.id);
   check('paid balance can be corrected back to pending', reopenedPayment.balanceStatus === 'pending');
-  check('reopening balance keeps the basic retouch stage', reopenedPayment.status === 'basic_retouch');
+  check('reopening balance keeps pending basic retouch', reopenedPayment.status === 'pending_basic_retouch');
   await confirmBalanceAndNotify(db, booking.id);
+  const awaitingSelection = await advanceStage(db, booking.id);
+  check('basic retouch done advances to client selection', awaitingSelection.status === 'basic_retouch');
   const furtherRetouch = await advanceStage(db, booking.id);
-  check('basic retouch advances to further retouch', furtherRetouch.status === 'further_retouch');
+  check('client selection advances to further retouch', furtherRetouch.status === 'further_retouch');
   const fullyCompleted = await advanceStage(db, booking.id);
   check('further retouch advances to photoshoot complete', fullyCompleted.status === 'completed');
   const reopenedRetouch = await revertStage(db, booking.id);
   check('photoshoot complete can go back to further retouch', reopenedRetouch.status === 'further_retouch');
   const backToBasic = await revertStage(db, booking.id);
-  check('further retouch can go back to basic retouch', backToBasic.status === 'basic_retouch');
+  check('further retouch can go back to client selection', backToBasic.status === 'basic_retouch');
+  const backToPendingBasic = await revertStage(db, booking.id);
+  check('client selection can go back to pending basic retouch', backToPendingBasic.status === 'pending_basic_retouch');
+  await advanceStage(db, booking.id);
   const completedWithoutFurtherRetouch = await skipFurtherRetouch(db, booking.id);
   check('basic retouch can skip further retouch and complete', completedWithoutFurtherRetouch.status === 'completed');
 
@@ -233,7 +238,7 @@ async function run() {
   await markCompleted(db2, session1.id);
   const s1BalanceResult = await confirmBalanceAndNotify(db2, session1.id);
   check('balance can be confirmed without first generating an invoice', !s1BalanceResult.invoiceRef);
-  check('session 1 starts basic retouch after balance confirmed', s1BalanceResult.status === 'basic_retouch');
+  check('session 1 remains pending basic retouch after balance confirmed', s1BalanceResult.status === 'pending_basic_retouch');
   const bundleAfterS1Balance = await db2.bundle.findUnique({ where: { id: session1.bundleParentId! } });
   check('bundle auto-activates once session 1 balance is confirmed', bundleAfterS1Balance?.activated === true);
 
@@ -348,6 +353,7 @@ async function run() {
   await confirmDepositAndNotify(reminderDb, reminderBooking.id);
   await markCompleted(reminderDb, reminderBooking.id);
   await confirmBalanceAndNotify(reminderDb, reminderBooking.id);
+  await advanceStage(reminderDb, reminderBooking.id); // Basic Retouch done; Gallery is ready for client selection.
   const reminderNow = new Date('2026-09-18T10:00:00Z');
   await reminderDb.booking.update({ where: { id: reminderBooking.id }, data: { balancePaidAt: new Date('2026-08-18T10:00:00Z') } });
   check('one-month further-retouch reminder is sent', await checkAndSendFurtherRetouchReminders(reminderDb, reminderNow) === 1);

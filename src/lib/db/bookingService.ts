@@ -496,7 +496,7 @@ export async function markCompleted(db: any, bookingId: string) {
   const due = currentBalanceDue({ balanceDue: booking.balanceDue, extraLineItems: booking.extraLineItems as { description: string; amount: number }[] });
   return db.booking.update({
     where: { id: bookingId },
-    data: { status: 'basic_retouch', balanceStatus: due > 0 ? 'pending' : 'n/a' },
+    data: { status: 'pending_basic_retouch', balanceStatus: due > 0 ? 'pending' : 'n/a' },
   });
 }
 
@@ -560,8 +560,8 @@ export async function confirmBalanceAndNotify(db: any, bookingId: string) {
       balancePaidAt: new Date(),
       furtherRetouchReminderSentAt: null,
       version: { increment: 1 },
-      // Convert old pending_balance records to the merged Basic Retouch stage.
-      status: current.status === 'pending_balance' ? 'basic_retouch' : current.status,
+      // Convert old records to the photographer's pending Basic Retouch stage.
+      status: current.status === 'pending_balance' ? 'pending_basic_retouch' : current.status,
     },
   });
   if (result.count !== 1) {
@@ -762,8 +762,10 @@ export async function purgeExpiredHolds(db: any) {
  *  'further_retouch' to final 'completed'. Earlier stages have
  *  their own dedicated transitions (confirmDepositAndNotify, markCompleted,
  *  confirmBalanceAndNotify) and are intentionally not reachable here. */
-const ADVANCEABLE_STATUSES = ['pending_balance', 'basic_retouch', 'further_retouch'];
+const ADVANCEABLE_STATUSES = ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch'];
 const REVERSIBLE_POST_PROCESSING_STATUSES: Record<string, string> = {
+  pending_basic_retouch: 'confirmed',
+  basic_retouch: 'pending_basic_retouch',
   further_retouch: 'basic_retouch',
   completed: 'further_retouch',
 };
@@ -774,12 +776,12 @@ export async function advanceStage(db: any, bookingId: string) {
     throw new Error(`Cannot advance stage from status "${booking.status}".`);
   }
   const nextStatus = booking.status === 'pending_balance'
-    ? 'further_retouch'
+    ? 'basic_retouch'
     : STATUS_ORDER[STATUS_ORDER.indexOf(booking.status as (typeof STATUS_ORDER)[number]) + 1];
   return db.booking.update({ where: { id: bookingId }, data: { status: nextStatus } });
 }
 
-/** Rolls back a post-processing stage without changing payment records or
+/** Rolls back one workflow stage without changing payment records or
  * sending customer notifications. */
 export async function revertStage(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
@@ -822,7 +824,7 @@ export async function checkAndSendFurtherRetouchReminders(db: any, now = new Dat
   const settings = await getSettings(db);
   const awaitingSelection = await db.booking.findMany({
     where: {
-      status: { in: ['basic_retouch', 'pending_balance'] },
+      status: 'basic_retouch',
       balanceStatus: 'paid',
     },
   });
@@ -880,7 +882,7 @@ export async function sendShootDayBalanceInvoices(db: any, now = new Date()) {
   const bookings = await db.booking.findMany({
     where: {
       date: singaporeDateString(now),
-      status: { in: ['confirmed', 'pending_balance', 'basic_retouch', 'further_retouch', 'completed'] },
+      status: { in: ['confirmed', 'pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'completed'] },
       balanceStatus: 'pending',
       invoiceGeneratedAt: null,
     },
