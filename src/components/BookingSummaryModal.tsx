@@ -17,9 +17,24 @@ type SummaryBooking = {
   ref?: string;
 };
 
+function splitBookingNotes(notes: string) {
+  let remaining = notes || '';
+  const genderMatch = remaining.match(/Baby gender:\s*([^\n]+?)(?=\s+(?:Sibling joining:|Baby name(?:\s+is|:))|$)/i);
+  const siblingMatch = remaining.match(/Sibling joining:\s*(yes|no)/i);
+  if (genderMatch) remaining = remaining.replace(genderMatch[0], ' ');
+  if (siblingMatch) remaining = remaining.replace(siblingMatch[0], ' ');
+  const other = remaining.split(/\n+/).map(line => line.trim()).filter(Boolean).join(' · ').replace(/\s{2,}/g, ' ').trim();
+  return {
+    gender: genderMatch?.[1]?.trim() || '',
+    sibling: siblingMatch?.[1] ? siblingMatch[1][0].toUpperCase() + siblingMatch[1].slice(1).toLowerCase() : '',
+    other,
+  };
+}
+
 export default function BookingSummaryModal({ booking, onClose }: { booking: SummaryBooking; onClose: () => void }) {
   const [imageDataUrl, setImageDataUrl] = useState('');
   const selectionLabel = /maternity/i.test(booking.sessionLabel) ? 'Outfit selections' : 'Setup selections';
+  const noteParts = splitBookingNotes(booking.notes);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,7 +48,9 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       ['Email', booking.clientEmail],
       ['Phone', booking.clientPhone],
       ...(booking.address ? [['Address', booking.address]] : []),
-      ['Notes', booking.notes || '—'],
+      ...(noteParts.gender ? [["Baby's gender", noteParts.gender]] : []),
+      ...(noteParts.sibling ? [['Sibling joining', noteParts.sibling]] : []),
+      ...(noteParts.other ? [['Other notes', noteParts.other]] : []),
       [selectionLabel, String(booking.referencePhotoUrls.length)],
     ];
     const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
@@ -49,12 +66,14 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
     ctx.fillStyle = '#b08d57'; ctx.font = '52px Georgia'; ctx.fillText('Booking Summary', 540, 205);
     let y = 350;
     entries.forEach(([label, value]) => {
-      ctx.textAlign = 'left'; ctx.fillStyle = '#6b6152'; ctx.font = '25px Arial'; ctx.fillText(label, 100, y);
+      ctx.font = '700 27px Arial'; const lines = wrap(ctx, value, 610);
+      const height = Math.max(58, lines.length * 36 + 18); const centre = y + height / 2;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#6b6152'; ctx.font = '25px Arial'; ctx.fillText(label, 100, centre);
       ctx.fillStyle = '#2e2a22'; ctx.font = '700 27px Arial';
-      const lines = wrap(ctx, value, 610); lines.forEach((line, index) => ctx.fillText(line, 370, y + index * 36));
-      const height = Math.max(58, lines.length * 36 + 18); y += height;
-      ctx.strokeStyle = '#e6decb'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(100, y - 20); ctx.lineTo(980, y - 20); ctx.stroke();
+      const firstLine = centre - ((lines.length - 1) * 36) / 2; lines.forEach((line, index) => ctx.fillText(line, 370, firstLine + index * 36));
+      y += height; ctx.strokeStyle = '#e6decb'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(100, y); ctx.lineTo(980, y); ctx.stroke();
     });
+    ctx.textBaseline = 'alphabetic';
     if (booking.referencePhotoUrls.length > 0) {
       ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 30px Arial'; ctx.fillText(selectionLabel, 100, y + 18); y += 58;
       const imageWidth = 270, imageHeight = 310, gap = 35;
@@ -88,7 +107,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
     }
     buildSummary();
     return () => { cancelled = true; };
-  }, [booking, selectionLabel]);
+  }, [booking, selectionLabel, noteParts.gender, noteParts.sibling, noteParts.other]);
 
   return (
     <div
@@ -115,7 +134,9 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         <div className="ticket-row"><span>Email</span><b>{booking.clientEmail}</b></div>
         <div className="ticket-row"><span>Phone</span><b>{booking.clientPhone}</b></div>
         {booking.address && <div className="ticket-row"><span>Address</span><b>{booking.address}</b></div>}
-        <div className="ticket-row"><span>Notes</span><b style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>{booking.notes || '—'}</b></div>
+        {noteParts.gender && <div className="ticket-row" style={{ alignItems: 'center' }}><span>Baby&apos;s gender</span><b>{noteParts.gender}</b></div>}
+        {noteParts.sibling && <div className="ticket-row" style={{ alignItems: 'center' }}><span>Sibling joining</span><b>{noteParts.sibling}</b></div>}
+        {noteParts.other && <div className="ticket-row" style={{ alignItems: 'center' }}><span>Other notes</span><b style={{ overflowWrap: 'anywhere' }}>{noteParts.other}</b></div>}
 
         {booking.referencePhotoUrls.length > 0 && (
           <div style={{ marginTop: 10 }}>
