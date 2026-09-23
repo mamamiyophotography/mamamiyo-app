@@ -19,8 +19,11 @@ type SummaryBooking = {
 
 export default function BookingSummaryModal({ booking, onClose }: { booking: SummaryBooking; onClose: () => void }) {
   const [imageDataUrl, setImageDataUrl] = useState('');
+  const selectionLabel = /maternity/i.test(booking.sessionLabel) ? 'Outfit selections' : 'Setup selections';
 
   useEffect(() => {
+    let cancelled = false;
+    async function buildSummary() {
     const entries = [
       ['Client', booking.clientName],
       ['Session', booking.sessionLabel],
@@ -31,7 +34,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       ['Phone', booking.clientPhone],
       ...(booking.address ? [['Address', booking.address]] : []),
       ['Notes', booking.notes || '—'],
-      ['Reference photos', String(booking.referencePhotoUrls.length)],
+      [selectionLabel, String(booking.referencePhotoUrls.length)],
     ];
     const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
       const words = text.split(/\s+/); const lines: string[] = []; let line = '';
@@ -52,9 +55,40 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       const height = Math.max(58, lines.length * 36 + 18); y += height;
       ctx.strokeStyle = '#e6decb'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(100, y - 20); ctx.lineTo(980, y - 20); ctx.stroke();
     });
+    if (booking.referencePhotoUrls.length > 0) {
+      ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 30px Arial'; ctx.fillText(selectionLabel, 100, y + 18); y += 58;
+      const imageWidth = 270, imageHeight = 310, gap = 35;
+      const loadImage = async (url: string) => {
+        try {
+          const response = await fetch(url); if (!response.ok) return null;
+          const objectUrl = URL.createObjectURL(await response.blob());
+          const image = new Image(); image.src = objectUrl;
+          await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Image failed to load')); });
+          return { image, objectUrl };
+        } catch { return null; }
+      };
+      const loaded = await Promise.all(booking.referencePhotoUrls.slice(0, 6).map(loadImage));
+      loaded.forEach((loadedImage, index) => {
+        const column = index % 3, row = Math.floor(index / 3); const x = 100 + column * (imageWidth + gap); const top = y + row * (imageHeight + 28);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(x, top, imageWidth, imageHeight);
+        ctx.strokeStyle = '#ded4c9'; ctx.lineWidth = 2; ctx.strokeRect(x, top, imageWidth, imageHeight);
+        if (loadedImage) {
+          const scale = Math.min(imageWidth / loadedImage.image.naturalWidth, imageHeight / loadedImage.image.naturalHeight);
+          const width = loadedImage.image.naturalWidth * scale, height = loadedImage.image.naturalHeight * scale;
+          ctx.drawImage(loadedImage.image, x + (imageWidth - width) / 2, top + (imageHeight - height) / 2, width, height);
+          URL.revokeObjectURL(loadedImage.objectUrl);
+        } else {
+          ctx.fillStyle = '#8b7d72'; ctx.font = '22px Arial'; ctx.textAlign = 'center'; ctx.fillText(`Selection ${index + 1}`, x + imageWidth / 2, top + imageHeight / 2);
+        }
+      });
+      y += Math.ceil(Math.min(6, booking.referencePhotoUrls.length) / 3) * (imageHeight + 28);
+    }
     if (booking.ref) { ctx.textAlign = 'center'; ctx.fillStyle = '#8c6d3f'; ctx.font = '23px Arial'; ctx.fillText(`Booking reference: ${booking.ref}`, 540, Math.min(canvas.height - 70, y + 45)); }
-    setImageDataUrl(canvas.toDataURL('image/png'));
-  }, [booking]);
+    if (!cancelled) setImageDataUrl(canvas.toDataURL('image/png'));
+    }
+    buildSummary();
+    return () => { cancelled = true; };
+  }, [booking, selectionLabel]);
 
   return (
     <div
@@ -85,7 +119,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
 
         {booking.referencePhotoUrls.length > 0 && (
           <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', marginBottom: 6 }}>Reference photos ({booking.referencePhotoUrls.length})</div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', marginBottom: 6 }}>{selectionLabel} ({booking.referencePhotoUrls.length})</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {booking.referencePhotoUrls.map((url) => (
                 <a key={url} href={url} target="_blank" rel="noopener" style={{ display: 'block', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', border: '1.5px solid var(--line)' }}>
