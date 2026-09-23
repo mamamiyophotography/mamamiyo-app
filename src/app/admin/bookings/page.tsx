@@ -136,17 +136,23 @@ export default function AdminBookingsPage() {
     ctx.strokeStyle = '#2e2a22'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(100, y); ctx.lineTo(980, y); ctx.stroke(); y += 54;
     for (const row of rows) {
       const lines = row.label.split('\n');
+      const height = rowHeight(row.label);
+      const centerY = y + (height - 44) / 2;
+      const firstLineY = centerY - ((lines.length - 1) * 34) / 2;
+      ctx.textBaseline = 'middle';
       ctx.textAlign = 'left'; ctx.fillStyle = '#6b6152'; ctx.font = '27px Arial';
-      lines.forEach((line, index) => ctx.fillText(line, 100, y + index * 34));
-      ctx.textAlign = 'right'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 29px Arial'; ctx.fillText(row.amount, 980, y);
-      y += rowHeight(row.label);
+      lines.forEach((line, index) => ctx.fillText(line, 100, firstLineY + index * 34));
+      ctx.textAlign = 'right'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 29px Arial'; ctx.fillText(row.amount, 980, centerY);
+      y += height;
       ctx.strokeStyle = '#e6decb'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(100, y - 20); ctx.lineTo(980, y - 20); ctx.stroke();
     }
-    y += 10; ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 36px Arial'; ctx.fillText('Balance due', 100, y + 20);
-    ctx.textAlign = 'right'; ctx.fillStyle = '#8c6d3f'; ctx.font = '60px Georgia'; ctx.fillText(`$${due}`, 980, y + 25);
+    y += 10;
+    const balanceCenterY = y + 24;
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 36px Arial'; ctx.fillText('Balance due', 100, balanceCenterY);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#8c6d3f'; ctx.font = '60px Georgia'; ctx.fillText(`$${due}`, 980, balanceCenterY);
     const qr = new Image(); qr.src = qrDataUrl; await new Promise<void>((resolve, reject) => { qr.onload = () => resolve(); qr.onerror = () => reject(new Error('Unable to render QR code.')); });
     const qrY = y + 90; ctx.drawImage(qr, 390, qrY, 300, 300);
-    ctx.textAlign = 'center'; ctx.fillStyle = '#6b6152'; ctx.font = '24px Arial'; ctx.fillText('Scan with your banking app to pay', 540, qrY + 345);
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center'; ctx.fillStyle = '#6b6152'; ctx.font = '24px Arial'; ctx.fillText('Scan with your banking app to pay', 540, qrY + 345);
     ctx.font = '22px Arial'; ctx.fillText(`PayNow reference: ${invoiceRef}`, 540, qrY + 385);
     return canvas.toDataURL('image/png');
   }
