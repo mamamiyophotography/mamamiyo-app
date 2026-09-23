@@ -117,19 +117,22 @@ export default function AdminBookingsPage() {
     }
 
     const rowHeight = (label: string) => 48 + (label.split('\n').length - 1) * 34;
+    const rowsHeight = rows.reduce((sum, row) => sum + rowHeight(row.label), 0);
+    const contentHeight = 1010 + rowsHeight;
     const canvas = document.createElement('canvas');
     canvas.width = 1080;
-    canvas.height = Math.max(1450, 1080 + rows.reduce((sum, row) => sum + rowHeight(row.label), 0));
+    canvas.height = Math.max(1450, contentHeight + 108);
+    const verticalOffset = (canvas.height - contentHeight) / 2 - 54;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Unable to create invoice image.');
     ctx.fillStyle = '#f5f0e8'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#2e2a22'; ctx.fillRect(54, 54, 972, 230);
-    ctx.textAlign = 'center'; ctx.fillStyle = '#c5a87c'; ctx.font = '700 26px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY', 540, 125);
-    ctx.fillStyle = '#b08d57'; ctx.font = '52px Georgia'; ctx.fillText('Invoice', 540, 205);
-    ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 34px Arial'; ctx.fillText(booking.clientName, 100, 350);
-    ctx.font = '25px Arial'; ctx.fillStyle = '#6b6152'; ctx.fillText(`${booking.sessionLabel} · ${fmtDatePretty(booking.date)} at ${fmtTime12(booking.startTime)}`, 100, 400);
-    ctx.fillText(`Reference: ${invoiceRef}`, 100, 444);
-    let y = 525;
+    ctx.fillStyle = '#2e2a22'; ctx.fillRect(54, 54 + verticalOffset, 972, 230);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#c5a87c'; ctx.font = '700 26px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY', 540, 125 + verticalOffset);
+    ctx.fillStyle = '#b08d57'; ctx.font = '52px Georgia'; ctx.fillText('Invoice', 540, 205 + verticalOffset);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 34px Arial'; ctx.fillText(booking.clientName, 100, 350 + verticalOffset);
+    ctx.font = '25px Arial'; ctx.fillStyle = '#6b6152'; ctx.fillText(`${booking.sessionLabel} · ${fmtDatePretty(booking.date)} at ${fmtTime12(booking.startTime)}`, 100, 400 + verticalOffset);
+    ctx.fillText(`Reference: ${invoiceRef}`, 100, 444 + verticalOffset);
+    let y = 525 + verticalOffset;
     ctx.strokeStyle = '#2e2a22'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(100, y); ctx.lineTo(980, y); ctx.stroke(); y += 54;
     for (const row of rows) {
       const lines = row.label.split('\n');
