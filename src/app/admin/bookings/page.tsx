@@ -10,7 +10,7 @@ import SetupChoiceModal from '@/components/SetupChoiceModal';
 
 type Booking = {
   additionalOrders?: {id:string;galleryId:string;version:number;items:{name:string;quantity:number;amount:number;bonusRetouches:number}[];total:number;bonusRetouches:number;status:string;invoiceRef:string;createdAt:string;paidAt:string|null}[];
-  gallerySelections?: {galleryId:string;version:number;submitted:boolean;locked:boolean;deliveredAt:string|null;emailSentAt:string|null;items:{filename:string;note:string}[]}[];
+  gallerySelections?: {galleryId:string;version:number;submitted:boolean;locked:boolean;deliveredAt:string|null;emailSentAt:string|null}[];
   id: string; ref: string; sessionTypeId: string; sessionLabel: string; location: string;
   date: string; startTime: string; endTime: string; isWeekend: boolean; addOns: Record<string, number>;
   notes: string; address: string; discountCode: string | null; discountAmount: number;
@@ -108,6 +108,12 @@ export default function AdminBookingsPage() {
     if (weekendFee) rows.push({ label: 'Weekend / PH surcharge', amount: `+$${weekendFee}` });
     if (booking.discountAmount) rows.push({ label: `Discount (${booking.discountCode || ''})`, amount: `−$${booking.discountAmount}` });
     booking.extraLineItems.forEach((item) => rows.push({ label: item.description, amount: `+$${item.amount}` }));
+    const extraTotal = booking.extraLineItems.reduce((sum, item) => sum + item.amount, 0);
+    const invoiceTotal = (booking.sessionTypeId === 'bundle' ? booking.balanceDue : booking.total) + extraTotal;
+    rows.push({ label: 'Total', amount: `$${invoiceTotal}` });
+    if (booking.sessionTypeId !== 'bundle' && booking.depositAmount > 0) {
+      rows.push({ label: 'Deposit paid', amount: `−$${booking.depositAmount}` });
+    }
 
     const rowHeight = (label: string) => 48 + (label.split('\n').length - 1) * 34;
     const canvas = document.createElement('canvas');

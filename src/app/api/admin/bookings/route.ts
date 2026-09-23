@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { db } from '@/lib/db/client';
 
 export async function GET(req: NextRequest) {
@@ -26,8 +25,14 @@ export async function GET(req: NextRequest) {
     orderBy: { date: 'asc' }, // always sorted by photoshoot date
   });
 
-  const inbox = await new PrismaClient().galleryInbox.findMany({where:{bookingId:{in:(bookings as any[]).map(b=>b.id)}}});
-  const orders = await new PrismaClient().additionalOrder.findMany({where:{bookingId:{in:(bookings as any[]).map(b=>b.id)},status:{not:'superseded'}},orderBy:{createdAt:'desc'}});
+  const bookingIds = (bookings as any[]).map(b=>b.id);
+  const [inbox,orders] = await Promise.all([
+    db.galleryInbox.findMany({
+      where:{bookingId:{in:bookingIds}},
+      select:{galleryId:true,bookingId:true,version:true,submitted:true,locked:true,deliveredAt:true,emailSentAt:true},
+    }),
+    db.additionalOrder.findMany({where:{bookingId:{in:bookingIds},status:{not:'superseded'}},orderBy:{createdAt:'desc'}}),
+  ]);
   const slim = (bookings as any[]).map((b) => ({ ...b, referencePhotoUrls: [], gallerySelections: inbox.filter(g=>g.bookingId===b.id), additionalOrders:orders.filter(o=>o.bookingId===b.id) }));
   return NextResponse.json({ bookings: slim });
 }
