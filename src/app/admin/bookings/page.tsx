@@ -50,6 +50,7 @@ export default function AdminBookingsPage() {
   const [editAddOnsBooking, setEditAddOnsBooking] = useState<Booking | null>(null);
   const [setupChoiceBooking, setSetupChoiceBooking] = useState<Booking | null>(null);
   const [actionSuccess, setActionSuccess] = useState<{ id: string; message: string } | null>(null);
+  const [invoiceGenerating, setInvoiceGenerating] = useState<{ id: string; sendEmail: boolean } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -180,12 +181,17 @@ export default function AdminBookingsPage() {
   }
 
   async function generateInvoice(booking: Booking, sendEmail: boolean) {
-    const data = await runAction(booking.id, 'generate-invoice', { sendEmail });
-    if (data?.payNowPayload) {
-      const QRCode = (await import('qrcode')).default;
-      const qrDataUrl = await QRCode.toDataURL(data.payNowPayload, { margin: 1, width: 320 });
-      const imageDataUrl = await createInvoiceImage(booking, qrDataUrl, data.due, data.booking.invoiceRef);
-      setInvoiceQr({ bookingId: booking.id, qrDataUrl, imageDataUrl, due: data.due, emailed: data.emailed });
+    setInvoiceGenerating({ id: booking.id, sendEmail });
+    try {
+      const data = await runAction(booking.id, 'generate-invoice', { sendEmail });
+      if (data?.payNowPayload) {
+        const QRCode = (await import('qrcode')).default;
+        const qrDataUrl = await QRCode.toDataURL(data.payNowPayload, { margin: 1, width: 320 });
+        const imageDataUrl = await createInvoiceImage(booking, qrDataUrl, data.due, data.booking.invoiceRef);
+        setInvoiceQr({ bookingId: booking.id, qrDataUrl, imageDataUrl, due: data.due, emailed: data.emailed });
+      }
+    } finally {
+      setInvoiceGenerating(null);
     }
   }
 
@@ -347,11 +353,13 @@ export default function AdminBookingsPage() {
                       }}>Add</button>
                     </div>
                     <div className="final-bill-actions">
-                      <button className="btn btn-primary" disabled={isBusy} onClick={() => generateInvoice(b, true)}>
+                      <button className="btn btn-primary" disabled={isBusy || invoiceGenerating?.id === b.id} onClick={() => generateInvoice(b, true)}>
                         Send invoice by email
                       </button>
-                      <button className="btn btn-ghost" disabled={isBusy} onClick={() => generateInvoice(b, false)}>
-                        Create image for WhatsApp
+                      <button className="btn btn-ghost" disabled={isBusy || invoiceGenerating?.id === b.id} onClick={() => generateInvoice(b, false)} aria-live="polite">
+                        {invoiceGenerating?.id === b.id && !invoiceGenerating.sendEmail
+                          ? <span className="invoice-generating">Creating image <span className="loading-dots" aria-label="Please wait"><i></i><i></i><i></i></span></span>
+                          : 'Create image for WhatsApp'}
                       </button>
                       <button className="btn btn-ghost" disabled={isBusy} onClick={() => {
                         if (confirm('Confirm that the balance payment has been received? A payment receipt will be emailed to the client.')) {
