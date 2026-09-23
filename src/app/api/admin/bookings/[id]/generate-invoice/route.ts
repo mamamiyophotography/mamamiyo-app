@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Build PayNow QR
     let payNowPayload: string | null = null;
     let payNowQr: PayNowQr | undefined;
-    if (shouldSendEmail) try {
+    try {
       const mobile = (settings.paynowMobile || '').replace(/\D/g, '').slice(-8);
       if (mobile.length === 8) {
         payNowPayload = buildPayNowPayload({
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       isInvoice: true,
     };
 
-    try {
+    if (shouldSendEmail) try {
       const pair = invoiceNotification(
         {
           ref: booking.ref, sessionTypeId: booking.sessionTypeId, sessionLabel: booking.sessionLabel,

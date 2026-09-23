@@ -236,6 +236,11 @@ async function run() {
   check('session 1 remains pending basic retouch after balance confirmed', s1BalanceResult.status === 'pending_basic_retouch');
   const bundleAfterS1Balance = await db2.bundle.findUnique({ where: { id: session1.bundleParentId! } });
   check('bundle auto-activates once session 1 balance is confirmed', bundleAfterS1Balance?.activated === true);
+  const session1Delivered = await advanceStage(db2, session1.id);
+  check('bundle session 1 completes after Basic Retouch without client selection', session1Delivered.status === 'completed');
+  const session1Reopened = await revertStage(db2, session1.id);
+  check('bundle session 1 can return to pending Basic Retouch', session1Reopened.status === 'pending_basic_retouch');
+  await advanceStage(db2, session1.id);
 
   const session2 = await redeemBundleSessionAndNotify(
     db2,

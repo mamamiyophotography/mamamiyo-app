@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/client';
-import { checkAndSendFurtherRetouchReminders, checkAndSendReminders } from '@/lib/db/bookingService';
+import { checkAndSendGalleryReminders, checkAndSendReminders } from '@/lib/db/bookingService';
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization');
@@ -10,8 +10,8 @@ export async function GET(req: NextRequest) {
   }
   try {
     const sent = await checkAndSendReminders(db);
-    const furtherRetouchSent = await checkAndSendFurtherRetouchReminders(db);
-    return NextResponse.json({ ok: true, remindersSent: sent, furtherRetouchRemindersSent: furtherRetouchSent });
+    const galleryReminders = await checkAndSendGalleryReminders(db);
+    return NextResponse.json({ ok: true, remindersSent: sent, galleryReminders });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }

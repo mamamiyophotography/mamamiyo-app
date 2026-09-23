@@ -138,6 +138,11 @@ model GalleryInbox {
   submitted Boolean @default(false)
   locked Boolean @default(false)
   deliveredAt DateTime?
+  expiresAt DateTime?
+  selectionEnabled Boolean @default(true)
+  selectionReminderSentAt DateTime?
+  expiryReminderSentAt DateTime?
+  createdAt DateTime @default(now())
   emailKey String?
   emailSentAt DateTime?
   updatedAt DateTime @updatedAt

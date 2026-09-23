@@ -17,7 +17,7 @@ const escape = (value: string) => value.replace(/[&<>"']/g, c => ({'&':'&amp;','
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({error:'Unauthorized'}, {status:401});
   const ref = req.nextUrl.searchParams.get('ref') || '';
-  const b = await prisma.booking.findUnique({where:{ref}, select:{ref:true, clientName:true, date:true, status:true}});
+  const b = await prisma.booking.findUnique({where:{ref}, select:{ref:true, clientName:true, date:true, status:true, sessionTypeId:true, bundleSessionNumber:true}});
   return b ? NextResponse.json(b) : NextResponse.json({error:'Booking reference not found'}, {status:404});
 }
 export async function POST(req: NextRequest) {
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
   }
   if (!/^[a-f0-9]{32}$/.test(p.galleryId || '') || typeof p.bookingRef !== 'string' || p.bookingRef.length > 100 ||
       !Number.isSafeInteger(p.version) || p.version < 0 || typeof p.submitted !== 'boolean' || typeof p.locked !== 'boolean' ||
+      typeof p.selectionEnabled !== 'boolean' || (p.expiresAt !== null && (typeof p.expiresAt !== 'string' || !Number.isFinite(Date.parse(p.expiresAt)))) ||
       !Array.isArray(p.items) || p.items.length > 60 || p.items.some((i:any) => typeof i.filename !== 'string' || i.filename.length > 255 || typeof i.note !== 'string' || i.note.length > 1000) ||
       (p.deliveredAt !== null && (typeof p.deliveredAt !== 'string' || !Number.isFinite(Date.parse(p.deliveredAt))))) {
     return NextResponse.json({error:'Invalid payload'}, {status:400});
@@ -80,8 +81,8 @@ export async function POST(req: NextRequest) {
     if (previous && (previous.version > p.version || (previous.deliveredAt && (!p.deliveredAt || previous.deliveredAt > new Date(p.deliveredAt))))) return previous;
     const deliveredAt = p.deliveredAt ? new Date(p.deliveredAt) : null;
     const result = await tx.galleryInbox.upsert({where:{galleryId:p.galleryId},
-      create:{galleryId:p.galleryId, bookingId:booking.id, version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt},
-      update:{version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt}});
+      create:{galleryId:p.galleryId, bookingId:booking.id, version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt,expiresAt:p.expiresAt ? new Date(p.expiresAt) : null,selectionEnabled:p.selectionEnabled},
+      update:{version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt,expiresAt:p.expiresAt ? new Date(p.expiresAt) : null,selectionEnabled:p.selectionEnabled}});
     if (deliveredAt && ['basic_retouch','pending_balance','further_retouch'].includes(booking.status)) {
       await tx.booking.update({where:{id:booking.id},data:{status:'completed'}});
     } else if (p.locked && p.submitted && ['basic_retouch','pending_balance'].includes(booking.status)) {
@@ -89,12 +90,22 @@ export async function POST(req: NextRequest) {
     }
     return result;
   });
-  if (!entry.submitted) return NextResponse.json({ok:true});
+  let bundleRetention: {galleryIds:string[]; expiresAt:string} | null = null;
+  if (p.deliveredAt && booking.bundleParentId && booking.bundleSessionNumber === 3) {
+    const bundleBookings = await prisma.booking.findMany({where:{bundleParentId:booking.bundleParentId},select:{id:true}});
+    const bundleGalleries = await prisma.galleryInbox.findMany({
+      where:{bookingId:{in:bundleBookings.map(item=>item.id)}},
+      select:{galleryId:true},
+    });
+    const expiresAt = new Date(Date.parse(p.deliveredAt) + 90 * 24 * 60 * 60 * 1000).toISOString();
+    bundleRetention = {galleryIds:bundleGalleries.map(item=>item.galleryId),expiresAt};
+  }
+  if (!entry.submitted) return NextResponse.json({ok:true,bundleRetention});
   // A lock-only change does not create another selection email.
   const fingerprint = JSON.stringify({items:entry.items, deliveredAt:entry.deliveredAt});
   const {createHash} = await import('node:crypto');
   const eventKey = createHash('sha256').update(fingerprint).digest('hex');
-  if (entry.emailKey === eventKey) return NextResponse.json({ok:true});
+  if (entry.emailKey === eventKey) return NextResponse.json({ok:true,bundleRetention});
   if (!process.env.PHOTOGRAPHER_EMAIL || !process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
     return NextResponse.json({error:'Photographer email is not configured; selection is saved'}, {status:503});
   }
@@ -110,5 +121,5 @@ export async function POST(req: NextRequest) {
     {idempotencyKey:`gallery-${entry.galleryId}-${eventKey}`});
   if (result.error) return NextResponse.json({error:'Email pending retry; selection is saved'}, {status:503});
   await prisma.galleryInbox.updateMany({where:{galleryId:entry.galleryId,version:entry.version},data:{emailKey:eventKey,emailSentAt:new Date()}});
-  return NextResponse.json({ok:true});
+  return NextResponse.json({ok:true,bundleRetention});
 }

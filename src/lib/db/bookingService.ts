@@ -774,7 +774,12 @@ export async function advanceStage(db: any, bookingId: string) {
   if (!ADVANCEABLE_STATUSES.includes(booking.status)) {
     throw new Error(`Cannot advance stage from status "${booking.status}".`);
   }
-  const nextStatus = booking.status === 'pending_balance'
+  const isEarlyBundleSession = booking.sessionTypeId === 'bundle'
+    && booking.bundleSessionNumber !== null
+    && booking.bundleSessionNumber < 3;
+  const nextStatus = booking.status === 'pending_basic_retouch' && isEarlyBundleSession
+    ? 'completed'
+    : booking.status === 'pending_balance'
     ? 'basic_retouch'
     : STATUS_ORDER[STATUS_ORDER.indexOf(booking.status as (typeof STATUS_ORDER)[number]) + 1];
   return db.booking.update({ where: { id: bookingId }, data: { status: nextStatus } });
@@ -784,7 +789,12 @@ export async function advanceStage(db: any, bookingId: string) {
  * sending customer notifications. */
 export async function revertStage(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
-  const previousStatus = REVERSIBLE_POST_PROCESSING_STATUSES[booking.status];
+  const previousStatus = booking.status === 'completed'
+    && booking.sessionTypeId === 'bundle'
+    && booking.bundleSessionNumber !== null
+    && booking.bundleSessionNumber < 3
+    ? 'pending_basic_retouch'
+    : REVERSIBLE_POST_PROCESSING_STATUSES[booking.status];
   if (!previousStatus) {
     throw new Error(`Cannot go back from status "${booking.status}".`);
   }
@@ -817,50 +827,48 @@ function oneCalendarMonthAfter(value: Date): Date {
   ));
 }
 
-/** Sends one email a month after balance payment and then monthly while the
- * booking is still awaiting the client's further-retouch selection. */
-export async function checkAndSendFurtherRetouchReminders(db: any, now = new Date()) {
+/** Sends Gallery reminders from the dates recorded by the Gallery itself:
+ * once after one month without a selection, and once three days before expiry. */
+export async function checkAndSendGalleryReminders(db: any, now = new Date()) {
   const settings = await getSettings(db);
-  const awaitingSelection = await db.booking.findMany({
-    where: {
-      status: 'basic_retouch',
-      balanceStatus: 'paid',
-    },
-  });
-  let sent = 0;
+  const galleries = await db.galleryInbox.findMany();
+  let selectionSent = 0;
+  let expirySent = 0;
+  for (const gallery of galleries) {
+    const booking = await db.booking.findUnique({where:{id:gallery.bookingId}});
+    if (!booking || booking.status === 'cancelled') continue;
+    const firstName = booking.clientName.split(' ')[0] || booking.clientName;
+    if (gallery.selectionEnabled && !gallery.submitted && !gallery.selectionReminderSentAt
+        && oneCalendarMonthAfter(new Date(gallery.createdAt)) <= now) {
+      const body = [`Hi ${firstName}!`,`Your Basic Retouch Gallery has been ready for one month. Please open your private Gallery link to choose and submit the photographs you would like us to Further Retouch.`,`If you need help or no longer require Further Retouch, please contact us.`,settings.businessName].join('\n\n');
+      const html = buildEmailHtml({title:'Photo Selection Reminder',paragraphs:body.split('\n\n'),details:[{label:'Session',value:booking.sessionLabel},{label:'Photoshoot date',value:fmtDatePretty(booking.date)}],businessName:settings.businessName});
+      await sendEmail(booking.clientEmail,`Reminder: Select your Further Retouch photos — ${booking.sessionLabel}`,body,undefined,html);
+      await db.galleryInbox.updateMany({where:{galleryId:gallery.galleryId,selectionReminderSentAt:null},data:{selectionReminderSentAt:now}});
+      selectionSent++;
+    }
+    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    if (gallery.expiresAt && !gallery.expiryReminderSentAt && gallery.expiresAt > now && gallery.expiresAt <= threeDaysFromNow) {
+      const deadline = fmtDatePretty(gallery.expiresAt.toISOString().slice(0,10));
+      const body = [`Hi ${firstName}!`,`Your private Gallery will expire on ${deadline}. Please open your original private Gallery link and download your photographs before the deadline.`,`Please contact us before the deadline if you need help.`,settings.businessName].join('\n\n');
+      const html = buildEmailHtml({title:'Gallery Download Deadline',paragraphs:body.split('\n\n'),details:[{label:'Session',value:booking.sessionLabel},{label:'Deadline',value:deadline}],businessName:settings.businessName});
+      await sendEmail(booking.clientEmail,`Your Gallery expires in 3 days — ${booking.sessionLabel}`,body,undefined,html);
+      await db.galleryInbox.updateMany({where:{galleryId:gallery.galleryId,expiryReminderSentAt:null},data:{expiryReminderSentAt:now}});
+      expirySent++;
+    }
+  }
+  return {selectionSent,expirySent};
+}
 
+/** Backward-compatible entry point used by existing operational checks. */
+export async function checkAndSendFurtherRetouchReminders(db: any, now = new Date()) {
+  if (db.galleryInbox) return (await checkAndSendGalleryReminders(db, now)).selectionSent;
+  const awaitingSelection = await db.booking.findMany({where:{status:'basic_retouch',balanceStatus:'paid'}});
+  let sent = 0;
   for (const booking of awaitingSelection) {
     if (!booking.balancePaidAt) continue;
-    const reminderAnchor = booking.furtherRetouchReminderSentAt || booking.balancePaidAt;
-    if (oneCalendarMonthAfter(new Date(reminderAnchor)) > now) continue;
-
-    const firstName = booking.clientName.split(' ')[0] || booking.clientName;
-    const body = [
-      `Hi ${firstName}!`,
-      `It has been a month since your balance payment for ${booking.sessionLabel}.`,
-      `When you are ready, please send us your selected photos for further retouch via WhatsApp at +65 9760 0798. If you do not require further retouch, just let us know.`,
-      settings.businessName,
-    ].join('\n\n');
-    const html = buildEmailHtml({
-      title: 'Further Retouch Selection Reminder',
-      paragraphs: body.split('\n\n'),
-      details: [
-        { label: 'Session', value: booking.sessionLabel },
-        { label: 'Photoshoot date', value: fmtDatePretty(booking.date) },
-      ],
-      businessName: settings.businessName,
-    });
-    await sendEmail(
-      booking.clientEmail,
-      `Reminder: Select photos for further retouch — ${booking.sessionLabel}`,
-      body,
-      undefined,
-      html,
-    );
-    await db.booking.update({
-      where: { id: booking.id },
-      data: { furtherRetouchReminderSentAt: now },
-    });
+    const anchor = booking.furtherRetouchReminderSentAt || booking.balancePaidAt;
+    if (oneCalendarMonthAfter(new Date(anchor)) > now) continue;
+    await db.booking.update({where:{id:booking.id},data:{furtherRetouchReminderSentAt:now}});
     sent++;
   }
   return sent;

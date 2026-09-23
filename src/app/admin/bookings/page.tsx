@@ -161,12 +161,14 @@ export default function AdminBookingsPage() {
   }
 
   function photoSelectCreateUrl(booking: Booking) {
+    const selectionEnabled = !(booking.sessionTypeId === 'bundle' && (booking.bundleSessionNumber || 1) < 3);
     const params = new URLSearchParams({
       action: 'create',
       booking: booking.ref,
       client: booking.clientName,
       session: booking.sessionLabel,
       date: booking.date,
+      selection: selectionEnabled ? '1' : '0',
     });
     return `http://127.0.0.1:8766/?${params.toString()}`;
   }
@@ -389,7 +391,9 @@ export default function AdminBookingsPage() {
                   )}
                   {(b.status === 'pending_balance' || b.status === 'pending_basic_retouch') && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => finishBasicRetouch(b)}>
-                      Basic Retouch Done · Create Gallery
+                      {b.sessionTypeId === 'bundle' && (b.bundleSessionNumber || 1) < 3
+                        ? 'Basic Retouch Done · Create Download Gallery'
+                        : 'Basic Retouch Done · Create Gallery'}
                     </button>
                   )}
                   {b.status === 'basic_retouch' && (
