@@ -156,12 +156,12 @@ export default function AdminBookingsPage() {
   }
 
   function shortGalleryUrl(galleryId: string) {
-    return `${window.location.origin}/g/${galleryId.slice(0,12)}?preview=gallery`;
+    return `${window.location.origin}/g/${galleryId.slice(0,12)}?preview=2`;
   }
 
   async function copyClientGalleryLink(bookingId: string, galleryId: string) {
     try {
-      await navigator.clipboard.writeText(`Thanks for your purchase! Your photos with Basic Retouch are ready. Tap below to view and download them:\n\n${shortGalleryUrl(galleryId)}`);
+      await navigator.clipboard.writeText(`Thanks for your purchase ♡\n\n${shortGalleryUrl(galleryId)}`);
       setActionSuccess({ id: bookingId, message: 'WhatsApp Gallery message copied with a short link.' });
     } catch {
       setActionError({ id: bookingId, message: 'Could not copy automatically. Open Client Gallery, then copy the address from your browser.' });
