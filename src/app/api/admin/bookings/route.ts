@@ -31,7 +31,9 @@ export async function GET(req: NextRequest) {
       where:{bookingId:{in:bookingIds}},
       select:{galleryId:true,bookingId:true,clientUrl:true,version:true,submitted:true,locked:true,deliveredAt:true,emailSentAt:true},
     }),
-    db.additionalOrder.findMany({where:{bookingId:{in:bookingIds},status:{not:'superseded'}},orderBy:{createdAt:'desc'}}),
+    // Cancelled/reset orders must disappear from the Booking App immediately.
+    // Keep paid orders as history and pending orders as actionable items.
+    db.additionalOrder.findMany({where:{bookingId:{in:bookingIds},status:{in:['pending','paid']}},orderBy:{createdAt:'desc'}}),
   ]);
   const slim = (bookings as any[]).map((b) => ({ ...b, referencePhotoUrls: [], gallerySelections: inbox.filter(g=>g.bookingId===b.id), additionalOrders:orders.filter(o=>o.bookingId===b.id) }));
   return NextResponse.json({ bookings: slim });
