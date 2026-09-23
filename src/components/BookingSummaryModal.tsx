@@ -61,17 +61,29 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
     };
     const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 1800;
     const ctx = canvas.getContext('2d'); if (!ctx) return;
+    ctx.font = '700 31px Arial';
+    const preparedEntries = entries.map(([label, value]) => {
+      const lines = wrap(ctx, value, 600);
+      return { label, lines, height: Math.max(68, lines.length * 42 + 22) };
+    });
+    const photoRows = booking.referencePhotoUrls.length > 0
+      ? Math.ceil(Math.min(6, booking.referencePhotoUrls.length) / 3)
+      : 0;
+    const contentHeight = 230 + 66
+      + preparedEntries.reduce((total, entry) => total + entry.height, 0)
+      + (photoRows ? 28 + photoRows * 338 : 0)
+      + (booking.ref ? 72 : 24);
+    const top = Math.max(54, Math.round((canvas.height - contentHeight) / 2));
     ctx.fillStyle = '#f5f0e8'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#2e2a22'; ctx.fillRect(54, 54, 972, 230);
-    ctx.textAlign = 'center'; ctx.fillStyle = '#c5a87c'; ctx.font = '700 26px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY', 540, 125);
-    ctx.fillStyle = '#b08d57'; ctx.font = '52px Georgia'; ctx.fillText('Booking Summary', 540, 205);
-    let y = 350;
-    entries.forEach(([label, value]) => {
-      ctx.font = '700 27px Arial'; const lines = wrap(ctx, value, 610);
-      const height = Math.max(58, lines.length * 36 + 18); const centre = y + height / 2;
-      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#6b6152'; ctx.font = '25px Arial'; ctx.fillText(label, 100, centre);
-      ctx.fillStyle = '#2e2a22'; ctx.font = '700 27px Arial';
-      const firstLine = centre - ((lines.length - 1) * 36) / 2; lines.forEach((line, index) => ctx.fillText(line, 370, firstLine + index * 36));
+    ctx.fillStyle = '#2e2a22'; ctx.fillRect(54, top, 972, 230);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#c5a87c'; ctx.font = '700 30px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY', 540, top + 76);
+    ctx.fillStyle = '#b08d57'; ctx.font = '58px Georgia'; ctx.fillText('Booking Summary', 540, top + 158);
+    let y = top + 296;
+    preparedEntries.forEach(({ label, lines, height }) => {
+      const centre = y + height / 2;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#6b6152'; ctx.font = '29px Arial'; ctx.fillText(label, 100, centre);
+      ctx.fillStyle = '#2e2a22'; ctx.font = '700 31px Arial';
+      const firstLine = centre - ((lines.length - 1) * 42) / 2; lines.forEach((line, index) => ctx.fillText(line, 370, firstLine + index * 42));
       y += height; ctx.strokeStyle = '#e6decb'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(100, y); ctx.lineTo(980, y); ctx.stroke();
     });
     ctx.textBaseline = 'alphabetic';
