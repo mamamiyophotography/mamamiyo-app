@@ -156,7 +156,7 @@ export default function AdminBookingsPage() {
   }
 
   function shortGalleryUrl(galleryId: string) {
-    return `${window.location.origin}/g/${galleryId.slice(0,12)}`;
+    return `${window.location.origin}/g/${galleryId.slice(0,12)}?preview=gallery`;
   }
 
   async function copyClientGalleryLink(bookingId: string, galleryId: string) {
