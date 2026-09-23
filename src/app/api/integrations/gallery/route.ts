@@ -26,6 +26,25 @@ export async function POST(req: NextRequest) {
   if (raw.length > 150000) return NextResponse.json({error:'Too large'}, {status:413});
   let p: any;
   try { p = JSON.parse(raw); } catch { return NextResponse.json({error:'Invalid JSON'}, {status:400}); }
+  if (p.kind === 'client_link') {
+    if (!/^[a-f0-9]{32}$/.test(p.galleryId || '') || typeof p.bookingRef !== 'string' || p.bookingRef.length > 100 || typeof p.clientUrl !== 'string' || p.clientUrl.length > 2000) {
+      return NextResponse.json({error:'Invalid client Gallery link'}, {status:400});
+    }
+    const publicBase = (process.env.GALLERY_PUBLIC_URL || 'https://mamamiyo-gallery.mamamiyo-gallery.workers.dev').replace(/\/$/, '');
+    let parsed: URL;
+    try { parsed = new URL(p.clientUrl); } catch { return NextResponse.json({error:'Invalid client Gallery link'}, {status:400}); }
+    if (`${parsed.origin}${parsed.pathname}` !== `${publicBase}/g/${p.galleryId}` || !/^#token=[A-Za-z0-9_-]{43}$/.test(parsed.hash)) {
+      return NextResponse.json({error:'Client Gallery link does not match this Gallery'}, {status:400});
+    }
+    const booking = await prisma.booking.findUnique({where:{ref:p.bookingRef}});
+    if (!booking || booking.status === 'cancelled') return NextResponse.json({error:'Booking not available'}, {status:409});
+    const existing = await prisma.galleryInbox.findUnique({where:{galleryId:p.galleryId}});
+    if (existing && existing.bookingId !== booking.id) return NextResponse.json({error:'Gallery already linked to another booking'}, {status:409});
+    await prisma.galleryInbox.upsert({where:{galleryId:p.galleryId},
+      create:{galleryId:p.galleryId,bookingId:booking.id,clientUrl:p.clientUrl,version:0,items:[],submitted:false,locked:false},
+      update:{bookingId:booking.id,clientUrl:p.clientUrl}});
+    return NextResponse.json({ok:true});
+  }
   if (p.kind === 'additional_order') {
     const catalog: Record<string, {name:string;price:number;bonus:number}> = {
       album8x8:{name:'Photo Album · 8in × 8in · 20 pages',price:108,bonus:20},

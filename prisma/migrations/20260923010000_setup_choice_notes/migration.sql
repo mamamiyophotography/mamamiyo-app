@@ -1,0 +1,1 @@
+ALTER TABLE "Booking" ADD COLUMN "setupChoiceNotes" TEXT NOT NULL DEFAULT '';

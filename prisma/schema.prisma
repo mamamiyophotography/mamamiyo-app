@@ -74,6 +74,7 @@ model Booking {
   isWeekend           Boolean   @default(false)
   addOns              Json      @default("{}")
   notes               String    @default("")
+  setupChoiceNotes    String    @default("")
   referencePhotoUrls  Json      @default("[]")
   address             String    @default("")
   discountCode        String?
@@ -133,6 +134,7 @@ model NotificationLog {
 model GalleryInbox {
   galleryId String @id
   bookingId String
+  clientUrl String?
   version Int
   items Json
   submitted Boolean @default(false)

@@ -10,10 +10,10 @@ import SetupChoiceModal from '@/components/SetupChoiceModal';
 
 type Booking = {
   additionalOrders?: {id:string;galleryId:string;version:number;items:{name:string;quantity:number;amount:number;bonusRetouches:number}[];total:number;bonusRetouches:number;status:string;invoiceRef:string;createdAt:string;paidAt:string|null}[];
-  gallerySelections?: {galleryId:string;version:number;submitted:boolean;locked:boolean;deliveredAt:string|null;emailSentAt:string|null}[];
+  gallerySelections?: {galleryId:string;clientUrl:string|null;version:number;submitted:boolean;locked:boolean;deliveredAt:string|null;emailSentAt:string|null}[];
   id: string; ref: string; sessionTypeId: string; sessionLabel: string; location: string;
   date: string; startTime: string; endTime: string; isWeekend: boolean; addOns: Record<string, number>;
-  notes: string; address: string; discountCode: string | null; discountAmount: number;
+  notes: string; setupChoiceNotes: string; address: string; discountCode: string | null; discountAmount: number;
   clientName: string; clientEmail: string; clientPhone: string;
   subtotal: number; total: number; depositAmount: number; balanceDue: number;
   extraLineItems: { description: string; amount: number }[]; invoiceRef: string | null;
@@ -155,6 +155,15 @@ export default function AdminBookingsPage() {
     return canvas.toDataURL('image/png');
   }
 
+  async function copyClientGalleryLink(bookingId: string, url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setActionSuccess({ id: bookingId, message: 'Private Client Link copied. You can paste it into WhatsApp.' });
+    } catch {
+      setActionError({ id: bookingId, message: 'Could not copy automatically. Open Client Gallery, then copy the address from your browser.' });
+    }
+  }
+
   async function openSetupChoice(id: string) {
     setBusyId(id); setActionError(null);
     try {
@@ -217,7 +226,7 @@ export default function AdminBookingsPage() {
                 {(b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <a href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer" title="Create a Gallery in PhotoSelect Pro on your studio computer" style={{display:'inline-block',marginTop:8,padding:'8px 12px',background:'#657e76',color:'#fff',borderRadius:7,textDecoration:'none',fontSize:13,fontWeight:600}}>Open PhotoSelect Pro · Create Gallery</a>}
                 {b.gallerySelections?.map(g => <div key={g.galleryId} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginTop:8,padding:'8px 10px',background:'#e3eee9',borderRadius:6,fontSize:13}}>
                   <span>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : g.submitted ? 'Client selection received' : 'Awaiting client selection'}</span>
-                  <a href={`http://127.0.0.1:8766/?gallery=${encodeURIComponent(g.galleryId)}`} target="_blank" rel="noopener noreferrer" title="Open in PhotoSelect Pro on your studio computer" style={{color:'#415e58',fontWeight:700,whiteSpace:'nowrap'}}>Open Gallery</a>
+                  {g.clientUrl ? <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><a href={g.clientUrl} target="_blank" rel="noopener noreferrer" style={{color:'#415e58',fontWeight:700,whiteSpace:'nowrap'}}>Open Client Gallery</a><button type="button" onClick={()=>copyClientGalleryLink(b.id,g.clientUrl!)} style={{border:0,background:'transparent',padding:0,color:'#415e58',fontWeight:700,textDecoration:'underline',cursor:'pointer'}}>Copy Client Link</button></div> : <span style={{color:'#8b5b43'}}>Link this Gallery again in PhotoSelect Pro to enable the mobile client link.</span>}
                 </div>)}
                 {b.additionalOrders?.map(order=><div key={order.id} style={{marginTop:8,padding:'10px 12px',background:order.status==='paid'?'#e4eadf':'#fff0d8',borderRadius:7,fontSize:13}}><div style={{display:'flex',justifyContent:'space-between',gap:8,fontWeight:700}}><span>Additional Order · {order.status==='paid'?'Paid':'Payment pending'}</span><span>${order.total}</span></div><div style={{marginTop:5,color:'#6f6258'}}>{order.items.map(item=>`${item.name} ×${item.quantity}`).join(' · ')}</div><div style={{marginTop:4}}>Ref: {order.invoiceRef} · +{order.bonusRetouches} complimentary retouch{order.bonusRetouches===1?'':'es'}</div>{order.status!=='paid'&&<button className="btn btn-sm" style={{marginTop:8}} disabled={busyId===b.id} onClick={()=>runAction(b.id,'confirm-additional-order',{orderId:order.id})}>Payment received</button>}</div>)}
                 <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>

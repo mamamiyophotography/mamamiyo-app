@@ -14,6 +14,7 @@ type SummaryBooking = {
   clientPhone: string;
   referencePhotoUrls: string[];
   notes: string;
+  setupChoiceNotes?: string;
   ref?: string;
 };
 
@@ -52,6 +53,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       ...(noteParts.gender ? [["Baby's gender", noteParts.gender]] : []),
       ...(noteParts.sibling ? [['Sibling joining', noteParts.sibling]] : []),
       ...(noteParts.other ? [['Other notes', noteParts.other]] : []),
+      ...(booking.setupChoiceNotes ? [[`${/maternity/i.test(booking.sessionLabel) ? 'Outfit' : 'Setup'} notes`, booking.setupChoiceNotes]] : []),
       [selectionLabel, String(booking.referencePhotoUrls.length)],
     ];
     const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
@@ -176,6 +178,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         {noteParts.gender && <div className="ticket-row" style={{ alignItems: 'center' }}><span>Baby&apos;s gender</span><b>{noteParts.gender}</b></div>}
         {noteParts.sibling && <div className="ticket-row" style={{ alignItems: 'center' }}><span>Sibling joining</span><b>{noteParts.sibling}</b></div>}
         {noteParts.other && <div className="ticket-row" style={{ alignItems: 'center' }}><span>Other notes</span><b style={{ overflowWrap: 'anywhere' }}>{noteParts.other}</b></div>}
+        {booking.setupChoiceNotes && <div className="ticket-row" style={{ alignItems: 'center' }}><span>{/maternity/i.test(booking.sessionLabel) ? 'Outfit' : 'Setup'} notes</span><b style={{ overflowWrap: 'anywhere' }}>{booking.setupChoiceNotes}</b></div>}
 
         {booking.referencePhotoUrls.length > 0 && (
           <div style={{ marginTop: 10 }}>

@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   const [inbox,orders] = await Promise.all([
     db.galleryInbox.findMany({
       where:{bookingId:{in:bookingIds}},
-      select:{galleryId:true,bookingId:true,version:true,submitted:true,locked:true,deliveredAt:true,emailSentAt:true},
+      select:{galleryId:true,bookingId:true,clientUrl:true,version:true,submitted:true,locked:true,deliveredAt:true,emailSentAt:true},
     }),
     db.additionalOrder.findMany({where:{bookingId:{in:bookingIds},status:{not:'superseded'}},orderBy:{createdAt:'desc'}}),
   ]);
