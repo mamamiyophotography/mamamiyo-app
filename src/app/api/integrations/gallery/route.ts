@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
   const quantities = (b.addOns && typeof b.addOns === 'object' && !Array.isArray(b.addOns)) ? b.addOns as Record<string, unknown> : {};
   const qty = (id:string) => Math.max(0, Number(quantities[id]) || 0);
   const bookedProductBonus = 20 * (qty('album8x8') + qty('album10x10') + qty('album12x12'))
-    + qty('canvas11x14') + qty('canvas16x24') + qty('plaque5x7') + qty('plaque6x8');
+    + 5 * (qty('canvas11x14') + qty('canvas16x24'))
+    + 2 * (qty('plaque5x7') + qty('plaque6x8'));
   return NextResponse.json({...b, packageComplimentary:10, setupBonus:5 * qty('extraSetup'), bookedProductBonus});
 }
 export async function POST(req: NextRequest) {
@@ -50,16 +51,26 @@ export async function POST(req: NextRequest) {
       update:{bookingId:booking.id,clientUrl:p.clientUrl}});
     return NextResponse.json({ok:true});
   }
-  if (p.kind === 'additional_order') {
+  if (p.kind === 'additional_order_reset') {
+    if (!/^[a-f0-9]{32}$/.test(p.galleryId || '') || typeof p.bookingRef !== 'string') {
+      return NextResponse.json({error:'Invalid order reset'}, {status:400});
+    }
+    const booking = await prisma.booking.findUnique({where:{ref:p.bookingRef}});
+    if (!booking || booking.status === 'cancelled') return NextResponse.json({error:'Booking not available'}, {status:409});
+    const paid = await prisma.additionalOrder.findFirst({where:{galleryId:p.galleryId,status:'paid'}});
+    if (paid) return NextResponse.json({error:'This order is already paid. Please contact Mamamiyo.'}, {status:409});
+    await prisma.additionalOrder.updateMany({where:{galleryId:p.galleryId,status:'pending'},data:{status:'cancelled'}});
+    return NextResponse.json({ok:true});
+  }  if (p.kind === 'additional_order') {
     const catalog: Record<string, {name:string;price:number;bonus:number}> = {
-      album8x8:{name:'Photo Album · 8in × 8in · 20 pages',price:108,bonus:20},
-      album10x10:{name:'Photo Album · 10in × 10in · 20 pages',price:138,bonus:20},
-      album12x12:{name:'Photo Album · 12in × 12in · 20 pages',price:158,bonus:20},
-      canvas11x14:{name:'Canvas · 11in × 14in',price:88,bonus:1},
-      canvas16x24:{name:'Canvas · 16in × 24in',price:128,bonus:1},
-      plaque5x7:{name:'Wooden / Crystal Plaque · 5in × 7in',price:58,bonus:1},
-      plaque6x8:{name:'Wooden / Crystal Plaque · 6in × 8in',price:68,bonus:1},
-      extraRetouch:{name:'Additional Further Retouch',price:5,bonus:1},
+      album8x8:{name:'Layflat Photo Album · 8in × 8in · 20 pages · +20 Bonus Further Retouch',price:108,bonus:20},
+      album10x10:{name:'Layflat Photo Album · 10in × 10in · 20 pages · +20 Bonus Further Retouch',price:138,bonus:20},
+      album12x12:{name:'Layflat Photo Album · 12in × 12in · 20 pages · +20 Bonus Further Retouch',price:158,bonus:20},
+      canvas11x14:{name:'Canvas · 11in × 14in · +5 Bonus Further Retouch',price:88,bonus:5},
+      canvas16x24:{name:'Canvas · 16in × 24in · +5 Bonus Further Retouch',price:128,bonus:5},
+      plaque5x7:{name:'Wooden / Crystal Plaque · 5in × 7in · +2 Bonus Further Retouch',price:58,bonus:2},
+      plaque6x8:{name:'Wooden / Crystal Plaque · 6in × 8in · +2 Bonus Further Retouch',price:68,bonus:2},
+      extraRetouch:{name:'Additional Further Retouch',price:5,bonus:0},
     };
     if (!/^[a-f0-9]{32}$/.test(p.galleryId || '') || typeof p.bookingRef !== 'string' ||
         !Number.isSafeInteger(p.version) || p.version < 1 || !Array.isArray(p.items) || !p.items.length || p.items.length > 20) {

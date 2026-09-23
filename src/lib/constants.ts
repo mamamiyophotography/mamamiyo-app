@@ -125,15 +125,15 @@ export const ADDONS: Record<string, { name: string; price: number }> = {
   extraOutfit: { name: 'Additional Outfit', price: 100 },
   headcount: { name: 'Additional Family / Grandparents', price: 30 },
   // Photo Album (layflat, rigid paper)
-  album8x8: { name: 'Photo Album\n8in × 8in / 20cm × 20cm\n20 pages, up to 30 images', price: 108 },
-  album10x10: { name: 'Photo Album\n10in × 10in / 25cm × 25cm\n20 pages, up to 30 images', price: 138 },
-  album12x12: { name: 'Photo Album\n12in × 12in / 30cm × 30cm\n20 pages, up to 30 images', price: 158 },
+  album8x8: { name: 'Layflat Photo Album\n8in × 8in / 20cm × 20cm\n20 pages, up to 30 images\nIncludes 20 Bonus Further Retouch', price: 108 },
+  album10x10: { name: 'Layflat Photo Album\n10in × 10in / 25cm × 25cm\n20 pages, up to 30 images\nIncludes 20 Bonus Further Retouch', price: 138 },
+  album12x12: { name: 'Layflat Photo Album\n12in × 12in / 30cm × 30cm\n20 pages, up to 30 images\nIncludes 20 Bonus Further Retouch', price: 158 },
   // Canvas
-  canvas11x14: { name: 'Canvas 11×14in / 28×35cm', price: 88 },
-  canvas16x24: { name: 'Canvas 16×24in / 40×60cm', price: 128 },
+  canvas11x14: { name: 'Canvas 11×14in / 28×35cm\nIncludes 5 Bonus Further Retouch', price: 88 },
+  canvas16x24: { name: 'Canvas 16×24in / 40×60cm\nIncludes 5 Bonus Further Retouch', price: 128 },
   // Wooden / Crystal Plaque
-  plaque5x7: { name: 'Wooden/Crystal Plaque 5×7in / 12×17cm', price: 58 },
-  plaque6x8: { name: 'Wooden/Crystal Plaque 6×8in / 15×20cm', price: 68 },
+  plaque5x7: { name: 'Wooden/Crystal Plaque 5×7in / 12×17cm\nIncludes 2 Bonus Further Retouch', price: 58 },
+  plaque6x8: { name: 'Wooden/Crystal Plaque 6×8in / 15×20cm\nIncludes 2 Bonus Further Retouch', price: 68 },
 };
 
 export const STUDIO_INFO = {
