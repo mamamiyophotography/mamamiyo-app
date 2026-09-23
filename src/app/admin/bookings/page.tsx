@@ -157,8 +157,8 @@ export default function AdminBookingsPage() {
 
   async function copyClientGalleryLink(bookingId: string, url: string) {
     try {
-      await navigator.clipboard.writeText(url);
-      setActionSuccess({ id: bookingId, message: 'Private Client Link copied. You can paste it into WhatsApp.' });
+      await navigator.clipboard.writeText(`Thanks for your purchase! Your photos with Basic Retouch are ready. You can view and download them here:\n${url}`);
+      setActionSuccess({ id: bookingId, message: 'Client message and Private Client Link copied. You can paste them into WhatsApp.' });
     } catch {
       setActionError({ id: bookingId, message: 'Could not copy automatically. Open Client Gallery, then copy the address from your browser.' });
     }

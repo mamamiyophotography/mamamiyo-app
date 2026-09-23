@@ -17,8 +17,13 @@ const escape = (value: string) => value.replace(/[&<>"']/g, c => ({'&':'&amp;','
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({error:'Unauthorized'}, {status:401});
   const ref = req.nextUrl.searchParams.get('ref') || '';
-  const b = await prisma.booking.findUnique({where:{ref}, select:{ref:true, clientName:true, date:true, status:true, sessionTypeId:true, bundleSessionNumber:true}});
-  return b ? NextResponse.json(b) : NextResponse.json({error:'Booking reference not found'}, {status:404});
+  const b = await prisma.booking.findUnique({where:{ref}, select:{ref:true, clientName:true, date:true, status:true, sessionTypeId:true, bundleSessionNumber:true, addOns:true}});
+  if (!b) return NextResponse.json({error:'Booking reference not found'}, {status:404});
+  const quantities = (b.addOns && typeof b.addOns === 'object' && !Array.isArray(b.addOns)) ? b.addOns as Record<string, unknown> : {};
+  const qty = (id:string) => Math.max(0, Number(quantities[id]) || 0);
+  const bookedProductBonus = 20 * (qty('album8x8') + qty('album10x10') + qty('album12x12'))
+    + qty('canvas11x14') + qty('canvas16x24') + qty('plaque5x7') + qty('plaque6x8');
+  return NextResponse.json({...b, packageComplimentary:10, setupBonus:5 * qty('extraSetup'), bookedProductBonus});
 }
 export async function POST(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({error:'Unauthorized'}, {status:401});
