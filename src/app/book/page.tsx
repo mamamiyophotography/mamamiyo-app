@@ -106,7 +106,6 @@ export default function BookPage() {
   if (sessionType?.id !== 'maternity' && !babyGender.trim()) missingFields.push("Baby's gender");
   if (!siblingJoining) missingFields.push('Sibling attendance');
   if (sessionType?.location === 'home' && !address.trim()) missingFields.push('Home address');
-  if (photos.length === 0) missingFields.push('Reference photos');
   const readyForReview = !!selectedSlot && missingFields.length === 0;
 
   const pricing =
@@ -386,7 +385,7 @@ export default function BookPage() {
             </div>
           )}
           <div className="field">
-            <label>Setup / inspiration photos<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label>
+            <label>Setup / inspiration photos <span style={{ color: 'var(--ink-faint)', fontWeight: 500 }}>(Optional — you may decide later)</span></label>
             <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 8 }}>
               {sessionType.referenceSetups === 1
                 ? <>Choose <b>1 setup look</b> from our website and screenshot it.</>
@@ -394,7 +393,7 @@ export default function BookPage() {
                   ? <>Choose <b>{sessionType.referenceSetups} outfit looks</b> from our website and screenshot each one.</>
                   : <>Choose <b>{sessionType.referenceSetups} baby solo setup looks</b> from our website and screenshot each one.</>
               }
-              {' '}Visit <a href="https://www.mamamiyo-photography.com/" target="_blank" rel="noopener" style={{ color: 'var(--gold-deep)' }}>www.mamamiyo-photography.com</a> and upload up to 5 images.
+              {' '}Visit <a href="https://www.mamamiyo-photography.com/" target="_blank" rel="noopener" style={{ color: 'var(--gold-deep)' }}>www.mamamiyo-photography.com</a> and upload up to 5 images now, or send your choices before the photoshoot.
             </div>
             <input type="file" accept="image/*" multiple disabled={photos.length >= 5} onChange={(e) => handlePhotoUpload(e.target.files)} />
             <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>

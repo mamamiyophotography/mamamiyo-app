@@ -164,7 +164,6 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
     if (!selectedSlot) return;
     if (!babyGender) { setError('Please select baby\'s gender.'); return; }
     if (!siblingJoining) { setError('Please tell us whether a sibling will be joining.'); return; }
-    if (!photos.length) { setError('Please attach at least one reference photo.'); return; }
     setSubmitting(true);
     setError(null);
     try {
@@ -264,8 +263,8 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
                   <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 6 }}>Sibling participation is free. The additional family / grandparents add-on is charged separately.</div>
                 </div>
                 <div className="field">
-                  <label>Reference photos — required</label>
-                  <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 6 }}>Upload up to 5 reference photos for this session.</div>
+                  <label>Setup choice — optional</label>
+                  <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 6 }}>Upload up to 5 reference photos now, or decide before the photoshoot.</div>
                   <input type="file" accept="image/*" multiple disabled={photos.length >= 5} onChange={(e) => {
                     if (!e.target.files) return;
                     const toAdd = Array.from(e.target.files).slice(0, 5 - photos.length);

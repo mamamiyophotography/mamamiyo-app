@@ -106,7 +106,6 @@ export type CreateBookingInput = {
 export async function createBooking(db: any, input: CreateBookingInput) {
   const st = sessionById(input.sessionTypeId);
   if (!st) throw new Error(`Unknown session type: ${input.sessionTypeId}`);
-  if (!input.referencePhotoUrls.length) throw new Error('At least one reference photo is required.');
   if (st.location === 'home' && !input.address.trim()) throw new Error('Home address is required for this package.');
 
   const settings = await getSettings(db);

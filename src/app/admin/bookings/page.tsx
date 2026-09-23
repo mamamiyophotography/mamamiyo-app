@@ -6,6 +6,7 @@ import { ADDONS, STATUS_LABELS } from '@/lib/constants';
 import BookingSummaryModal from '@/components/BookingSummaryModal';
 import EditBookingModal from '@/components/EditBookingModal';
 import EditAddOnsModal from '@/components/EditAddOnsModal';
+import SetupChoiceModal from '@/components/SetupChoiceModal';
 
 type Booking = {
   additionalOrders?: {id:string;galleryId:string;version:number;items:{name:string;quantity:number;amount:number;bonusRetouches:number}[];total:number;bonusRetouches:number;status:string;invoiceRef:string;createdAt:string;paidAt:string|null}[];
@@ -47,6 +48,7 @@ export default function AdminBookingsPage() {
   const [summaryBooking, setSummaryBooking] = useState<Booking | null>(null);
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
   const [editAddOnsBooking, setEditAddOnsBooking] = useState<Booking | null>(null);
+  const [setupChoiceBooking, setSetupChoiceBooking] = useState<Booking | null>(null);
   const [actionSuccess, setActionSuccess] = useState<{ id: string; message: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -137,6 +139,16 @@ export default function AdminBookingsPage() {
     ctx.textAlign = 'center'; ctx.fillStyle = '#6b6152'; ctx.font = '24px Arial'; ctx.fillText('Scan with your banking app to pay', 540, qrY + 345);
     ctx.font = '22px Arial'; ctx.fillText(`PayNow reference: ${invoiceRef}`, 540, qrY + 385);
     return canvas.toDataURL('image/png');
+  }
+
+  async function openSetupChoice(id: string) {
+    setBusyId(id); setActionError(null);
+    try {
+      const response = await fetch(`/api/admin/bookings/${id}`); const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not load Setup choice.');
+      setSetupChoiceBooking(data.booking);
+    } catch (error) { setActionError({ id, message: (error as Error).message }); }
+    finally { setBusyId(null); }
   }
 
   async function finishBasicRetouch(booking: Booking) {
@@ -358,6 +370,11 @@ export default function AdminBookingsPage() {
                   {(b.status === 'pending' || b.status === 'confirmed') && (
                     <button className="btn btn-ghost" disabled={isBusy} onClick={() => setEditBooking(b)}>Edit booking</button>
                   )}
+                  {(b.status === 'pending' || b.status === 'confirmed') && (
+                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => openSetupChoice(b.id)}>
+                      {/maternity/i.test(b.sessionLabel) ? 'Add / Edit Outfit choice' : 'Add / Edit Setup choice'}
+                    </button>
+                  )}
                   {b.status !== 'cancelled' && b.balanceStatus !== 'paid' && (
                     <button className="btn btn-ghost" disabled={isBusy} onClick={() => setEditAddOnsBooking(b)}>Edit Add-ons</button>
                   )}
@@ -512,6 +529,18 @@ export default function AdminBookingsPage() {
             setEditAddOnsBooking(null);
             setInvoiceQr((current) => current?.bookingId === id ? null : current);
             setActionSuccess({ id, message: invoiceNeedsRegeneration ? 'Changes saved. Please generate and send a new invoice.' : 'Changes saved.' });
+            await load();
+          }}
+        />
+      )}
+      {setupChoiceBooking && (
+        <SetupChoiceModal
+          booking={setupChoiceBooking}
+          onClose={() => setSetupChoiceBooking(null)}
+          onSaved={async () => {
+            const id = setupChoiceBooking.id;
+            setSetupChoiceBooking(null);
+            setActionSuccess({ id, message: 'Setup / Outfit choice saved.' });
             await load();
           }}
         />

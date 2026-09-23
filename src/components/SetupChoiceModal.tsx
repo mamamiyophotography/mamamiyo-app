@@ -1,0 +1,23 @@
+'use client';
+
+import { useState } from 'react';
+import { uploadPhotoFromBrowser } from '@/lib/uploadClient';
+
+type PendingPhoto={file:File;previewUrl:string};
+
+export default function SetupChoiceModal({booking,onClose,onSaved}:{booking:{id:string;clientName:string;sessionLabel:string;referencePhotoUrls:string[]};onClose:()=>void;onSaved:()=>void|Promise<void>}){
+  const [existing,setExisting]=useState<string[]>(booking.referencePhotoUrls||[]);const [pending,setPending]=useState<PendingPhoto[]>([]);const [saving,setSaving]=useState(false);const [error,setError]=useState('');
+  const outfit=/maternity/i.test(booking.sessionLabel);const total=existing.length+pending.length;
+  function add(files:FileList|null){if(!files)return;const room=5-total;const added=Array.from(files).filter(file=>file.type.startsWith('image/')).slice(0,room).map(file=>({file,previewUrl:URL.createObjectURL(file)}));setPending(current=>[...current,...added]);}
+  async function save(){setSaving(true);setError('');try{const uploaded=await Promise.all(pending.map(item=>uploadPhotoFromBrowser(item.file)));const urls=[...existing,...uploaded];const response=await fetch(`/api/admin/bookings/${booking.id}/setup-choice`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({referencePhotoUrls:urls})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not save Setup choice.');await onSaved();}catch(err){setError((err as Error).message);}finally{setSaving(false);}}
+  return <div role="dialog" aria-modal="true" style={{position:'fixed',inset:0,zIndex:1100,display:'grid',placeItems:'center',padding:18,background:'rgba(46,42,34,.58)'}} onMouseDown={event=>{if(event.target===event.currentTarget)onClose();}}><div className="card" style={{width:'min(620px,100%)',maxHeight:'calc(100vh - 36px)',overflowY:'auto',padding:24}}>
+    <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'start'}}><div><div className="bookings-kicker">{booking.clientName}</div><h2 style={{margin:'3px 0 6px'}}>{outfit?'Outfit choice':'Setup choice'}</h2><p style={{margin:0,color:'var(--ink-soft)',fontSize:13}}>Add, remove, or replace choices any time before the session is marked done.</p></div><button className="btn btn-ghost" onClick={onClose}>Close</button></div>
+    {error&&<div className="notice warn" style={{marginTop:14}}>{error}</div>}
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(105px,1fr))',gap:10,margin:'20px 0'}}>
+      {existing.map((url,index)=><div key={url} style={{position:'relative',aspectRatio:'4/5',borderRadius:9,overflow:'hidden',border:'1px solid var(--line)',background:'#eee'}}><img src={url} alt={`${outfit?'Outfit':'Setup'} ${index+1}`} style={{width:'100%',height:'100%',objectFit:'contain'}}/><button type="button" aria-label="Remove choice" onClick={()=>setExisting(items=>items.filter(item=>item!==url))} style={{position:'absolute',top:5,right:5,border:0,borderRadius:999,background:'#3a2e28dd',color:'#fff',width:28,height:28}}>×</button></div>)}
+      {pending.map((item,index)=><div key={item.previewUrl} style={{position:'relative',aspectRatio:'4/5',borderRadius:9,overflow:'hidden',border:'2px solid #78988e',background:'#eee'}}><img src={item.previewUrl} alt="New choice" style={{width:'100%',height:'100%',objectFit:'contain'}}/><button type="button" aria-label="Remove new choice" onClick={()=>setPending(items=>items.filter((_,i)=>i!==index))} style={{position:'absolute',top:5,right:5,border:0,borderRadius:999,background:'#3a2e28dd',color:'#fff',width:28,height:28}}>×</button></div>)}
+    </div>
+    <label className="btn btn-ghost" style={{display:'inline-flex',cursor:total>=5?'default':'pointer',opacity:total>=5?.5:1}}>Add {outfit?'outfit':'setup'} image<input hidden type="file" accept="image/*" multiple disabled={total>=5||saving} onChange={event=>{add(event.target.files);event.target.value='';}}/></label><div style={{fontSize:12,color:'var(--ink-faint)',marginTop:8}}>{total}/5 selected</div>
+    <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:20}}><button className="btn btn-ghost" disabled={saving} onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={saving} onClick={save}>{saving?'Uploading & saving…':'Save latest choices'}</button></div>
+  </div></div>;
+}

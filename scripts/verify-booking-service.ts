@@ -147,13 +147,8 @@ async function run() {
   });
   check('changing bundle session 1 back to standalone removes the bundle link', !changedBack.bundleParentId && !changedBack.bundleSessionNumber);
 
-  let missingPhotoRejected = false;
-  try {
-    await createBooking(db, { ...({} as any), sessionTypeId: 'baby', date: futureDateStr(11), startTime: '09:00', endTime: '10:00', isWeekend: false, addOns: {}, notes: '', referencePhotoUrls: [], address: '', clientName: 'X', clientEmail: 'x@example.com', countryCode: '+65', phone: '90000000' });
-  } catch (e) {
-    missingPhotoRejected = /reference photo/i.test((e as Error).message);
-  }
-  check('booking without a reference photo is rejected', missingPhotoRejected);
+  const withoutSetupChoice = await createBooking(db, { ...({} as any), sessionTypeId: 'baby', date: futureDateStr(11), startTime: '09:00', endTime: '10:00', isWeekend: false, addOns: {}, notes: '', referencePhotoUrls: [], address: '', clientName: 'X', clientEmail: 'x@example.com', countryCode: '+65', phone: '90000000' });
+  check('booking can be created before the client decides on a Setup choice', withoutSetupChoice.referencePhotoUrls.length === 0);
 
   // ---- 3. Confirm deposit ----
   const confirmed = await confirmDepositAndNotify(db, booking.id);

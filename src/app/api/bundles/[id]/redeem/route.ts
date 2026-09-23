@@ -17,9 +17,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  if (!body.referencePhotoUrls?.length) {
-    return NextResponse.json({ error: 'At least one reference photo is required.' }, { status: 400 });
-  }
   try {
     const booking = await redeemBundleSessionAndNotify(
       db, id, body.slot, body.addOns || {},
