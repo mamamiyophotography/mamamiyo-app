@@ -76,7 +76,9 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
     });
     ctx.textBaseline = 'alphabetic';
     if (booking.referencePhotoUrls.length > 0) {
-      ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 30px Arial'; ctx.fillText(selectionLabel, 100, y + 18); y += 58;
+      // The table row immediately above already names the selection type and
+      // shows its count, so the photo grid does not need a second heading.
+      y += 28;
       const imageWidth = 270, imageHeight = 310, gap = 35;
       const loadImage = async (url: string) => {
         try {
