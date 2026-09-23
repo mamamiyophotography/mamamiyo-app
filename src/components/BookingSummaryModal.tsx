@@ -33,6 +33,7 @@ function splitBookingNotes(notes: string) {
 
 export default function BookingSummaryModal({ booking, onClose }: { booking: SummaryBooking; onClose: () => void }) {
   const [imageDataUrl, setImageDataUrl] = useState('');
+  const [saveMessage, setSaveMessage] = useState('');
   const selectionLabel = /maternity/i.test(booking.sessionLabel) ? 'Outfit selections' : 'Setup selections';
   const noteParts = splitBookingNotes(booking.notes);
 
@@ -109,6 +110,29 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
     return () => { cancelled = true; };
   }, [booking, selectionLabel, noteParts.gender, noteParts.sibling, noteParts.other]);
 
+  async function saveOrShare() {
+    if (!imageDataUrl) return;
+    setSaveMessage('Preparing image…');
+    try {
+      const blob = await (await fetch(imageDataUrl)).blob();
+      const safeRef = (booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-');
+      const filename = `Mamamiyo-Booking-${safeRef}.png`;
+      const file = new File([blob], filename, { type: 'image/png' });
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+        await navigator.share({ title: 'Mamamiyo Booking Summary', files: [file] });
+        setSaveMessage('Choose Save Image, Save to Files, WhatsApp, or another app from the share menu.');
+        return;
+      }
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a'); link.href = objectUrl; link.download = filename; link.target = '_blank'; link.rel = 'noopener';
+      document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+      setSaveMessage('The image was opened or downloaded. On iPhone, long-press it and choose Save to Photos.');
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') setSaveMessage('Could not open the save menu. Long-press the summary image above and choose Save to Photos.');
+      else setSaveMessage('Save cancelled.');
+    }
+  }
+
   return (
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(46,42,34,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
@@ -121,9 +145,10 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       >
         <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Booking Summary</div>
         {imageDataUrl && <>
-          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 8 }}>Long-press the image to save it on your phone.</div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 8 }}>Tap Save / Share below. You can save it to Photos or Files, or send it through WhatsApp.</div>
           <img className="invoice-image-preview" src={imageDataUrl} alt={`Booking summary for ${booking.clientName}`} />
-          <a className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', textDecoration: 'none', marginTop: 10 }} href={imageDataUrl} download={`Mamamiyo-Booking-${booking.ref || booking.clientName}.png`}>Download booking summary</a>
+          <button type="button" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 10 }} onClick={saveOrShare}>Save / Share booking summary</button>
+          {saveMessage && <div role="status" style={{ fontSize: 12.5, color: 'var(--ink-soft)', lineHeight: 1.45, marginTop: 8 }}>{saveMessage}</div>}
         </>}
         <div style={{ fontWeight: 700, fontSize: 13, margin: '20px 0 8px' }}>Details</div>
         <div className="ticket-row"><span>Client</span><b>{booking.clientName}</b></div>
