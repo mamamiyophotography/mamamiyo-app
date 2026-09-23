@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           refNumber: invoiceRef,
           merchantName: settings.businessName,
         });
-        payNowQr = { payload: payNowPayload, amount: due, ref: invoiceRef };
+        payNowQr = { payload: payNowPayload, amount: due, ref: '' };
       }
     } catch (qrErr) {
       console.error('PayNow QR generation failed:', (qrErr as Error).message);

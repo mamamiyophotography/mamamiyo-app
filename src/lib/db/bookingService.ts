@@ -539,7 +539,7 @@ export async function generateInvoiceAndNotify(db: any, bookingId: string) {
     if (mobile.length === 8) {
       const { buildPayNowPayload } = await import('../paynow');
       const payload = buildPayNowPayload({ mobile8: mobile, amount: due, refNumber: invoiceRef, merchantName: settings.businessName });
-      payNowQr = { payload, amount: due, ref: invoiceRef };
+      payNowQr = { payload, amount: due, ref: '' };
     }
   } catch { /* QR failed silently */ }
   // Don't let notification failure block invoice generation

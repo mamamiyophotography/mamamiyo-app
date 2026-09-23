@@ -99,7 +99,7 @@ export default function AdminBookingsPage() {
     if (data?.booking) setSummaryBooking(data.booking);
   }
 
-  async function createInvoiceImage(booking: Booking, qrDataUrl: string, due: number, invoiceRef: string) {
+  async function createInvoiceImage(booking: Booking, qrDataUrl: string, due: number) {
     const rows: { label: string; amount: string }[] = [];
     const addOnsTotal = Object.entries(booking.addOns || {}).filter(([, q]) => q > 0).reduce((sum, [id, q]) => sum + (ADDONS[id]?.price || 0) * q, 0);
     const weekendFee = booking.isWeekend ? 50 : 0;
@@ -118,7 +118,7 @@ export default function AdminBookingsPage() {
 
     const rowHeight = (label: string) => 48 + (label.split('\n').length - 1) * 34;
     const rowsHeight = rows.reduce((sum, row) => sum + rowHeight(row.label), 0);
-    const contentHeight = 1010 + rowsHeight;
+    const contentHeight = 970 + rowsHeight;
     const canvas = document.createElement('canvas');
     canvas.width = 1080;
     canvas.height = Math.max(1450, contentHeight + 108);
@@ -131,7 +131,6 @@ export default function AdminBookingsPage() {
     ctx.fillStyle = '#b08d57'; ctx.font = '52px Georgia'; ctx.fillText('Invoice', 540, 205 + verticalOffset);
     ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 34px Arial'; ctx.fillText(booking.clientName, 100, 350 + verticalOffset);
     ctx.font = '25px Arial'; ctx.fillStyle = '#6b6152'; ctx.fillText(`${booking.sessionLabel} · ${fmtDatePretty(booking.date)} at ${fmtTime12(booking.startTime)}`, 100, 400 + verticalOffset);
-    ctx.fillText(`Reference: ${invoiceRef}`, 100, 444 + verticalOffset);
     let y = 525 + verticalOffset;
     ctx.strokeStyle = '#2e2a22'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(100, y); ctx.lineTo(980, y); ctx.stroke(); y += 54;
     for (const row of rows) {
@@ -153,7 +152,6 @@ export default function AdminBookingsPage() {
     const qr = new Image(); qr.src = qrDataUrl; await new Promise<void>((resolve, reject) => { qr.onload = () => resolve(); qr.onerror = () => reject(new Error('Unable to render QR code.')); });
     const qrY = y + 90; ctx.drawImage(qr, 390, qrY, 300, 300);
     ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center'; ctx.fillStyle = '#6b6152'; ctx.font = '24px Arial'; ctx.fillText('Scan with your banking app to pay', 540, qrY + 345);
-    ctx.font = '22px Arial'; ctx.fillText(`PayNow reference: ${invoiceRef}`, 540, qrY + 385);
     return canvas.toDataURL('image/png');
   }
 
@@ -196,7 +194,7 @@ export default function AdminBookingsPage() {
       if (data?.payNowPayload) {
         const QRCode = (await import('qrcode')).default;
         const qrDataUrl = await QRCode.toDataURL(data.payNowPayload, { margin: 1, width: 320 });
-        const imageDataUrl = await createInvoiceImage(booking, qrDataUrl, data.due, data.booking.invoiceRef);
+        const imageDataUrl = await createInvoiceImage(booking, qrDataUrl, data.due);
         setInvoiceQr({ bookingId: booking.id, qrDataUrl, imageDataUrl, due: data.due, emailed: data.emailed });
       }
     } finally {
