@@ -49,6 +49,12 @@ export async function POST(req: NextRequest) {
     await prisma.galleryInbox.upsert({where:{galleryId:p.galleryId},
       create:{galleryId:p.galleryId,bookingId:booking.id,clientUrl:p.clientUrl,version:0,items:[],submitted:false,locked:false},
       update:{bookingId:booking.id,clientUrl:p.clientUrl}});
+    // A linked client Gallery means Basic Retouch has already been prepared.
+    // Keep the Booking workflow in the same stage as the Gallery shown to staff.
+    if (booking.status === 'pending_balance' || booking.status === 'pending_basic_retouch') {
+      const downloadOnlyBundle = booking.sessionTypeId === 'bundle' && (booking.bundleSessionNumber || 1) < 3;
+      await prisma.booking.update({where:{id:booking.id},data:{status:downloadOnlyBundle?'completed':'basic_retouch',version:{increment:1}}});
+    }
     return NextResponse.json({ok:true});
   }
   if (p.kind === 'additional_order_reset') {

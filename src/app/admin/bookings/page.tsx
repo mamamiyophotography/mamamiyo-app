@@ -218,8 +218,10 @@ export default function AdminBookingsPage() {
   function renderBookingCard(b: Booking) {
         const isOpen = expandedId === b.id;
         const isBusy = busyId === b.id;
-        const statusStyle = STATUS_LABEL[b.status] || { label: b.status, color: '#3A2E28', bg: '#EDE6DC' };
-        const isPostProcessing = ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'completed'].includes(b.status);
+        const hasClientGallery = Boolean(b.gallerySelections?.some(g => g.clientUrl));
+        const displayStatus = hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch') ? 'basic_retouch' : b.status;
+        const statusStyle = STATUS_LABEL[displayStatus] || { label: displayStatus, color: '#3A2E28', bg: '#EDE6DC' };
+        const isPostProcessing = ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'completed'].includes(displayStatus);
 
         return (
           <div key={b.id} className={`booking-card${isOpen ? ' open' : ''}${filter === 'active' ? ((b.status === 'pending' || b.status === 'confirmed') ? ' pre-shoot-card' : ' post-shoot-card') : ''}`}>
@@ -227,7 +229,7 @@ export default function AdminBookingsPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: '0 0 68%', minWidth: 0 }}>
                 <div style={{ fontFamily: "'Quicksand', sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: '#3A2E28' }}>{b.clientName}</div>
-                {(b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <a href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer" title="Create a Gallery in PhotoSelect Pro on your studio computer" style={{display:'inline-block',marginTop:8,padding:'8px 12px',background:'#657e76',color:'#fff',borderRadius:7,textDecoration:'none',fontSize:13,fontWeight:600}}>Open PhotoSelect Pro · Create Gallery</a>}
+                {!hasClientGallery && (b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <a href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer" title="Create a Gallery in PhotoSelect Pro on your studio computer" style={{display:'inline-block',marginTop:8,padding:'8px 12px',background:'#657e76',color:'#fff',borderRadius:7,textDecoration:'none',fontSize:13,fontWeight:600}}>Open PhotoSelect Pro · Create Gallery</a>}
                 {b.gallerySelections?.map(g => <div key={g.galleryId} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginTop:8,padding:'8px 10px',background:'#e3eee9',borderRadius:6,fontSize:13}}>
                   <span>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : g.submitted ? 'Client selection received' : 'Awaiting client selection'}</span>
                   {g.clientUrl ? <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><a href={`/g/${g.galleryId.slice(0,12)}`} target="_blank" rel="noopener noreferrer" style={{color:'#415e58',fontWeight:700,whiteSpace:'nowrap'}}>Open Client Gallery</a><button type="button" onClick={()=>copyClientGalleryLink(b.id,g.galleryId)} style={{border:0,background:'transparent',padding:0,color:'#415e58',fontWeight:700,textDecoration:'underline',cursor:'pointer'}}>Copy WhatsApp Gallery Message</button></div> : <span style={{color:'#8b5b43'}}>Link this Gallery again in PhotoSelect Pro to enable the mobile client link.</span>}
@@ -423,7 +425,7 @@ export default function AdminBookingsPage() {
                   {b.status === 'confirmed' && (
                     <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>
                   )}
-                  {(b.status === 'pending_balance' || b.status === 'pending_basic_retouch') && (
+                  {!hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch') && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => finishBasicRetouch(b)}>
                       {b.sessionTypeId === 'bundle' && (b.bundleSessionNumber || 1) < 3
                         ? 'Basic Retouch Done · Create Download Gallery'
