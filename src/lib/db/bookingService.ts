@@ -34,6 +34,7 @@ import { dispatchNotification, Receipt, ClientDetails } from '../notify';
 import { buildEmailHtml, sendEmail } from '../email';
 import { generateIcs, icsToBase64 } from '../ics';
 import { fmtDatePretty } from '../format';
+import { balancePaymentReference } from '../paynow';
 
 const PHOTOGRAPHER_EMAIL_ENV = 'PHOTOGRAPHER_EMAIL';
 const PHOTOGRAPHER_PHONE_ENV = 'PHOTOGRAPHER_PHONE';
@@ -522,7 +523,7 @@ export async function generateInvoiceAndNotify(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
   const items = (booking.extraLineItems as { description: string; amount: number }[]) || [];
   const due = currentBalanceDue({ balanceDue: booking.balanceDue, extraLineItems: items });
-  const invoiceRef = refCode('BAL');
+  const invoiceRef = balancePaymentReference(booking.clientName, booking.date);
 
   const updated = await db.booking.update({
     where: { id: bookingId },

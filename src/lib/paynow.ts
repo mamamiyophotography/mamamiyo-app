@@ -19,6 +19,19 @@ function tlv(id: string, value: string): string {
   return id + String(value.length).padStart(2, '0') + value;
 }
 
+export function balancePaymentReference(clientName: string, photoshootDate: string): string {
+  const cleanName = clientName
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, ' ')
+    .trim() || 'Client';
+  const [year = '', month = '', day = ''] = photoshootDate.split('-');
+  const monthName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(month) - 1] || '';
+  const datePart = monthName && day && year ? `${day}${monthName}${year.slice(-2)}` : photoshootDate.replace(/[^0-9]/g, '').slice(0, 8);
+  const suffix = `-${datePart || 'Session'}`;
+  return `${cleanName.slice(0, Math.max(1, 25 - suffix.length)).trim()}${suffix}`;
+}
+
 export function buildPayNowPayload({
   mobile8,
   amount,

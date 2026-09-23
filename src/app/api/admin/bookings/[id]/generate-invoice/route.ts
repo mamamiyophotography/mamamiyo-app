@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/client';
 import { getSettings } from '@/lib/db/bookingService';
-import { buildPayNowPayload } from '@/lib/paynow';
+import { balancePaymentReference, buildPayNowPayload } from '@/lib/paynow';
 import { currentBalanceDue } from '@/lib/pricing';
 import { invoiceNotification } from '@/lib/notifications';
 import { dispatchNotification, PayNowQr, Receipt } from '@/lib/notify';
@@ -14,10 +14,6 @@ function photographerContacts() {
   };
 }
 
-function refCode(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-}
-
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const body = await req.json().catch(() => ({})) as { sendEmail?: boolean };
@@ -27,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const booking = await db.booking.findUniqueOrThrow({ where: { id } });
     const items = (booking.extraLineItems as { description: string; amount: number }[]) || [];
     const due = currentBalanceDue({ balanceDue: booking.balanceDue, extraLineItems: items });
-    const invoiceRef = refCode('BAL');
+    const invoiceRef = balancePaymentReference(booking.clientName, booking.date);
 
     // Build PayNow QR
     let payNowPayload: string | null = null;
