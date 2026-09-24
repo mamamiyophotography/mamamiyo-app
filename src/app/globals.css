@@ -97,6 +97,7 @@ a { color: inherit; }
   overflow-wrap: anywhere;
   word-break: normal;
 }
+.booking-review-card .ticket-row{grid-template-columns:minmax(145px,.42fr) minmax(0,1fr)}
 .ticket-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .ticket-total .amt { font-family: Georgia, serif; font-size: 24px; color: var(--gold-deep); }
 .final-bill-panel { margin-top: 14px; padding: 14px; border-radius: 10px; background: var(--gold-pale); }
@@ -200,6 +201,7 @@ a { color: inherit; }
   .pre-shoot-heading, .post-shoot-heading { grid-column: auto; }
   .booking-card { padding: 14px; border-radius: 18px; }
   .ticket-row { grid-template-columns: 88px minmax(0, 1fr); gap: 5px 10px; }
+  .booking-review-card .ticket-row{grid-template-columns:minmax(132px,.46fr) minmax(0,1fr)}
   .final-bill-panel .ticket-row { grid-template-columns: minmax(0, 1fr) auto; }
   .final-bill-add-charge { grid-template-columns: minmax(0, 1fr) 76px; }
   .final-bill-add-charge .btn { grid-column: 1 / -1; justify-content: center; }

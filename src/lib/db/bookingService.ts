@@ -95,6 +95,7 @@ export type CreateBookingInput = {
   notes: string;
   babyGender?: string;  // 'boy' | 'girl' | 'prefer_not_to_say' | ''
   siblingJoining?: string; // 'yes' | 'no' | ''
+  siblingCount?: number;
   setupSelectionCount?: number;
   setupSelections?: { slot: number; referencePhotoUrls: string[]; note?: string; outfitSource?: 'mamamiyo'|'own'|null }[];
   inspirationReferencePhotoUrls?: string[];
@@ -111,6 +112,7 @@ export async function createBooking(db: any, input: CreateBookingInput) {
   const st = sessionById(input.sessionTypeId);
   if (!st) throw new Error(`Unknown session type: ${input.sessionTypeId}`);
   if (st.location === 'home' && !input.address.trim()) throw new Error('Home address is required for this package.');
+  if(input.siblingJoining==='yes'&&input.siblingCount!==undefined&&(!Number.isSafeInteger(input.siblingCount)||Number(input.siblingCount)<1))throw new Error('Enter how many siblings will be joining.');
   const setupSelectionCount = Number(input.setupSelectionCount ?? 0);
   if (!Number.isSafeInteger(setupSelectionCount) || setupSelectionCount < 0 || setupSelectionCount > 3) throw new Error('Number of setup selections must be between 0 and 3.');
   const setupSelections = Array.isArray(input.setupSelections) ? input.setupSelections : [];
@@ -182,6 +184,7 @@ export async function createBooking(db: any, input: CreateBookingInput) {
         addOns: input.addOns,
         notes: [
           input.siblingJoining ? `Sibling joining: ${input.siblingJoining}` : '',
+          input.siblingJoining==='yes'&&input.siblingCount ? `Number of siblings: ${input.siblingCount}` : '',
           input.babyGender ? `Baby gender: ${input.babyGender}` : '',
           input.notes,
         ].filter(Boolean).join('\n'),
@@ -950,6 +953,15 @@ export async function checkAndSendReminders(db: any) {
     for (const threshold of REMINDER_THRESHOLDS) {
       if (hoursUntil <= threshold.hours && !already.includes(threshold.key)) {
         const pair = reminderNotification(toNotifyBooking(booking), threshold, settings.businessName);
+        if(threshold.key==='3day'){
+          const setupSelections=Array.isArray(booking.setupSelections)?booking.setupSelections:[];
+          const inspiration=Array.isArray(booking.inspirationReferencePhotoUrls)?booking.inspirationReferencePhotoUrls:[];
+          const hasSetupChoice=setupSelections.some((group:any)=>group?.outfitSource||group?.note?.trim()||(Array.isArray(group?.referencePhotoUrls)&&group.referencePhotoUrls.length>0))||inspiration.length>0;
+          if(!hasSetupChoice){
+            pair.client.emailSubject=`Action needed: Confirm your Setup — ${booking.sessionLabel}`;
+            pair.client.emailBody+=`\n\nYour Setup choice is still blank. Please confirm your preferred Setup before the photoshoot by replying to this email or contacting us on WhatsApp. You may send screenshots from the MamaMiyo Photography Portfolio.`;
+          }
+        }
         await dispatchNotification(pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone);
         already.push(threshold.key);
         await db.booking.update({ where: { id: booking.id }, data: { remindersSent: already } });

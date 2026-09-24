@@ -10,7 +10,7 @@ import { MonthCalendar, CandidateSlot, startOfMonth, addMonths, fmtDateISO } fro
 type Step = 'package' | 'calendar' | 'information' | 'setup' | 'addons' | 'review' | 'result';
 const BOOKING_STEPS: {id:Exclude<Step,'result'>;label:string}[] = [
   {id:'package',label:'Package'},{id:'calendar',label:'Date & Time'},{id:'information',label:'Your Information'},
-  {id:'setup',label:'Your Setup'},{id:'addons',label:'Add-ons'},{id:'review',label:'Review'},
+  {id:'setup',label:'Choose Your Setup (you may decide later)'},{id:'addons',label:'Choose Add-ons'},{id:'review',label:'Review & Confirm'},
 ];
 
 const PRODUCT_GROUPS = [
@@ -32,13 +32,15 @@ export default function BookPage() {
 
   const [addOns, setAddOns] = useState<Record<string, number>>({});
   const [productVariants,setProductVariants]=useState<Record<string,string>>({album:'album8x8',canvas:'canvas11x14',plaque:'plaque5x7'});
-  const [name, setName] = useState('');
+  const [firstName,setFirstName]=useState('');
+  const [lastName,setLastName]=useState('');
   const [email, setEmail] = useState('');
   const [countryCode, setCountryCode] = useState('+65');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [babyGender, setBabyGender] = useState('');
   const [siblingJoining, setSiblingJoining] = useState('');
+  const [siblingCount,setSiblingCount]=useState('');
   const [notes, setNotes] = useState('');
   const [setupPhotos, setSetupPhotos] = useState<{ file: File; previewUrl: string }[][]>([[], [], []]);
   const [setupNotes, setSetupNotes] = useState<string[]>(['', '', '']);
@@ -138,11 +140,13 @@ export default function BookPage() {
   function goBack(){const order=BOOKING_STEPS.map(item=>item.id);const index=order.indexOf(step as Exclude<Step,'result'>);if(index>0)setStep(order[index-1]);}
 
   const missingFields: string[] = [];
-  if (!name.trim()) missingFields.push('Your name');
+  if (!firstName.trim()) missingFields.push('First name');
+  if (!lastName.trim()) missingFields.push('Last name');
   if (!email.trim()) missingFields.push('Email');
   if (!phone.trim()) missingFields.push('WhatsApp number');
   if (sessionType?.id !== 'maternity' && !babyGender.trim()) missingFields.push("Baby's gender");
   if (!siblingJoining) missingFields.push('Sibling attendance');
+  if(siblingJoining==='yes'&&(!Number.isSafeInteger(Number(siblingCount))||Number(siblingCount)<1))missingFields.push('Number of siblings');
   if (sessionType?.location === 'home' && !address.trim()) missingFields.push('Home address');
   const readyForReview = !!selectedSlot && missingFields.length === 0;
 
@@ -186,13 +190,14 @@ export default function BookPage() {
           notes,
           babyGender,
           siblingJoining,
+          siblingCount:siblingJoining==='yes'?Number(siblingCount):0,
           setupSelectionCount: activeSetupCount,
           setupSelections,
           inspirationReferencePhotoUrls,
           referencePhotoUrls: referencePhotoUrls,
           address,
           discountCode: appliedDiscount?.code || null,
-          clientName: name,
+          clientName: `${firstName.trim()} ${lastName.trim()}`,
           clientEmail: email,
           countryCode,
           phone,
@@ -385,6 +390,7 @@ export default function BookPage() {
           {step==='addons'&&<h3 style={{ fontSize: 15 }}>Choose Add-ons</h3>}
           {step==='addons'&&(
           <div className="card">
+            <a className="btn btn-ghost" href="https://www.mamamiyo-photography.com/products" target="_blank" rel="noopener" style={{display:'inline-flex',textDecoration:'none',marginBottom:10}}>View MamaMiyo Products</a>
             {selectedSlot.isWeekend && (
               <div style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--rust-pale)', padding: '10px 12px', borderRadius: 8, marginBottom: 8, fontSize: 13.5 }}>
                 <span>Weekend / PH surcharge — applies automatically</span>
@@ -416,7 +422,7 @@ export default function BookPage() {
           )}
 
           {step==='information'&&<>
-          <div className="field"><label>Your name<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" /></div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div className="field"><label>First name<span style={{color:'var(--rust)',fontWeight:700}}> (Compulsory)</span></label><input value={firstName} onChange={event=>setFirstName(event.target.value)} autoComplete="given-name"/></div><div className="field"><label>Last name<span style={{color:'var(--rust)',fontWeight:700}}> (Compulsory)</span></label><input value={lastName} onChange={event=>setLastName(event.target.value)} autoComplete="family-name"/></div></div>
           <div className="field"><label>Email<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" /></div>
           <div className="field">
             <label>WhatsApp number<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label>
@@ -434,10 +440,7 @@ export default function BookPage() {
           </>}
           {step==='setup'&&<>
           <div className="field">
-            <label>Setup / inspiration photos <span style={{ color: 'var(--ink-faint)', fontWeight: 500 }}>(Optional — you may decide later)</span></label>
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 8 }}>
-              <b>One Setup = one outfit + one background setting.</b> Your package includes <b>{includedSetupCount} {includedSetupCount === 1 ? 'Setup' : 'Setups'}</b>. <b>Each Additional Setup is $100.</b> You decide which photos belong together. References may come from MamaMiyo or anywhere else, and each Setup can include up to 3 photos showing different poses, angles or details. <a href={sessionType.id==='maternity'?'https://www.mamamiyo-photography.com/sensual-maternity/':sessionType.id==='newborn'?'https://www.mamamiyo-photography.com/cutie-newborn':'https://www.mamamiyo-photography.com/'} target="_blank" rel="noopener" style={{color:'var(--gold-deep)',fontWeight:700}}>View MamaMiyo Portfolio</a>
-            </div>
+            <div className="notice" style={{fontSize:12,lineHeight:1.55,marginBottom:10}}><p style={{margin:'0 0 8px'}}><b>One Setup = one outfit + one background setting.</b></p><p style={{margin:'0 0 8px'}}>Your package includes <b>{includedSetupCount} {includedSetupCount===1?'Setup':'Setups'}</b>. Each Additional Setup is <b>$100</b>.</p><p style={{margin:'0 0 8px'}}>Please choose your preferred Setup from the <a href={sessionType.id==='maternity'?'https://www.mamamiyo-photography.com/sensual-maternity/':sessionType.id==='newborn'?'https://www.mamamiyo-photography.com/cutie-newborn':'https://www.mamamiyo-photography.com/'} target="_blank" rel="noopener" style={{color:'var(--gold-deep)',fontWeight:700}}>MamaMiyo Photography Portfolio here</a> and upload screenshots.</p><p style={{margin:0}}>You may bring your own outfit. Please add a note in advance; its suitability is subject to fit, safety, styling and the backgrounds or props available in the studio.</p></div>
             <div style={{ display: 'grid', gap: 10 }}>
               {[0,1,2].map((slotIndex) => { const slot=slotIndex+1; const included=slot<=includedSetupCount; const active=slot<=activeSetupCount; return <div key={slot} style={{ border:'1.5px solid var(--line)',borderRadius:10,padding:12,background:active?'var(--paper)':'#f6f2ee' }}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><b>Setup {slot}</b><span style={{fontSize:11.5,color:included?'var(--ink-soft)':'var(--rust)',fontWeight:700}}>{included?'Included':'Additional Setup ($100)'}</span></div>
@@ -469,9 +472,10 @@ export default function BookPage() {
             <label>Will a sibling be joining the photoshoot?<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
               {[['yes', 'Yes'], ['no', 'No']].map(([val, label]) => (
-                <button key={val} type="button" className={`chip ${siblingJoining === val ? 'selected' : ''}`} onClick={() => setSiblingJoining(val)}>{label}</button>
+                <button key={val} type="button" className={`chip ${siblingJoining === val ? 'selected' : ''}`} onClick={() => {setSiblingJoining(val);if(val==='no')setSiblingCount('');}}>{label}</button>
               ))}
             </div>
+            {siblingJoining==='yes'&&<div style={{marginTop:9,maxWidth:220}}><label>How many siblings?</label><input type="number" min="1" step="1" value={siblingCount} onChange={event=>setSiblingCount(event.target.value)} placeholder="1"/></div>}
             <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 6 }}>Sibling participation is free. The additional family / grandparents add-on is charged separately.</div>
           </div>
           <div className="field"><label>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything we should know?" /></div>
@@ -500,14 +504,14 @@ export default function BookPage() {
             {appliedDiscount && <div style={{ fontSize: 12, color: 'var(--sage)', marginTop: 6 }}>&quot;{appliedDiscount.code}&quot; applied — −${appliedDiscount.amount}</div>}
           </div>
 
-          <div className="card">
+          <div className="card booking-review-card">
             {/* Session details */}
             <div className="ticket-row"><span>Package <button type="button" onClick={()=>setStep('package')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{sessionType.name}</b></div>
             <div className="ticket-row"><span>Date &amp; time <button type="button" onClick={()=>setStep('calendar')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{fmtDatePretty(selectedSlot.date)}, {fmtTime12(selectedSlot.startTime)}</b></div>
-            <div className="ticket-row"><span>Your information <button type="button" onClick={()=>setStep('information')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{name}</b></div>
+            <div className="ticket-row"><span>Your information <button type="button" onClick={()=>setStep('information')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{firstName} {lastName}</b></div>
             <div className="ticket-row"><span>Setups <button type="button" onClick={()=>setStep('setup')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{activeSetupCount} · {inspirationPhotos.length} inspiration</b></div>
             <div className="ticket-row"><span>Add-ons <button type="button" onClick={()=>setStep('addons')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{Object.values(addOns).reduce((sum,q)=>sum+q,0)}</b></div>
-            <div className="ticket-row"><span>Sibling joining</span><b>{siblingJoining === 'yes' ? 'Yes' : 'No'}</b></div>
+            <div className="ticket-row"><span>Sibling joining</span><b>{siblingJoining === 'yes' ? `Yes · ${siblingCount}` : 'No'}</b></div>
 
             {sessionType.isBundle ? (<>
               {/* Bundle: deposit due now — surcharge on session balance, shown in schedule */}
