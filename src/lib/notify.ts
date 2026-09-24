@@ -54,6 +54,7 @@ function buildHtml(opts: {
   qrApiUrl?: string;        // external QR image URL (Gmail-compatible)
   payNowAmount?: number;
   payNowRef?: string;
+  postProcessFlow?: boolean;
 }): string {
   const gold = '#b08d57';
   const ink = '#2e2a22';
@@ -109,6 +110,16 @@ function buildHtml(opts: {
     if (mentionsCalendar && calBtn) bodyHtml += calBtn;
   }
   if (calBtn && !bodyHtml.includes(calBtn)) bodyHtml += calBtn;
+
+  if(opts.postProcessFlow){
+    const steps=[
+      ['1','Basic Retouch','#dcece7'],
+      ['2','Select Photos for Further Retouch<br><span style="font-size:10px;font-weight:400;">Choose Additional Products &amp; Add-ons</span>','#f9e8bd'],
+      ['3','Soft Copy Delivery<br><span style="font-size:10px;font-weight:400;">Basic &amp; Further Retouch</span>','#eedfd7'],
+      ['4','Physical Product Delivery<br><span style="font-size:10px;font-weight:400;">If any</span>','#e8def2'],
+    ];
+    bodyHtml+=`<div style="margin:22px 0 4px;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${soft};font-family:sans-serif;padding:6px 0;border-top:2px solid ${ink};">Post Process Flow</div><table width="100%" cellpadding="0" cellspacing="0"><tbody>${steps.map(([number,label,color])=>`<tr><td style="padding:4px 0;"><table width="100%" cellpadding="0" cellspacing="0" style="background:${color};border-radius:9px;"><tbody><tr><td style="width:30px;padding:11px 8px 11px 11px;"><span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;border-radius:7px;background:#fff;color:${ink};font:700 12px sans-serif;">${number}</span></td><td style="padding:11px 11px 11px 0;color:${ink};font:700 12px/1.35 sans-serif;">${label}</td></tr></tbody></table></td></tr>`).join('')}</tbody></table></div>`;
+  }
 
   // Studio section
   if (opts.studioDetails?.length) bodyHtml += sectionTable('Studio Details', opts.studioDetails, '📍');
@@ -325,6 +336,7 @@ export async function dispatchNotification(
     qrApiUrl,
     payNowAmount: payNowAmount || undefined,
     payNowRef: payNowRef || undefined,
+    postProcessFlow:isInvoiceEmail,
   });
 
   const sends: Promise<void>[] = [];
