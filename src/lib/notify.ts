@@ -114,7 +114,7 @@ function buildHtml(opts: {
   if(opts.postProcessFlow){
     const steps=[
       ['1','Basic Retouch','#dcece7'],
-      ['2','Select Photos for Further Retouch<br><span style="font-size:10px;font-weight:400;">Choose Additional Products &amp; Add-ons</span>','#f9e8bd'],
+      ['2','Select Photos for Further Retouch<br><span style="font-size:10px;font-weight:400;">Choose Additional Products &amp; Add-ons, if any</span>','#f9e8bd'],
       ['3','Soft Copy Delivery<br><span style="font-size:10px;font-weight:400;">Basic &amp; Further Retouch</span>','#eedfd7'],
       ['4','Physical Product Delivery<br><span style="font-size:10px;font-weight:400;">If any</span>','#e8def2'],
     ];

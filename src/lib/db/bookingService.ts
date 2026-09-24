@@ -856,8 +856,8 @@ function oneCalendarMonthAfter(value: Date): Date {
   ));
 }
 
-/** Sends Gallery reminders from the dates recorded by the Gallery itself:
- * once after one month without a selection, and once three days before expiry. */
+/** Sends Gallery reminders from the Gallery creation date: after seven days,
+ * after one calendar month, then monthly until the client submits. */
 export async function checkAndSendGalleryReminders(db: any, now = new Date()) {
   const settings = await getSettings(db);
   const galleries = await db.galleryInbox.findMany();
@@ -867,12 +867,24 @@ export async function checkAndSendGalleryReminders(db: any, now = new Date()) {
     const booking = await db.booking.findUnique({where:{id:gallery.bookingId}});
     if (!booking || booking.status === 'cancelled') continue;
     const firstName = booking.clientName.split(' ')[0] || booking.clientName;
-    if (gallery.selectionEnabled && !gallery.submitted && !gallery.selectionReminderSentAt
-        && oneCalendarMonthAfter(new Date(gallery.createdAt)) <= now) {
-      const body = [`Hi ${firstName}!`,`Your Basic Retouch Gallery has been ready for one month. Please open your private Gallery link to choose and submit the photographs you would like us to Further Retouch.`,`If you need help or no longer require Further Retouch, please contact us.`,settings.businessName].join('\n\n');
+    const createdAt=new Date(gallery.createdAt);
+    const firstWeekDue=new Date(createdAt.getTime()+7*24*60*60*1000);
+    const firstMonthDue=oneCalendarMonthAfter(createdAt);
+    const lastSelectionReminder=gallery.selectionReminderSentAt?new Date(gallery.selectionReminderSentAt):null;
+    let selectionReminderLabel:string|null=null;
+    if(!lastSelectionReminder){
+      if(firstMonthDue<=now)selectionReminderLabel='one month';
+      else if(firstWeekDue<=now)selectionReminderLabel='one week';
+    }else{
+      const nextDue=lastSelectionReminder<firstMonthDue?firstMonthDue:oneCalendarMonthAfter(lastSelectionReminder);
+      if(nextDue<=now)selectionReminderLabel=lastSelectionReminder<firstMonthDue?'one month':'another month';
+    }
+    if (gallery.selectionEnabled && !gallery.submitted && selectionReminderLabel) {
+      const timing=selectionReminderLabel==='one week'?'one week':selectionReminderLabel==='one month'?'one month':'another month';
+      const body = [`Hi ${firstName}!`,`Your Basic Retouch Gallery has been ready for ${timing}. Please open your private Gallery link to choose and submit the photographs you would like us to Further Retouch.`,`If you need help or no longer require Further Retouch, please contact us.`,settings.businessName].join('\n\n');
       const html = buildEmailHtml({title:'Photo Selection Reminder',paragraphs:body.split('\n\n'),details:[{label:'Session',value:booking.sessionLabel},{label:'Photoshoot date',value:fmtDatePretty(booking.date)}],businessName:settings.businessName});
       await sendEmail(booking.clientEmail,`Reminder: Select your Further Retouch photos — ${booking.sessionLabel}`,body,undefined,html);
-      await db.galleryInbox.updateMany({where:{galleryId:gallery.galleryId,selectionReminderSentAt:null},data:{selectionReminderSentAt:now}});
+      await db.galleryInbox.updateMany({where:{galleryId:gallery.galleryId,selectionReminderSentAt:gallery.selectionReminderSentAt??null},data:{selectionReminderSentAt:now}});
       selectionSent++;
     }
     const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
