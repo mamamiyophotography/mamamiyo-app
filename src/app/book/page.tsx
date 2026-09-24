@@ -9,6 +9,12 @@ import { MonthCalendar, CandidateSlot, startOfMonth, addMonths, fmtDateISO } fro
 
 type Step = 'package' | 'calendar' | 'details' | 'review' | 'result';
 
+const PRODUCT_GROUPS = [
+  {key:'album',name:'Layflat Photo Album',detail:'20 pages · up to 30 images',bonus:'+20 Bonus Further Retouch',ids:['album8x8','album10x10','album12x12']},
+  {key:'canvas',name:'Canvas',detail:'Ready-to-display wall art',bonus:'+5 Bonus Further Retouch',ids:['canvas11x14','canvas16x24']},
+  {key:'plaque',name:'Wooden / Crystal Plaque',detail:'Tabletop display',bonus:'+2 Bonus Further Retouch',ids:['plaque5x7','plaque6x8']},
+] as const;
+
 export default function BookPage() {
   const [step, setStep] = useState<Step>('package');
   const [sessionTypeId, setSessionTypeId] = useState<string | null>(null);
@@ -21,6 +27,7 @@ export default function BookPage() {
   const [selectedSlot, setSelectedSlot] = useState<CandidateSlot | null>(null);
 
   const [addOns, setAddOns] = useState<Record<string, number>>({});
+  const [productVariants,setProductVariants]=useState<Record<string,string>>({album:'album8x8',canvas:'canvas11x14',plaque:'plaque5x7'});
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [countryCode, setCountryCode] = useState('+65');
@@ -364,18 +371,10 @@ export default function BookPage() {
             <div style={{ marginTop: 10, marginBottom: 4, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--ink-soft)', letterSpacing: 0.5 }}>
               Products — <a href="https://www.mamamiyo-photography.com/products" target="_blank" rel="noopener" style={{ color: 'var(--gold-deep)', fontWeight: 400, textTransform: 'none' }}>view all options</a>
             </div>
-            {sessionType.addOns.filter(id => !['extraSetup','extraOutfit','headcount'].includes(id)).map((id) => (
-              <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px dashed var(--line)' }}>
-                <span style={{ fontSize: 13, paddingLeft: 12 }}>
-                  {ADDONS[id].name} <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>${ADDONS[id].price}</span>
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: Math.max(0, (a[id] || 0) - 1) }))} style={{ width: 26, height: 26, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>−</button>
-                  <span style={{ minWidth: 16, textAlign: 'center', fontWeight: 700 }}>{addOns[id] || 0}</span>
-                  <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: (a[id] || 0) + 1 }))} style={{ width: 26, height: 26, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>+</button>
-                </div>
-              </div>
-            ))}
+            {PRODUCT_GROUPS.map(group=>{const id=productVariants[group.key];const quantity=addOns[id]||0;return <div key={group.key} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:12,padding:'12px 0',borderBottom:'1px dashed var(--line)',alignItems:'center'}}>
+              <div style={{minWidth:0}}><div style={{fontWeight:700,fontSize:14}}>{group.name}</div><div style={{fontSize:11.5,color:'var(--ink-soft)',marginTop:2}}>{group.detail}</div><div style={{fontSize:11.5,color:'var(--sage)',fontWeight:700,marginTop:2}}>{group.bonus}</div><select value={id} onChange={event=>{const nextId=event.target.value;setProductVariants(current=>({...current,[group.key]:nextId}));setAddOns(current=>{const next={...current};const qty=group.ids.reduce((sum,item)=>sum+(next[item]||0),0);group.ids.forEach(item=>delete next[item]);if(qty)next[nextId]=qty;return next;});}} style={{marginTop:7,width:'100%',maxWidth:250,padding:'7px 9px',border:'1.5px solid var(--line)',borderRadius:8,background:'var(--paper)'}}>{group.ids.map(optionId=><option key={optionId} value={optionId}>{ADDONS[optionId].name.replace(group.name,'').trim().replace(/^·\s*/, '')}</option>)}</select></div>
+              <div style={{display:'grid',justifyItems:'end',gap:8}}><strong style={{fontSize:20,color:'var(--gold-deep)'}}>${ADDONS[id].price}</strong><div style={{display:'flex',alignItems:'center',gap:10}}><button type="button" onClick={()=>setAddOns(current=>({...current,[id]:Math.max(0,(current[id]||0)-1)}))} style={{width:28,height:28,borderRadius:8,border:'1.5px solid var(--line)',background:'var(--paper)'}}>−</button><strong style={{minWidth:16,textAlign:'center'}}>{quantity}</strong><button type="button" onClick={()=>setAddOns(current=>({...current,[id]:(current[id]||0)+1}))} style={{width:28,height:28,borderRadius:8,border:'1.5px solid var(--line)',background:'var(--paper)'}}>+</button></div></div>
+            </div>})}
           </div>
 
           <div className="field"><label>Your name<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" /></div>
