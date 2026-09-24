@@ -19,7 +19,7 @@ type Booking = {
   invoiceStale: boolean; version: number;
   status: string; depositStatus: string; balanceStatus: string;
   referencePhotoUrls: string[]; remindersSent: string[]; bundleSessionNumber: number | null;
-  setupSelectionCount?: number; setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string}[];
+  setupSelectionCount?: number; setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string;outfitSource?:'mamamiyo'|'own'|null}[]; inspirationReferencePhotoUrls?:string[];
 };
 
 const STATUS_TABS = [
