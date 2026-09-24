@@ -6,7 +6,6 @@ import { ADDONS, STATUS_LABELS } from '@/lib/constants';
 import BookingSummaryModal from '@/components/BookingSummaryModal';
 import EditBookingModal from '@/components/EditBookingModal';
 import EditAddOnsModal from '@/components/EditAddOnsModal';
-import SetupChoiceModal from '@/components/SetupChoiceModal';
 
 type Booking = {
   additionalOrders?: {id:string;galleryId:string;version:number;items:{name:string;quantity:number;amount:number;bonusRetouches:number}[];total:number;bonusRetouches:number;status:string;invoiceRef:string;createdAt:string;paidAt:string|null}[];
@@ -20,6 +19,7 @@ type Booking = {
   invoiceStale: boolean; version: number;
   status: string; depositStatus: string; balanceStatus: string;
   referencePhotoUrls: string[]; remindersSent: string[]; bundleSessionNumber: number | null;
+  setupSelectionCount?: number; setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string}[];
 };
 
 const STATUS_TABS = [
@@ -40,6 +40,7 @@ export default function AdminBookingsPage() {
   const [loading, setLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedPhotos, setExpandedPhotos] = useState<string[]>([]);
+  const [expandedSetups, setExpandedSetups] = useState<{slot:number;referencePhotoUrls:string[];note?:string}[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [lineDesc, setLineDesc] = useState('');
   const [lineAmount, setLineAmount] = useState('');
@@ -48,7 +49,6 @@ export default function AdminBookingsPage() {
   const [summaryBooking, setSummaryBooking] = useState<Booking | null>(null);
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
   const [editAddOnsBooking, setEditAddOnsBooking] = useState<Booking | null>(null);
-  const [setupChoiceBooking, setSetupChoiceBooking] = useState<Booking | null>(null);
   const [actionSuccess, setActionSuccess] = useState<{ id: string; message: string } | null>(null);
   const [invoiceGenerating, setInvoiceGenerating] = useState<{ id: string; sendEmail: boolean } | null>(null);
 
@@ -66,12 +66,13 @@ export default function AdminBookingsPage() {
   useEffect(() => { load(); }, [load]);
 
   async function expandBooking(id: string) {
-    if (expandedId === id) { setExpandedId(null); setExpandedPhotos([]); return; }
+    if (expandedId === id) { setExpandedId(null); setExpandedPhotos([]); setExpandedSetups([]); return; }
     setExpandedId(id);
     setExpandedPhotos([]);
     const res = await fetch(`/api/admin/bookings/${id}`);
     const data = await res.json();
     setExpandedPhotos(data.booking?.referencePhotoUrls || []);
+    setExpandedSetups(data.booking?.setupSelections || []);
   }
 
   async function runAction(id: string, path: string, body?: unknown) {
@@ -168,12 +169,12 @@ export default function AdminBookingsPage() {
     }
   }
 
-  async function openSetupChoice(id: string) {
+  async function openEditBooking(id: string) {
     setBusyId(id); setActionError(null);
     try {
       const response = await fetch(`/api/admin/bookings/${id}`); const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Could not load Setup choice.');
-      setSetupChoiceBooking(data.booking);
+      if (!response.ok) throw new Error(data.error || 'Could not load booking information.');
+      setEditBooking(data.booking);
     } catch (error) { setActionError({ id, message: (error as Error).message }); }
     finally { setBusyId(null); }
   }
@@ -268,16 +269,17 @@ export default function AdminBookingsPage() {
                 {b.discountCode && <div className="ticket-row"><span>Discount</span><b>−${b.discountAmount} ({b.discountCode})</b></div>}
                 <div className="ticket-row"><span>Notes</span><b style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>{b.notes || '—'}</b></div>
 
-                {expandedPhotos.length > 0 && (
+                {(expandedSetups.length > 0 || expandedPhotos.length > 0) && (
                   <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', marginBottom: 6 }}>Reference photos ({expandedPhotos.length})</div>
+                    {(expandedSetups.length ? expandedSetups : [{slot:1,referencePhotoUrls:expandedPhotos,note:''}]).map(group => <div key={group.slot} style={{marginBottom:12}}>
+                    <div style={{ fontSize: 12, fontWeight:700, color: 'var(--ink-soft)', marginBottom: 6 }}>Setup {group.slot}{group.note ? ` · ${group.note}` : ''}</div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {expandedPhotos.map((url) => (
+                      {group.referencePhotoUrls.map((url) => (
                         <a key={url} href={url} target="_blank" rel="noopener" style={{ display: 'block', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', border: '1.5px solid var(--line)' }}>
                           <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </a>
                       ))}
-                    </div>
+                    </div></div>)}
                   </div>
                 )}
 
@@ -406,12 +408,7 @@ export default function AdminBookingsPage() {
                 {/* Action buttons */}
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
                   {(b.status === 'pending' || b.status === 'confirmed') && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => setEditBooking(b)}>Edit booking</button>
-                  )}
-                  {(b.status === 'pending' || b.status === 'confirmed') && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => openSetupChoice(b.id)}>
-                      {/maternity/i.test(b.sessionLabel) ? 'Add / Edit Outfit choice' : 'Add / Edit Setup choice'}
-                    </button>
+                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Edit booking</button>
                   )}
                   {b.status !== 'cancelled' && b.balanceStatus !== 'paid' && (
                     <button className="btn btn-ghost" disabled={isBusy} onClick={() => setEditAddOnsBooking(b)}>Edit Add-ons</button>
@@ -569,18 +566,6 @@ export default function AdminBookingsPage() {
             setEditAddOnsBooking(null);
             setInvoiceQr((current) => current?.bookingId === id ? null : current);
             setActionSuccess({ id, message: invoiceNeedsRegeneration ? 'Changes saved. Please generate and send a new invoice.' : 'Changes saved.' });
-            await load();
-          }}
-        />
-      )}
-      {setupChoiceBooking && (
-        <SetupChoiceModal
-          booking={setupChoiceBooking}
-          onClose={() => setSetupChoiceBooking(null)}
-          onSaved={async () => {
-            const id = setupChoiceBooking.id;
-            setSetupChoiceBooking(null);
-            setActionSuccess({ id, message: 'Setup / Outfit choice saved.' });
             await load();
           }}
         />

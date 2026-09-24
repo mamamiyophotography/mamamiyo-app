@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ADDONS, SESSION_TYPES } from '@/lib/constants';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { addMonths, CandidateSlot, MonthCalendar, startOfMonth } from '@/components/MonthCalendar';
+import { uploadPhotoFromBrowser } from '@/lib/uploadClient';
 
 export type EditableBooking = {
   id: string;
@@ -18,6 +19,10 @@ export type EditableBooking = {
   address: string;
   notes: string;
   clientName: string;
+  referencePhotoUrls?: string[];
+  setupSelectionCount?: number;
+  setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string}[];
+  setupChoiceNotes?: string;
 };
 
 export default function EditBookingModal({
@@ -49,6 +54,12 @@ export default function EditBookingModal({
   const [notes, setNotes] = useState(
     (booking.notes || '').split('\n').filter((line) => !/^Sibling joining:/i.test(line.trim())).join('\n').trim(),
   );
+  const initialGroups=booking.setupSelections?.length?booking.setupSelections:[{slot:1,referencePhotoUrls:booking.referencePhotoUrls||[],note:''}];
+  const includedSetups=SESSION_TYPES.find(item=>item.id===booking.sessionTypeId)?.referenceSetups||1;
+  const [setupCount,setSetupCount]=useState(Math.min(3,Math.max(includedSetups,booking.setupSelectionCount||includedSetups)));
+  const [setupExisting,setSetupExisting]=useState<string[][]>([1,2,3].map(slot=>initialGroups.find(group=>group.slot===slot)?.referencePhotoUrls||[]));
+  const [setupPending,setSetupPending]=useState<{file:File;previewUrl:string}[][]>([[],[],[]]);
+  const [setupNotes,setSetupNotes]=useState<string[]>([1,2,3].map(slot=>initialGroups.find(group=>group.slot===slot)?.note||''));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -140,6 +151,9 @@ export default function EditBookingModal({
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not update the booking.');
+      const setupSelections=await Promise.all([0,1,2].slice(0,setupCount).map(async index=>({slot:index+1,note:setupNotes[index].trim(),referencePhotoUrls:[...setupExisting[index],...await Promise.all(setupPending[index].map(item=>uploadPhotoFromBrowser(item.file)))]})));
+      const setupResponse=await fetch(`/api/admin/bookings/${booking.id}/setup-choice`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({setupSelectionCount:setupCount,setupSelections,setupChoiceNotes:booking.setupChoiceNotes||''})});
+      const setupData=await setupResponse.json();if(!setupResponse.ok)throw new Error(setupData.error||'Could not update Setup choices.');
       await onSaved();
     } catch (err) {
       setError((err as Error).message);
@@ -218,6 +232,10 @@ export default function EditBookingModal({
             );
           })}
         </div>
+
+        <div style={{fontWeight:700,margin:'20px 0 6px'}}>Setup choices</div>
+        <div style={{fontSize:12,color:'var(--ink-soft)',marginBottom:10}}><b>One Setup = one outfit + one background setting.</b> This package includes {includedSetups} {includedSetups===1?'Setup':'Setups'}; each Additional Setup is $100. Each Setup can contain up to 3 reference photos and its own outfit note.</div>
+        <div style={{display:'grid',gap:10,marginBottom:18}}>{[0,1,2].map(index=>{const slot=index+1;const active=slot<=setupCount;const included=slot<=includedSetups;return <div key={slot} style={{border:'1.5px solid var(--line)',borderRadius:9,padding:10}}><div style={{display:'flex',justifyContent:'space-between'}}><b>Setup {slot}</b><span style={{fontSize:11,fontWeight:700,color:included?'var(--ink-soft)':'var(--rust)'}}>{included?'Included':'Additional Setup ($100)'}</span></div>{!active?<button type="button" className="btn btn-ghost" style={{marginTop:8}} onClick={()=>setSetupCount(slot)}>Add Setup {slot} · $100</button>:<><div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap'}}>{setupExisting[index].map(url=><div key={url} style={{position:'relative',width:58,height:58}}><img src={url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:7}}/><button type="button" onClick={()=>setSetupExisting(groups=>groups.map((items,i)=>i===index?items.filter(item=>item!==url):items))} style={{position:'absolute',right:1,top:1,border:0,borderRadius:99,background:'#3a2e28dd',color:'#fff'}}>×</button></div>)}{setupPending[index].map((item,photoIndex)=><div key={item.previewUrl} style={{position:'relative',width:58,height:58}}><img src={item.previewUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:7}}/><button type="button" onClick={()=>setSetupPending(groups=>groups.map((items,i)=>i===index?items.filter((_,p)=>p!==photoIndex):items))} style={{position:'absolute',right:1,top:1,border:0,borderRadius:99,background:'#3a2e28dd',color:'#fff'}}>×</button></div>)}</div><label className="btn btn-ghost" style={{display:'inline-flex',marginTop:8}}>Add reference photos<input hidden type="file" accept="image/*" multiple disabled={setupExisting[index].length+setupPending[index].length>=3} onChange={event=>{const room=3-setupExisting[index].length-setupPending[index].length;const added=Array.from(event.target.files||[]).slice(0,room).map(file=>({file,previewUrl:URL.createObjectURL(file)}));setSetupPending(groups=>groups.map((items,i)=>i===index?[...items,...added]:items));event.target.value='';}}/></label><input value={setupNotes[index]} maxLength={300} onChange={event=>setSetupNotes(values=>values.map((value,i)=>i===index?event.target.value:value))} placeholder="Outfit / Setup note (e.g. Client will bring this outfit)" style={{width:'100%',marginTop:8,padding:'8px 10px',border:'1.5px solid var(--line)',borderRadius:8}}/>{!included&&slot===setupCount&&<button type="button" className="btn btn-ghost" style={{marginTop:8}} onClick={()=>setSetupCount(count=>count-1)}>Remove Additional Setup</button>}</>}</div>})}</div>
 
         {sessionType.location === 'home' && <div className="field"><label>Client’s home address</label><textarea value={address} onChange={(event) => setAddress(event.target.value)} /></div>}
         <div className="field">
