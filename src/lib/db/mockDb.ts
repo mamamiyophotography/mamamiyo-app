@@ -45,6 +45,8 @@ export function createMockDb(seed: {
     if (where?.date !== undefined && b.date !== where.date) return false;
     if (where?.startTime?.lt !== undefined && !(b.startTime < where.startTime.lt)) return false;
     if (where?.endTime?.gt !== undefined && !(b.endTime > where.endTime.gt)) return false;
+    if (where?.date?.lte !== undefined && !(b.date <= where.date.lte)) return false;
+    if (where?.date?.lt !== undefined && !(b.date < where.date.lt)) return false;
     if (where?.NOT?.status !== undefined && b.status === where.NOT.status) return false;
     if (where?.OR !== undefined) {
       const ok = where.OR.some((cond: any) => {
@@ -61,7 +63,8 @@ export function createMockDb(seed: {
     if (where?.balanceStatus?.not !== undefined && b.balanceStatus === where.balanceStatus.not) return false;
     if (where?.version !== undefined && b.version !== where.version) return false;
     if (where?.invoiceGeneratedAt === null && b.invoiceGeneratedAt !== null) return false;
-    if (where?.bundleParentId !== undefined && b.bundleParentId !== where.bundleParentId) return false;
+    if (where?.bundleParentId !== undefined && (typeof where.bundleParentId==='string'||where.bundleParentId===null) && b.bundleParentId !== where.bundleParentId) return false;
+    if (where?.bundleParentId?.not === null && b.bundleParentId === null) return false;
     if (where?.holdExpiresAt?.lt !== undefined && (!b.holdExpiresAt || !(b.holdExpiresAt < where.holdExpiresAt.lt))) return false;
     return true;
   }

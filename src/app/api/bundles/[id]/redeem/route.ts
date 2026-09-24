@@ -9,7 +9,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     addOns?: Record<string, number>;
     referencePhotoUrls?: string[];
     setupSelectionCount?: number;
-    setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string}[];
+    setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string;outfitSource?:'mamamiyo'|'own'|null}[];
+    inspirationReferencePhotoUrls?: string[];
     notes?: string;
     babyGender?: string;
     siblingJoining?: string;
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const booking = await redeemBundleSessionAndNotify(
       db, id, body.slot, body.addOns || {},
-      body.referencePhotoUrls || [], body.setupSelectionCount || 0, body.setupSelections || [], body.notes || '', body.babyGender || '', body.siblingJoining || ''
+      body.referencePhotoUrls || [], body.setupSelectionCount || 0, body.setupSelections || [], body.inspirationReferencePhotoUrls || [], body.notes || '', body.babyGender || '', body.siblingJoining || ''
     );
     return NextResponse.json({ booking }, { status: 201 });
   } catch (err) {

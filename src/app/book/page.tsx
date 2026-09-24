@@ -7,7 +7,11 @@ import { computeBookingPricing } from '@/lib/pricing';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { MonthCalendar, CandidateSlot, startOfMonth, addMonths, fmtDateISO } from '@/components/MonthCalendar';
 
-type Step = 'package' | 'calendar' | 'details' | 'review' | 'result';
+type Step = 'package' | 'calendar' | 'information' | 'setup' | 'addons' | 'review' | 'result';
+const BOOKING_STEPS: {id:Exclude<Step,'result'>;label:string}[] = [
+  {id:'package',label:'Package'},{id:'calendar',label:'Date & Time'},{id:'information',label:'Your Information'},
+  {id:'setup',label:'Your Setup'},{id:'addons',label:'Add-ons'},{id:'review',label:'Review'},
+];
 
 const PRODUCT_GROUPS = [
   {key:'album',name:'Layflat Photo Album',detail:'20 pages · up to 30 images',bonus:'+20 Bonus Further Retouch',ids:['album8x8','album10x10','album12x12']},
@@ -38,6 +42,9 @@ export default function BookPage() {
   const [notes, setNotes] = useState('');
   const [setupPhotos, setSetupPhotos] = useState<{ file: File; previewUrl: string }[][]>([[], [], []]);
   const [setupNotes, setSetupNotes] = useState<string[]>(['', '', '']);
+  const [setupOutfitSources,setSetupOutfitSources]=useState<('mamamiyo'|'own'|null)[]>([null,null,null]);
+  const [inspirationPhotos,setInspirationPhotos]=useState<{file:File;previewUrl:string}[]>([]);
+  const [stepErrors,setStepErrors]=useState<Record<string,string>>({});
   const [uploading, setUploading] = useState(false);
 
   const [discountInput, setDiscountInput] = useState('');
@@ -84,6 +91,8 @@ export default function BookPage() {
     setAddOns({});
     setSetupPhotos([[], [], []]);
     setSetupNotes(['', '', '']);
+    setSetupOutfitSources([null,null,null]);
+    setInspirationPhotos([]);
     setDiscountInput('');
     setAppliedDiscount(null);
   }
@@ -111,6 +120,22 @@ export default function BookPage() {
   function removePhoto(slotIndex: number, photoIndex: number) {
     setSetupPhotos((prev) => prev.map((items, index) => index === slotIndex ? items.filter((_, i) => i !== photoIndex) : items));
   }
+
+  function handleInspirationUpload(files:FileList|null){
+    if(!files?.length)return;
+    const toAdd=Array.from(files).slice(0,10-inspirationPhotos.length);
+    setInspirationPhotos(items=>[...items,...toAdd.map(file=>({file,previewUrl:URL.createObjectURL(file)}))]);
+  }
+
+  function goNext(){
+    setStepErrors({});
+    if(step==='package'){if(!sessionType){setStepErrors({package:'Choose a package to continue.'});return;}setStep('calendar');return;}
+    if(step==='calendar'){if(!selectedSlot){setStepErrors({calendar:'Choose a date and time to continue.'});return;}setStep('information');return;}
+    if(step==='information'){if(missingFields.length){setStepErrors({information:`Please complete: ${missingFields.join(', ')}.`});return;}setStep('setup');return;}
+    if(step==='setup'){setStep('addons');return;}
+    if(step==='addons')setStep('review');
+  }
+  function goBack(){const order=BOOKING_STEPS.map(item=>item.id);const index=order.indexOf(step as Exclude<Step,'result'>);if(index>0)setStep(order[index-1]);}
 
   const missingFields: string[] = [];
   if (!name.trim()) missingFields.push('Your name');
@@ -143,8 +168,9 @@ export default function BookPage() {
       // Upload directly from browser to Supabase Storage — bypasses Vercel's
       // 4.5MB request body limit entirely since files go straight to Supabase.
       const { uploadPhotoFromBrowser } = await import('@/lib/uploadClient');
-      const setupSelections = await Promise.all(setupPhotos.slice(0, activeSetupCount).map(async (items, index) => ({slot:index + 1,note:setupNotes[index].trim(),referencePhotoUrls:await Promise.all(items.map((p) => uploadPhotoFromBrowser(p.file)))})));
+      const setupSelections = await Promise.all(setupPhotos.slice(0, activeSetupCount).map(async (items, index) => ({slot:index + 1,note:setupNotes[index].trim(),outfitSource:setupOutfitSources[index],referencePhotoUrls:await Promise.all(items.map((p) => uploadPhotoFromBrowser(p.file)))})));
       const referencePhotoUrls = setupSelections.flatMap(group => group.referencePhotoUrls);
+      const inspirationReferencePhotoUrls=await Promise.all(inspirationPhotos.map(photo=>uploadPhotoFromBrowser(photo.file)));
       setUploading(false);
 
       const res = await fetch('/api/bookings', {
@@ -162,6 +188,7 @@ export default function BookPage() {
           siblingJoining,
           setupSelectionCount: activeSetupCount,
           setupSelections,
+          inspirationReferencePhotoUrls,
           referencePhotoUrls: referencePhotoUrls,
           address,
           discountCode: appliedDiscount?.code || null,
@@ -232,8 +259,14 @@ export default function BookPage() {
       <div style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--gold-deep)', fontWeight: 600 }}>Mamamiyo Photography</div>
       <h1 style={{ fontSize: 30, marginTop: 6 }}>Book your session</h1>
       <p style={{ color: 'var(--ink-soft)' }}>Pick a package, choose a time, and secure it with a $100 deposit via PayNow.</p>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:5,margin:'18px 0 22px'}}>
+        {BOOKING_STEPS.map((item,index)=>{const current=BOOKING_STEPS.findIndex(s=>s.id===step);return <div key={item.id}><div style={{height:5,borderRadius:8,background:index<=current?'var(--sage)':'var(--line)'}}/><div style={{fontSize:10,marginTop:5,textAlign:'center',color:index===current?'var(--ink)':'var(--ink-faint)',fontWeight:index===current?700:400}}>{index+1}</div></div>})}
+      </div>
+      <div style={{fontSize:12,textTransform:'uppercase',letterSpacing:.7,color:'var(--sage)',fontWeight:700,marginBottom:8}}>Step {Math.max(1,BOOKING_STEPS.findIndex(s=>s.id===step)+1)} of 6</div>
+      <h2 style={{fontSize:22,margin:'0 0 14px'}}>{BOOKING_STEPS.find(s=>s.id===step)?.label}</h2>
 
       {/* Step 1: package */}
+      <div style={{display:step==='package'?'block':'none'}}>
       <div style={{ position: 'relative', maxWidth: 420, marginTop: 16 }}>
         <button
           type="button"
@@ -306,9 +339,11 @@ export default function BookPage() {
           </p>
         </div>
       )}
+      </div>
+      {step==='package'&&<WizardNav next={goNext} nextDisabled={!sessionType} error={stepErrors.package}/>}
 
       {/* Step 2: calendar */}
-      {sessionType && (
+      {sessionType && step==='calendar' && (
         <div style={{ marginTop: 24 }}>
           <h3 style={{ fontSize: 15 }}>Pick a date &amp; time</h3>
           {loadingSlots && <div style={{ color: 'var(--ink-faint)', fontSize: 13 }}>Loading availability…</div>}
@@ -340,13 +375,15 @@ export default function BookPage() {
               )}
             </>
           )}
+          <WizardNav back={goBack} next={goNext} nextDisabled={!selectedSlot} error={stepErrors.calendar}/>
         </div>
       )}
 
       {/* Step 3: add-ons + details */}
-      {sessionType && selectedSlot && (
+      {sessionType && selectedSlot && ['information','setup','addons'].includes(step) && (
         <div style={{ marginTop: 24 }}>
-          <h3 style={{ fontSize: 15 }}>Add-ons &amp; your details</h3>
+          {step==='addons'&&<h3 style={{ fontSize: 15 }}>Choose Add-ons</h3>}
+          {step==='addons'&&(
           <div className="card">
             {selectedSlot.isWeekend && (
               <div style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--rust-pale)', padding: '10px 12px', borderRadius: 8, marginBottom: 8, fontSize: 13.5 }}>
@@ -376,7 +413,9 @@ export default function BookPage() {
               <div style={{display:'grid',justifyItems:'end',gap:8}}><strong style={{fontSize:20,color:'var(--gold-deep)'}}>${ADDONS[id].price}</strong><div style={{display:'flex',alignItems:'center',gap:10}}><button type="button" onClick={()=>setAddOns(current=>({...current,[id]:Math.max(0,(current[id]||0)-1)}))} style={{width:28,height:28,borderRadius:8,border:'1.5px solid var(--line)',background:'var(--paper)'}}>−</button><strong style={{minWidth:16,textAlign:'center'}}>{quantity}</strong><button type="button" onClick={()=>setAddOns(current=>({...current,[id]:(current[id]||0)+1}))} style={{width:28,height:28,borderRadius:8,border:'1.5px solid var(--line)',background:'var(--paper)'}}>+</button></div></div>
             </div>})}
           </div>
+          )}
 
+          {step==='information'&&<>
           <div className="field"><label>Your name<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" /></div>
           <div className="field"><label>Email<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" /></div>
           <div className="field">
@@ -392,6 +431,8 @@ export default function BookPage() {
               <textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Unit number, street, postal code" style={{ minHeight: 56 }} />
             </div>
           )}
+          </>}
+          {step==='setup'&&<>
           <div className="field">
             <label>Setup / inspiration photos <span style={{ color: 'var(--ink-faint)', fontWeight: 500 }}>(Optional — you may decide later)</span></label>
             <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 8 }}>
@@ -401,6 +442,7 @@ export default function BookPage() {
               {[0,1,2].map((slotIndex) => { const slot=slotIndex+1; const included=slot<=includedSetupCount; const active=slot<=activeSetupCount; return <div key={slot} style={{ border:'1.5px solid var(--line)',borderRadius:10,padding:12,background:active?'var(--paper)':'#f6f2ee' }}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><b>Setup {slot}</b><span style={{fontSize:11.5,color:included?'var(--ink-soft)':'var(--rust)',fontWeight:700}}>{included?'Included':'Additional Setup ($100)'}</span></div>
                 {!active ? <button type="button" className="btn btn-ghost" style={{marginTop:9}} onClick={()=>setAddOns(a=>({...a,[additionalSetupKey]:slot-includedSetupCount}))}>Add Setup {slot} · $100</button> : <>
+                  <div style={{display:'flex',gap:7,flexWrap:'wrap',marginTop:9}}>{[{value:'mamamiyo',label:'MamaMiyo outfit'},{value:'own',label:'Own outfit'},{value:null,label:'Decide later'}].map(option=><button key={String(option.value)} type="button" className={`chip ${setupOutfitSources[slotIndex]===option.value?'selected':''}`} onClick={()=>setSetupOutfitSources(values=>values.map((value,index)=>index===slotIndex?option.value as 'mamamiyo'|'own'|null:value))}>{option.label}</button>)}</div>
                   <input type="file" accept="image/*" multiple disabled={setupPhotos[slotIndex].length>=3} onChange={(e)=>{handlePhotoUpload(slotIndex,e.target.files);e.target.value='';}} style={{marginTop:9}}/>
                   <div style={{display:'flex',gap:8,marginTop:9,flexWrap:'wrap'}}>{setupPhotos[slotIndex].map((p,i)=><div key={p.previewUrl} style={{position:'relative',width:64,height:64,borderRadius:9,overflow:'hidden',border:'1.5px solid var(--line)'}}><img src={p.previewUrl} alt={`Setup ${slot} reference ${i+1}`} style={{width:'100%',height:'100%',objectFit:'cover'}}/><button type="button" onClick={()=>removePhoto(slotIndex,i)} style={{position:'absolute',top:2,right:2,width:18,height:18,borderRadius:'50%',background:'rgba(46,42,34,.75)',color:'#fff',border:'none',fontSize:11}}>×</button></div>)}</div>
                   <div style={{fontSize:11.5,color:'var(--ink-faint)',marginTop:6}}>{setupPhotos[slotIndex].length}/3 reference photos</div>
@@ -410,6 +452,9 @@ export default function BookPage() {
               </div>;})}
             </div>
           </div>
+          <div className="field"><label>Inspirational Reference <span style={{color:'var(--ink-faint)',fontWeight:500}}>(Optional · up to 10 photos)</span></label><div className="notice" style={{marginBottom:9}}>For poses, colours, props, composition or the overall feeling. These photos do not count as a Setup and do not change the price.</div><input type="file" accept="image/*" multiple disabled={inspirationPhotos.length>=10} onChange={event=>{handleInspirationUpload(event.target.files);event.target.value='';}}/><div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:9}}>{inspirationPhotos.map((photo,index)=><div key={photo.previewUrl} style={{position:'relative',width:64,height:64,borderRadius:9,overflow:'hidden',border:'1.5px solid var(--line)'}}><img src={photo.previewUrl} alt={`Inspirational reference ${index+1}`} style={{width:'100%',height:'100%',objectFit:'cover'}}/><button type="button" onClick={()=>setInspirationPhotos(items=>items.filter((_,itemIndex)=>itemIndex!==index))} style={{position:'absolute',top:2,right:2,width:18,height:18,borderRadius:'50%',background:'rgba(46,42,34,.75)',color:'#fff',border:'none'}}>×</button></div>)}</div><div style={{fontSize:11.5,color:'var(--ink-faint)',marginTop:6}}>{inspirationPhotos.length}/10 photos</div></div>
+          </>}
+          {step==='information'&&<>
           {sessionType.id !== 'maternity' && (
             <div className="field">
               <label>Baby's gender<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label>
@@ -430,11 +475,15 @@ export default function BookPage() {
             <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 6 }}>Sibling participation is free. The additional family / grandparents add-on is charged separately.</div>
           </div>
           <div className="field"><label>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything we should know?" /></div>
+          </>}
+          {step==='information'&&<WizardNav back={goBack} next={goNext} error={stepErrors.information}/>}
+          {step==='setup'&&<WizardNav back={goBack} next={goNext}/>}
+          {step==='addons'&&<><div className="card" style={{marginTop:14}}><div className="ticket-row"><span>Additional charges</span><b>${pricing ? pricing.total-sessionType.price : 0}</b></div><div className="ticket-total"><span>Estimated total</span><span className="amt">${pricing?.total||sessionType.price}</span></div></div><WizardNav back={goBack} next={goNext}/></>}
         </div>
       )}
 
       {/* Step 4: review */}
-      {sessionType && selectedSlot && pricing && (
+      {sessionType && selectedSlot && pricing && step==='review' && (
         <div style={{ marginTop: 24 }}>
           <h3 style={{ fontSize: 15 }}>Review &amp; pay deposit</h3>
           <div className="field" style={{ maxWidth: 320 }}>
@@ -453,8 +502,11 @@ export default function BookPage() {
 
           <div className="card">
             {/* Session details */}
-            <div className="ticket-row"><span>Date</span><b>{fmtDatePretty(selectedSlot.date)}, {fmtTime12(selectedSlot.startTime)}</b></div>
-            <div className="ticket-row"><span>Session</span><b>{sessionType.name}</b></div>
+            <div className="ticket-row"><span>Package <button type="button" onClick={()=>setStep('package')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{sessionType.name}</b></div>
+            <div className="ticket-row"><span>Date &amp; time <button type="button" onClick={()=>setStep('calendar')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{fmtDatePretty(selectedSlot.date)}, {fmtTime12(selectedSlot.startTime)}</b></div>
+            <div className="ticket-row"><span>Your information <button type="button" onClick={()=>setStep('information')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{name}</b></div>
+            <div className="ticket-row"><span>Setups <button type="button" onClick={()=>setStep('setup')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{activeSetupCount} · {inspirationPhotos.length} inspiration</b></div>
+            <div className="ticket-row"><span>Add-ons <button type="button" onClick={()=>setStep('addons')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{Object.values(addOns).reduce((sum,q)=>sum+q,0)}</b></div>
             <div className="ticket-row"><span>Sibling joining</span><b>{siblingJoining === 'yes' ? 'Yes' : 'No'}</b></div>
 
             {sessionType.isBundle ? (<>
@@ -491,9 +543,9 @@ export default function BookPage() {
             </>)}
           </div>
 
-          <button className="btn btn-primary" style={{ marginTop: 16 }} disabled={submitting} onClick={submitBooking}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:16}}><button type="button" className="btn btn-ghost" onClick={goBack}>Back</button><button className="btn btn-primary" disabled={submitting} onClick={submitBooking}>
             {submitting ? (uploading ? 'Uploading photos…' : 'Creating booking…') : 'Generate payment QR'}
-          </button>
+          </button></div>
           {missingFields.length > 0 && (
             <div style={{ marginTop: 10, padding: '10px 14px', background: 'var(--rust-pale)', borderRadius: 8, border: '1px solid #e7c3a8' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--rust)', marginBottom: 4 }}>Please fill in the following before continuing:</div>
@@ -507,4 +559,8 @@ export default function BookPage() {
       )}
     </div>
   );
+}
+
+function WizardNav({back,next,nextDisabled,error}:{back?:()=>void;next:()=>void;nextDisabled?:boolean;error?:string}){
+  return <div style={{marginTop:22}}>{error&&<div className="error-text" style={{marginBottom:10}}>{error}</div>}<div style={{display:'grid',gridTemplateColumns:back?'1fr 1fr':'1fr',gap:10}}>{back&&<button type="button" className="btn btn-ghost" onClick={back}>Back</button>}<button type="button" className="btn btn-primary" disabled={nextDisabled} onClick={next}>Next Step</button></div></div>;
 }

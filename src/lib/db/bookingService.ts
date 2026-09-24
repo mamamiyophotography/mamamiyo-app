@@ -96,7 +96,8 @@ export type CreateBookingInput = {
   babyGender?: string;  // 'boy' | 'girl' | 'prefer_not_to_say' | ''
   siblingJoining?: string; // 'yes' | 'no' | ''
   setupSelectionCount?: number;
-  setupSelections?: { slot: number; referencePhotoUrls: string[]; note?: string }[];
+  setupSelections?: { slot: number; referencePhotoUrls: string[]; note?: string; outfitSource?: 'mamamiyo'|'own'|null }[];
+  inspirationReferencePhotoUrls?: string[];
   referencePhotoUrls: string[];
   address: string;
   discountCode?: string | null;
@@ -113,7 +114,9 @@ export async function createBooking(db: any, input: CreateBookingInput) {
   const setupSelectionCount = Number(input.setupSelectionCount ?? 0);
   if (!Number.isSafeInteger(setupSelectionCount) || setupSelectionCount < 0 || setupSelectionCount > 3) throw new Error('Number of setup selections must be between 0 and 3.');
   const setupSelections = Array.isArray(input.setupSelections) ? input.setupSelections : [];
-  if (setupSelections.length > 3 || setupSelections.some(group => !Number.isSafeInteger(group?.slot) || group.slot < 1 || group.slot > 3 || !Array.isArray(group.referencePhotoUrls) || group.referencePhotoUrls.length > 3 || group.referencePhotoUrls.some(url => typeof url !== 'string' || url.length > 2000) || (group.note !== undefined && (typeof group.note !== 'string' || group.note.length > 300)))) throw new Error('Each Setup may contain up to 3 valid reference photos and a short note.');
+  if (setupSelections.length > 3 || setupSelections.some(group => !Number.isSafeInteger(group?.slot) || group.slot < 1 || group.slot > 3 || !Array.isArray(group.referencePhotoUrls) || group.referencePhotoUrls.length > 3 || group.referencePhotoUrls.some(url => typeof url !== 'string' || url.length > 2000) || (group.note !== undefined && (typeof group.note !== 'string' || group.note.length > 300)) || ![undefined,null,'mamamiyo','own'].includes(group.outfitSource))) throw new Error('Each Setup may contain up to 3 valid reference photos, an outfit source and a short note.');
+  const inspirationReferencePhotoUrls=Array.isArray(input.inspirationReferencePhotoUrls)?input.inspirationReferencePhotoUrls:[];
+  if(inspirationReferencePhotoUrls.length>10||inspirationReferencePhotoUrls.some(url=>typeof url!=='string'||url.length>2000))throw new Error('Up to 10 valid Inspirational Reference photos are allowed.');
 
   const settings = await getSettings(db);
 
@@ -184,6 +187,7 @@ export async function createBooking(db: any, input: CreateBookingInput) {
         ].filter(Boolean).join('\n'),
         setupSelectionCount,
         setupSelections,
+        inspirationReferencePhotoUrls,
         referencePhotoUrls: input.referencePhotoUrls,
         address: st.location === 'home' ? input.address : '',
         discountCode: discount?.code,
@@ -208,7 +212,6 @@ export async function createBooking(db: any, input: CreateBookingInput) {
     return booking;
   });
 
-  return result;
 }
 
 function toNotifyBooking(b: { ref: string; sessionTypeId: string; sessionLabel: string; location: string; date: string; startTime: string; clientName: string; bundleSessionNumber: number | null }): NotifyBooking {
@@ -550,10 +553,15 @@ export async function generateInvoiceAndNotify(db: any, bookingId: string) {
       payNowQr = { payload, amount: due, ref: '' };
     }
   } catch { /* QR failed silently */ }
-  // Don't let notification failure block invoice generation
-  await dispatchNotification(pair, updated.clientEmail, updated.clientPhone, photographer.email, photographer.phone, undefined, undefined, payNowQr).catch((err) => {
-    console.error('Invoice notification failed:', err?.message);
-  });
+  // A failed send must remain retryable. Previously the invoice was marked as
+  // generated before delivery and the cron silently swallowed email failures,
+  // so bundle invoices could never be attempted again.
+  try {
+    await dispatchNotification(pair, updated.clientEmail, updated.clientPhone, photographer.email, photographer.phone, undefined, undefined, payNowQr);
+  } catch (err) {
+    await db.booking.update({where:{id:bookingId},data:{invoiceRef:null,invoiceGeneratedAt:null}});
+    throw err;
+  }
   return updated;
 }
 
@@ -650,13 +658,15 @@ export async function redeemBundleSessionAndNotify(
   addOns: Record<string, number>,
   referencePhotoUrls: string[] = [],
   setupSelectionCount: number = 0,
-  setupSelections: {slot:number;referencePhotoUrls:string[];note?:string}[] = [],
+  setupSelections: {slot:number;referencePhotoUrls:string[];note?:string;outfitSource?:'mamamiyo'|'own'|null}[] = [],
+  inspirationReferencePhotoUrls: string[] = [],
   notes: string = '',
   babyGender: string = '',
   siblingJoining: string = '',
 ) {
   if (!Number.isSafeInteger(setupSelectionCount) || setupSelectionCount < 0 || setupSelectionCount > 3) throw new Error('Number of setup selections must be between 0 and 3.');
-  if (!Array.isArray(setupSelections) || setupSelections.length > 3 || setupSelections.some(group=>!Number.isSafeInteger(group?.slot)||group.slot<1||group.slot>3||!Array.isArray(group.referencePhotoUrls)||group.referencePhotoUrls.length>3||(group.note!==undefined&&(typeof group.note!=='string'||group.note.length>300)))) throw new Error('Each Setup may contain up to 3 reference photos and a short note.');
+  if (!Array.isArray(setupSelections) || setupSelections.length > 3 || setupSelections.some(group=>!Number.isSafeInteger(group?.slot)||group.slot<1||group.slot>3||!Array.isArray(group.referencePhotoUrls)||group.referencePhotoUrls.length>3||(group.note!==undefined&&(typeof group.note!=='string'||group.note.length>300))||![undefined,null,'mamamiyo','own'].includes(group.outfitSource))) throw new Error('Each Setup may contain up to 3 reference photos, an outfit source and a short note.');
+  if(!Array.isArray(inspirationReferencePhotoUrls)||inspirationReferencePhotoUrls.length>10)throw new Error('Up to 10 Inspirational Reference photos are allowed.');
   const settings = await getSettings(db);
   const bundle = await db.bundle.findUniqueOrThrow({ where: { id: bundleId } });
   if (!bundle.activated) throw new Error('BUNDLE_NOT_ACTIVATED');
@@ -692,6 +702,7 @@ export async function redeemBundleSessionAndNotify(
       notes: combinedNotes,
       setupSelectionCount,
       setupSelections,
+      inspirationReferencePhotoUrls,
       referencePhotoUrls,
       clientName: bundle.clientName,
       clientEmail: bundle.clientEmail,
@@ -901,18 +912,25 @@ function singaporeDateString(now: Date): string {
 /** Sends the balance invoice at 6pm SGT on the photoshoot date. The cron
  * route controls the time; this function protects against duplicates. */
 export async function sendShootDayBalanceInvoices(db: any, now = new Date()) {
-  const bookings = await db.booking.findMany({
-    where: {
-      date: singaporeDateString(now),
+  const commonWhere = {
       status: { in: ['confirmed', 'pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'completed'] },
       balanceStatus: 'pending',
       invoiceGeneratedAt: null,
+  };
+  const [todayBookings,missedBundleBookings] = await Promise.all([db.booking.findMany({
+    where: {
+      ...commonWhere,date: singaporeDateString(now),
     },
-  });
+  }),db.booking.findMany({where:{...commonWhere,date:{lt:singaporeDateString(now)},bundleParentId:{not:null}}})]);
+  const bookings=[...todayBookings,...missedBundleBookings.filter((item:any)=>!todayBookings.some((today:any)=>today.id===item.id))];
   let sent = 0;
   for (const booking of bookings) {
-    await generateInvoiceAndNotify(db, booking.id);
-    sent++;
+    try {
+      await generateInvoiceAndNotify(db, booking.id);
+      sent++;
+    } catch (error) {
+      console.error(`Automatic invoice failed for ${booking.ref}:`,(error as Error).message);
+    }
   }
   return sent;
 }

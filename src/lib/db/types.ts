@@ -34,7 +34,8 @@ export type Booking = {
   notes: string;
   setupChoiceNotes: string;
   setupSelectionCount: number;
-  setupSelections: { slot: number; referencePhotoUrls: string[]; note?: string }[];
+  setupSelections: { slot: number; referencePhotoUrls: string[]; note?: string; outfitSource?: 'mamamiyo'|'own'|null }[];
+  inspirationReferencePhotoUrls: string[];
   referencePhotoUrls: string[];
   address: string;
   discountCode: string | null;

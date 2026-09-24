@@ -77,6 +77,7 @@ model Booking {
   setupChoiceNotes    String    @default("")
   setupSelectionCount Int       @default(0)
   setupSelections     Json      @default("[]")
+  inspirationReferencePhotoUrls Json @default("[]")
   referencePhotoUrls  Json      @default("[]")
   address             String    @default("")
   discountCode        String?

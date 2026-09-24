@@ -20,8 +20,9 @@ export type EditableBooking = {
   notes: string;
   clientName: string;
   referencePhotoUrls?: string[];
+  inspirationReferencePhotoUrls?: string[];
   setupSelectionCount?: number;
-  setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string}[];
+  setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string;outfitSource?:'mamamiyo'|'own'|null}[];
   setupChoiceNotes?: string;
 };
 
@@ -60,6 +61,7 @@ export default function EditBookingModal({
   const [setupExisting,setSetupExisting]=useState<string[][]>([1,2,3].map(slot=>initialGroups.find(group=>group.slot===slot)?.referencePhotoUrls||[]));
   const [setupPending,setSetupPending]=useState<{file:File;previewUrl:string}[][]>([[],[],[]]);
   const [setupNotes,setSetupNotes]=useState<string[]>([1,2,3].map(slot=>initialGroups.find(group=>group.slot===slot)?.note||''));
+  const [setupOutfitSources,setSetupOutfitSources]=useState<('mamamiyo'|'own'|null)[]>([1,2,3].map(slot=>initialGroups.find(group=>group.slot===slot)?.outfitSource||null));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,8 +153,8 @@ export default function EditBookingModal({
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not update the booking.');
-      const setupSelections=await Promise.all([0,1,2].slice(0,setupCount).map(async index=>({slot:index+1,note:setupNotes[index].trim(),referencePhotoUrls:[...setupExisting[index],...await Promise.all(setupPending[index].map(item=>uploadPhotoFromBrowser(item.file)))]})));
-      const setupResponse=await fetch(`/api/admin/bookings/${booking.id}/setup-choice`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({setupSelectionCount:setupCount,setupSelections,setupChoiceNotes:booking.setupChoiceNotes||''})});
+      const setupSelections=await Promise.all([0,1,2].slice(0,setupCount).map(async index=>({slot:index+1,note:setupNotes[index].trim(),outfitSource:setupOutfitSources[index],referencePhotoUrls:[...setupExisting[index],...await Promise.all(setupPending[index].map(item=>uploadPhotoFromBrowser(item.file)))]})));
+      const setupResponse=await fetch(`/api/admin/bookings/${booking.id}/setup-choice`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({setupSelectionCount:setupCount,setupSelections,inspirationReferencePhotoUrls:booking.inspirationReferencePhotoUrls||[],setupChoiceNotes:booking.setupChoiceNotes||''})});
       const setupData=await setupResponse.json();if(!setupResponse.ok)throw new Error(setupData.error||'Could not update Setup choices.');
       await onSaved();
     } catch (err) {

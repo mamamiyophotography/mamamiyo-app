@@ -143,6 +143,8 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
   const [notes, setNotes] = useState('');
   const [setupPhotos, setSetupPhotos] = useState<{ file: File; previewUrl: string }[][]>([[],[],[]]);
   const [setupNotes, setSetupNotes] = useState<string[]>(['','','']);
+  const [setupOutfitSources,setSetupOutfitSources]=useState<('mamamiyo'|'own'|null)[]>([null,null,null]);
+  const [inspirationPhotos,setInspirationPhotos]=useState<{file:File;previewUrl:string}[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -172,12 +174,13 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
     try {
       // Upload photos directly to Supabase
       const { uploadPhotoFromBrowser } = await import('@/lib/uploadClient');
-      const setupSelections = await Promise.all(setupPhotos.slice(0,activeSetupCount).map(async(items,index)=>({slot:index+1,note:setupNotes[index].trim(),referencePhotoUrls:await Promise.all(items.map(p=>uploadPhotoFromBrowser(p.file)))})));
+      const setupSelections = await Promise.all(setupPhotos.slice(0,activeSetupCount).map(async(items,index)=>({slot:index+1,note:setupNotes[index].trim(),outfitSource:setupOutfitSources[index],referencePhotoUrls:await Promise.all(items.map(p=>uploadPhotoFromBrowser(p.file)))})));
       const referencePhotoUrls = setupSelections.flatMap(group=>group.referencePhotoUrls);
+      const inspirationReferencePhotoUrls=await Promise.all(inspirationPhotos.map(photo=>uploadPhotoFromBrowser(photo.file)));
       const res = await fetch(`/api/bundles/${bundle.id}/redeem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slot: selectedSlot, addOns, referencePhotoUrls, setupSelectionCount:activeSetupCount, setupSelections, notes, babyGender, siblingJoining }),
+        body: JSON.stringify({ slot: selectedSlot, addOns, referencePhotoUrls, setupSelectionCount:activeSetupCount, setupSelections, inspirationReferencePhotoUrls, notes, babyGender, siblingJoining }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Redemption failed'); return; }
