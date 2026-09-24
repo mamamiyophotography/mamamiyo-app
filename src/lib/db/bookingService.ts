@@ -95,6 +95,8 @@ export type CreateBookingInput = {
   notes: string;
   babyGender?: string;  // 'boy' | 'girl' | 'prefer_not_to_say' | ''
   siblingJoining?: string; // 'yes' | 'no' | ''
+  setupSelectionCount?: number;
+  setupSelections?: { slot: number; referencePhotoUrls: string[]; note?: string }[];
   referencePhotoUrls: string[];
   address: string;
   discountCode?: string | null;
@@ -108,6 +110,10 @@ export async function createBooking(db: any, input: CreateBookingInput) {
   const st = sessionById(input.sessionTypeId);
   if (!st) throw new Error(`Unknown session type: ${input.sessionTypeId}`);
   if (st.location === 'home' && !input.address.trim()) throw new Error('Home address is required for this package.');
+  const setupSelectionCount = Number(input.setupSelectionCount ?? 0);
+  if (!Number.isSafeInteger(setupSelectionCount) || setupSelectionCount < 0 || setupSelectionCount > 3) throw new Error('Number of setup selections must be between 0 and 3.');
+  const setupSelections = Array.isArray(input.setupSelections) ? input.setupSelections : [];
+  if (setupSelections.length > 3 || setupSelections.some(group => !Number.isSafeInteger(group?.slot) || group.slot < 1 || group.slot > 3 || !Array.isArray(group.referencePhotoUrls) || group.referencePhotoUrls.length > 3 || group.referencePhotoUrls.some(url => typeof url !== 'string' || url.length > 2000) || (group.note !== undefined && (typeof group.note !== 'string' || group.note.length > 300)))) throw new Error('Each Setup may contain up to 3 valid reference photos and a short note.');
 
   const settings = await getSettings(db);
 
@@ -176,6 +182,8 @@ export async function createBooking(db: any, input: CreateBookingInput) {
           input.babyGender ? `Baby gender: ${input.babyGender}` : '',
           input.notes,
         ].filter(Boolean).join('\n'),
+        setupSelectionCount,
+        setupSelections,
         referencePhotoUrls: input.referencePhotoUrls,
         address: st.location === 'home' ? input.address : '',
         discountCode: discount?.code,
@@ -641,10 +649,14 @@ export async function redeemBundleSessionAndNotify(
   slot: { date: string; startTime: string; endTime: string; isWeekend: boolean },
   addOns: Record<string, number>,
   referencePhotoUrls: string[] = [],
+  setupSelectionCount: number = 0,
+  setupSelections: {slot:number;referencePhotoUrls:string[];note?:string}[] = [],
   notes: string = '',
   babyGender: string = '',
   siblingJoining: string = '',
 ) {
+  if (!Number.isSafeInteger(setupSelectionCount) || setupSelectionCount < 0 || setupSelectionCount > 3) throw new Error('Number of setup selections must be between 0 and 3.');
+  if (!Array.isArray(setupSelections) || setupSelections.length > 3 || setupSelections.some(group=>!Number.isSafeInteger(group?.slot)||group.slot<1||group.slot>3||!Array.isArray(group.referencePhotoUrls)||group.referencePhotoUrls.length>3||(group.note!==undefined&&(typeof group.note!=='string'||group.note.length>300)))) throw new Error('Each Setup may contain up to 3 reference photos and a short note.');
   const settings = await getSettings(db);
   const bundle = await db.bundle.findUniqueOrThrow({ where: { id: bundleId } });
   if (!bundle.activated) throw new Error('BUNDLE_NOT_ACTIVATED');
@@ -678,6 +690,8 @@ export async function redeemBundleSessionAndNotify(
       isWeekend: slot.isWeekend,
       addOns: addOns,
       notes: combinedNotes,
+      setupSelectionCount,
+      setupSelections,
       referencePhotoUrls,
       clientName: bundle.clientName,
       clientEmail: bundle.clientEmail,

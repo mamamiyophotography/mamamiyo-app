@@ -29,7 +29,8 @@ export default function BookPage() {
   const [babyGender, setBabyGender] = useState('');
   const [siblingJoining, setSiblingJoining] = useState('');
   const [notes, setNotes] = useState('');
-  const [photos, setPhotos] = useState<{ file: File; previewUrl: string }[]>([]);
+  const [setupPhotos, setSetupPhotos] = useState<{ file: File; previewUrl: string }[][]>([[], [], []]);
+  const [setupNotes, setSetupNotes] = useState<string[]>(['', '', '']);
   const [uploading, setUploading] = useState(false);
 
   const [discountInput, setDiscountInput] = useState('');
@@ -42,6 +43,9 @@ export default function BookPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   const sessionType: SessionType | undefined = SESSION_TYPES.find((s) => s.id === sessionTypeId);
+  const includedSetupCount = sessionType?.referenceSetups || 1;
+  const additionalSetupKey = sessionType?.id === 'maternity' ? 'extraOutfit' : 'extraSetup';
+  const activeSetupCount = Math.min(3, includedSetupCount + (addOns[additionalSetupKey] || 0));
 
   // Fetch availability whenever the package changes
   useEffect(() => {
@@ -71,6 +75,8 @@ export default function BookPage() {
     setSessionTypeId(id);
     setPkgOpen(false);
     setAddOns({});
+    setSetupPhotos([[], [], []]);
+    setSetupNotes(['', '', '']);
     setDiscountInput('');
     setAppliedDiscount(null);
   }
@@ -87,16 +93,16 @@ export default function BookPage() {
     setAppliedDiscount({ code: data.code, amount: data.amount, description: data.description });
   }
 
-  async function handlePhotoUpload(files: FileList | null) {
+  async function handlePhotoUpload(slotIndex: number, files: FileList | null) {
     if (!files || !files.length) return;
-    const room = 5 - photos.length;
+    const room = 3 - setupPhotos[slotIndex].length;
     if (room <= 0) return;
     const toAdd = Array.from(files).slice(0, room);
-    setPhotos((prev) => [...prev, ...toAdd.map((file) => ({ file, previewUrl: URL.createObjectURL(file) }))]);
+    setSetupPhotos((prev) => prev.map((items, index) => index === slotIndex ? [...items, ...toAdd.map((file) => ({ file, previewUrl: URL.createObjectURL(file) }))] : items));
   }
 
-  function removePhoto(index: number) {
-    setPhotos((prev) => prev.filter((_, i) => i !== index));
+  function removePhoto(slotIndex: number, photoIndex: number) {
+    setSetupPhotos((prev) => prev.map((items, index) => index === slotIndex ? items.filter((_, i) => i !== photoIndex) : items));
   }
 
   const missingFields: string[] = [];
@@ -130,7 +136,8 @@ export default function BookPage() {
       // Upload directly from browser to Supabase Storage — bypasses Vercel's
       // 4.5MB request body limit entirely since files go straight to Supabase.
       const { uploadPhotoFromBrowser } = await import('@/lib/uploadClient');
-      const referencePhotoUrls = await Promise.all(photos.map((p) => uploadPhotoFromBrowser(p.file)));
+      const setupSelections = await Promise.all(setupPhotos.slice(0, activeSetupCount).map(async (items, index) => ({slot:index + 1,note:setupNotes[index].trim(),referencePhotoUrls:await Promise.all(items.map((p) => uploadPhotoFromBrowser(p.file)))})));
+      const referencePhotoUrls = setupSelections.flatMap(group => group.referencePhotoUrls);
       setUploading(false);
 
       const res = await fetch('/api/bookings', {
@@ -146,6 +153,8 @@ export default function BookPage() {
           notes,
           babyGender,
           siblingJoining,
+          setupSelectionCount: activeSetupCount,
+          setupSelections,
           referencePhotoUrls: referencePhotoUrls,
           address,
           discountCode: appliedDiscount?.code || null,
@@ -347,7 +356,7 @@ export default function BookPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: Math.max(0, (a[id] || 0) - 1) }))} style={{ width: 26, height: 26, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>−</button>
                   <span style={{ minWidth: 16, textAlign: 'center', fontWeight: 700 }}>{addOns[id] || 0}</span>
-                  <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: (a[id] || 0) + 1 }))} style={{ width: 26, height: 26, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>+</button>
+                  <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: ['extraSetup','extraOutfit'].includes(id) ? Math.min(3-includedSetupCount,(a[id]||0)+1) : (a[id]||0)+1 }))} style={{ width: 26, height: 26, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>+</button>
                 </div>
               </div>
             ))}
@@ -387,24 +396,20 @@ export default function BookPage() {
           <div className="field">
             <label>Setup / inspiration photos <span style={{ color: 'var(--ink-faint)', fontWeight: 500 }}>(Optional — you may decide later)</span></label>
             <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 8 }}>
-              {sessionType.referenceSetups === 1
-                ? <>Choose <b>1 setup look</b> from our website and screenshot it.</>
-                : sessionType.id === 'maternity'
-                  ? <>Choose <b>{sessionType.referenceSetups} outfit looks</b> from our website and screenshot each one.</>
-                  : <>Choose <b>{sessionType.referenceSetups} baby solo setup looks</b> from our website and screenshot each one.</>
-              }
-              {' '}Visit <a href="https://www.mamamiyo-photography.com/" target="_blank" rel="noopener" style={{ color: 'var(--gold-deep)' }}>www.mamamiyo-photography.com</a> and upload up to 5 images now, or send your choices before the photoshoot.
+              <b>One Setup = one outfit + one background setting.</b> Your package includes <b>{includedSetupCount} {includedSetupCount === 1 ? 'Setup' : 'Setups'}</b>. <b>Each Additional Setup is $100.</b> You decide which photos belong together. References may come from MamaMiyo or anywhere else, and each Setup can include up to 3 photos showing different poses, angles or details. <a href={sessionType.id==='maternity'?'https://www.mamamiyo-photography.com/sensual-maternity/':sessionType.id==='newborn'?'https://www.mamamiyo-photography.com/cutie-newborn':'https://www.mamamiyo-photography.com/'} target="_blank" rel="noopener" style={{color:'var(--gold-deep)',fontWeight:700}}>View MamaMiyo Portfolio</a>
             </div>
-            <input type="file" accept="image/*" multiple disabled={photos.length >= 5} onChange={(e) => handlePhotoUpload(e.target.files)} />
-            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              {photos.map((p, i) => (
-                <div key={i} style={{ position: 'relative', width: 64, height: 64, borderRadius: 10, overflow: 'hidden', border: '1.5px solid var(--line)' }}>
-                  <img src={p.previewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <button type="button" onClick={() => removePhoto(i)} style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(46,42,34,.75)', color: '#fff', border: 'none', fontSize: 11 }}>×</button>
-                </div>
-              ))}
+            <div style={{ display: 'grid', gap: 10 }}>
+              {[0,1,2].map((slotIndex) => { const slot=slotIndex+1; const included=slot<=includedSetupCount; const active=slot<=activeSetupCount; return <div key={slot} style={{ border:'1.5px solid var(--line)',borderRadius:10,padding:12,background:active?'var(--paper)':'#f6f2ee' }}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><b>Setup {slot}</b><span style={{fontSize:11.5,color:included?'var(--ink-soft)':'var(--rust)',fontWeight:700}}>{included?'Included':'Additional Setup ($100)'}</span></div>
+                {!active ? <button type="button" className="btn btn-ghost" style={{marginTop:9}} onClick={()=>setAddOns(a=>({...a,[additionalSetupKey]:slot-includedSetupCount}))}>Add Setup {slot} · $100</button> : <>
+                  <input type="file" accept="image/*" multiple disabled={setupPhotos[slotIndex].length>=3} onChange={(e)=>{handlePhotoUpload(slotIndex,e.target.files);e.target.value='';}} style={{marginTop:9}}/>
+                  <div style={{display:'flex',gap:8,marginTop:9,flexWrap:'wrap'}}>{setupPhotos[slotIndex].map((p,i)=><div key={p.previewUrl} style={{position:'relative',width:64,height:64,borderRadius:9,overflow:'hidden',border:'1.5px solid var(--line)'}}><img src={p.previewUrl} alt={`Setup ${slot} reference ${i+1}`} style={{width:'100%',height:'100%',objectFit:'cover'}}/><button type="button" onClick={()=>removePhoto(slotIndex,i)} style={{position:'absolute',top:2,right:2,width:18,height:18,borderRadius:'50%',background:'rgba(46,42,34,.75)',color:'#fff',border:'none',fontSize:11}}>×</button></div>)}</div>
+                  <div style={{fontSize:11.5,color:'var(--ink-faint)',marginTop:6}}>{setupPhotos[slotIndex].length}/3 reference photos</div>
+                  <input value={setupNotes[slotIndex]} maxLength={300} onChange={e=>setSetupNotes(notes=>notes.map((note,index)=>index===slotIndex?e.target.value:note))} placeholder="Outfit / Setup note (e.g. Client will bring this outfit)" style={{width:'100%',marginTop:8,padding:'8px 10px',border:'1.5px solid var(--line)',borderRadius:8,font:'inherit',fontSize:12}}/>
+                  {!included&&slot===activeSetupCount&&<button type="button" className="btn btn-ghost" style={{marginTop:8}} onClick={()=>{setAddOns(a=>({...a,[additionalSetupKey]:Math.max(0,(a[additionalSetupKey]||0)-1)}));setSetupPhotos(groups=>groups.map((items,index)=>index===slotIndex?[]:items));}}>Remove Additional Setup</button>}
+                </>}
+              </div>;})}
             </div>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 6 }}>{photos.length}/5 attached</div>
           </div>
           {sessionType.id !== 'maternity' && (
             <div className="field">

@@ -32,6 +32,9 @@ export type Booking = {
   isWeekend: boolean;
   addOns: Record<string, number>;
   notes: string;
+  setupChoiceNotes: string;
+  setupSelectionCount: number;
+  setupSelections: { slot: number; referencePhotoUrls: string[]; note?: string }[];
   referencePhotoUrls: string[];
   address: string;
   discountCode: string | null;

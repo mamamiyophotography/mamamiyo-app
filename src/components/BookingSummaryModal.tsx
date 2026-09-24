@@ -13,6 +13,7 @@ type SummaryBooking = {
   clientEmail: string;
   clientPhone: string;
   referencePhotoUrls: string[];
+  setupSelectionCount?: number;
   notes: string;
   setupChoiceNotes?: string;
   ref?: string;
@@ -54,7 +55,8 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       ...(noteParts.sibling ? [['Sibling joining', noteParts.sibling]] : []),
       ...(noteParts.other ? [['Other notes', noteParts.other]] : []),
       ...(booking.setupChoiceNotes ? [[`${/maternity/i.test(booking.sessionLabel) ? 'Outfit' : 'Setup'} notes`, booking.setupChoiceNotes]] : []),
-      [selectionLabel, String(booking.referencePhotoUrls.length)],
+      [selectionLabel, String(booking.setupSelectionCount || 0)],
+      ['Reference photos', String(booking.referencePhotoUrls.length)],
     ];
     const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
       const words = text.split(/\s+/); const lines: string[] = []; let line = '';
@@ -179,10 +181,11 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         {noteParts.sibling && <div className="ticket-row" style={{ alignItems: 'center' }}><span>Sibling joining</span><b>{noteParts.sibling}</b></div>}
         {noteParts.other && <div className="ticket-row" style={{ alignItems: 'center' }}><span>Other notes</span><b style={{ overflowWrap: 'anywhere' }}>{noteParts.other}</b></div>}
         {booking.setupChoiceNotes && <div className="ticket-row" style={{ alignItems: 'center' }}><span>{/maternity/i.test(booking.sessionLabel) ? 'Outfit' : 'Setup'} notes</span><b style={{ overflowWrap: 'anywhere' }}>{booking.setupChoiceNotes}</b></div>}
+        <div className="ticket-row" style={{ alignItems: 'center' }}><span>{selectionLabel}</span><b>{booking.setupSelectionCount || 0}</b></div>
 
         {booking.referencePhotoUrls.length > 0 && (
           <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', marginBottom: 6 }}>{selectionLabel} ({booking.referencePhotoUrls.length})</div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', marginBottom: 6 }}>Reference photos ({booking.referencePhotoUrls.length})</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {booking.referencePhotoUrls.map((url) => (
                 <a key={url} href={url} target="_blank" rel="noopener" style={{ display: 'block', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', border: '1.5px solid var(--line)' }}>

@@ -1,0 +1,2 @@
+ALTER TABLE "Booking" ADD COLUMN "setupSelectionCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Booking" ADD COLUMN "setupSelections" JSONB NOT NULL DEFAULT '[]';
