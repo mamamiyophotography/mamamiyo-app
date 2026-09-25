@@ -81,14 +81,17 @@ export function preparationGuideFor(booking: Pick<SummaryBooking, 'sessionTypeId
 
 function splitBookingNotes(notes: string) {
   let remaining = notes || '';
-  const genderMatch = remaining.match(/Baby gender:\s*([^\n]+?)(?=\s+(?:Sibling joining:|Baby name(?:\s+is|:))|$)/i);
+  const genderMatch = remaining.match(/Baby gender:\s*([^\n·]+)/i);
   const siblingMatch = remaining.match(/Sibling joining:\s*(yes|no)/i);
+  const siblingCountMatch = remaining.match(/Number of siblings:\s*(\d+)/i);
   if (genderMatch) remaining = remaining.replace(genderMatch[0], ' ');
   if (siblingMatch) remaining = remaining.replace(siblingMatch[0], ' ');
-  const other = remaining.split(/\n+/).map(line => line.trim()).filter(Boolean).join(' · ').replace(/\s{2,}/g, ' ').trim();
+  if (siblingCountMatch) remaining = remaining.replace(siblingCountMatch[0], ' ');
+  const other = remaining.split(/\n+|·/).map(line => line.trim()).filter(Boolean).join(' · ').replace(/\s{2,}/g, ' ').trim();
   return {
     gender: genderMatch?.[1]?.trim() || '',
     sibling: siblingMatch?.[1] ? siblingMatch[1][0].toUpperCase() + siblingMatch[1].slice(1).toLowerCase() : '',
+    siblingCount: siblingCountMatch?.[1] || '',
     other,
   };
 }
@@ -103,122 +106,94 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
   useEffect(() => {
     let cancelled = false;
     async function buildSummary() {
-    const entries = [
-      ['Client', booking.clientName],
-      ['Session', booking.sessionLabel],
-      ['Date', fmtDatePretty(booking.date)],
-      ['Time', fmtTime12(booking.startTime)],
-      ['Location', booking.location === 'home' ? "Client's home" : 'Studio'],
-      ['Email', booking.clientEmail],
-      ['Phone', booking.clientPhone],
-      ...(booking.address ? [['Address', booking.address]] : []),
-      ...(noteParts.gender ? [["Baby's gender", noteParts.gender]] : []),
-      ...(noteParts.sibling ? [['Sibling joining', noteParts.sibling]] : []),
-      ...(noteParts.other ? [['Other notes', noteParts.other]] : []),
-      ...(booking.setupChoiceNotes ? [[`${/maternity/i.test(booking.sessionLabel) ? 'Outfit' : 'Setup'} notes`, booking.setupChoiceNotes]] : []),
-      [selectionLabel, String(booking.setupSelectionCount || 0)],
-      ['Setup reference photos', String(booking.referencePhotoUrls.length)],
-      ['Inspirational reference photos', String(booking.inspirationReferencePhotoUrls?.length || 0)],
-    ];
-    const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
-      const words = text.split(/\s+/); const lines: string[] = []; let line = '';
-      words.forEach((word) => { const next = line ? `${line} ${word}` : word; if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = word; } else line = next; });
-      if (line) lines.push(line); return lines;
-    };
-    const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 2200;
-    const ctx = canvas.getContext('2d'); if (!ctx) return;
-    ctx.font = '700 31px Arial';
-    const preparedEntries = entries.map(([label, value]) => {
-      const lines = wrap(ctx, value, 600);
-      return { label, lines, height: Math.max(68, lines.length * 42 + 22) };
-    });
-    const photoRows = booking.referencePhotoUrls.length > 0
-      ? Math.ceil(Math.min(3, booking.referencePhotoUrls.length) / 3)
-      : 0;
-    const inspirationRows = (booking.inspirationReferencePhotoUrls?.length || 0) > 0 ? 1 : 0;
-    const contentHeight = 230 + 66
-      + preparedEntries.reduce((total, entry) => total + entry.height, 0)
-      + (photoRows ? 72 + photoRows * 338 : 0)
-      + (inspirationRows ? 72 + inspirationRows * 338 : 0)
-      + (booking.ref ? 72 : 24);
-    const top = Math.max(54, Math.round((canvas.height - contentHeight) / 2));
-    ctx.fillStyle = '#f5f0e8'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#2e2a22'; ctx.fillRect(54, top, 972, 230);
-    ctx.textAlign = 'center'; ctx.fillStyle = '#c5a87c'; ctx.font = '700 30px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY', 540, top + 76);
-    ctx.fillStyle = '#b08d57'; ctx.font = '58px Georgia'; ctx.fillText('Booking Summary', 540, top + 158);
-    let y = top + 296;
-    preparedEntries.forEach(({ label, lines, height }) => {
-      const centre = y + height / 2;
-      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#6b6152'; ctx.font = '29px Arial'; ctx.fillText(label, 100, centre);
-      ctx.fillStyle = '#2e2a22'; ctx.font = '700 31px Arial';
-      const firstLine = centre - ((lines.length - 1) * 42) / 2; lines.forEach((line, index) => ctx.fillText(line, 370, firstLine + index * 42));
-      y += height; ctx.strokeStyle = '#e6decb'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(100, y); ctx.lineTo(980, y); ctx.stroke();
-    });
-    ctx.textBaseline = 'alphabetic';
-    if (booking.referencePhotoUrls.length > 0) {
-      y += 36;
-      ctx.textAlign = 'left'; ctx.fillStyle = '#6b6152'; ctx.font = '700 25px Arial'; ctx.fillText('Setup Reference', 100, y);
-      y += 28;
-      const imageWidth = 270, imageHeight = 310, gap = 35;
+      const entries = [
+        ['Client', booking.clientName],
+        ['Session', booking.sessionLabel],
+        ['Date', fmtDatePretty(booking.date)],
+        ['Time', fmtTime12(booking.startTime)],
+        ['Location', booking.location === 'home' ? "Client's home" : 'Studio'],
+        ['Email', booking.clientEmail],
+        ['Phone', booking.clientPhone],
+        ...(booking.address ? [['Address', booking.address]] : []),
+        ...(noteParts.gender ? [['Baby gender', noteParts.gender]] : []),
+        ...(noteParts.sibling ? [['Sibling joining', noteParts.sibling]] : []),
+        ...(noteParts.siblingCount ? [['Number of siblings', noteParts.siblingCount]] : []),
+        ...(noteParts.other ? [['Notes', noteParts.other]] : []),
+        [selectionLabel, String(booking.setupSelectionCount || 0)],
+      ];
+      const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
+        const words = text.split(/\s+/); const lines: string[] = []; let line = '';
+        words.forEach((word) => { const next = line ? `${line} ${word}` : word; if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = word; } else line = next; });
+        if (line) lines.push(line); return lines;
+      };
+      const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 1500;
+      let ctx = canvas.getContext('2d'); if (!ctx) return;
+      ctx.font = '700 27px Arial';
+      const preparedEntries = entries.map(([label, value]) => {
+        const lines = wrap(ctx!, value, 520);
+        return { label, lines, height: Math.max(52, lines.length * 34 + 16) };
+      });
+      const additionalLines = booking.setupChoiceNotes ? wrap(ctx, booking.setupChoiceNotes, 520) : [];
+      const additionalHeight = additionalLines.length ? Math.max(52, additionalLines.length * 34 + 16) : 0;
+      const setupPhotos = booking.referencePhotoUrls.slice(0, 3);
+      const inspirationPhotos = (booking.inspirationReferencePhotoUrls || []).slice(0, 3);
+      const photoBlockHeight = (photos: string[]) => 52 + (photos.length ? 218 : 0);
+      const contentHeight = 210 + 28 + preparedEntries.reduce((sum, entry) => sum + entry.height, 0)
+        + photoBlockHeight(setupPhotos) + photoBlockHeight(inspirationPhotos) + additionalHeight + 82;
+      canvas.height = Math.max(1350, contentHeight + 56);
+      ctx = canvas.getContext('2d'); if (!ctx) return;
+
+      ctx.fillStyle = '#f5f0e8'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#8c6d3f'; ctx.lineWidth = 8; ctx.strokeRect(28, 28, canvas.width - 56, canvas.height - 56);
+      ctx.fillStyle = '#2e2a22'; ctx.fillRect(54, 54, 972, 180);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#c5a87c'; ctx.font = '700 28px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY', 540, 112);
+      ctx.fillStyle = '#ffffff'; ctx.font = '700 62px Georgia'; ctx.fillText('Booking Summary', 540, 190);
+      let y = 262;
+
+      const drawRow = (label: string, lines: string[], height: number) => {
+        const centre = y + height / 2;
+        ctx!.textAlign = 'left'; ctx!.textBaseline = 'middle'; ctx!.fillStyle = '#6b6152'; ctx!.font = '26px Arial'; ctx!.fillText(label, 82, centre);
+        ctx!.fillStyle = '#2e2a22'; ctx!.font = '700 27px Arial';
+        const firstLine = centre - ((lines.length - 1) * 34) / 2;
+        lines.forEach((line, index) => ctx!.fillText(line, 470, firstLine + index * 34));
+        y += height; ctx!.strokeStyle = '#e0d7c9'; ctx!.lineWidth = 2; ctx!.beginPath(); ctx!.moveTo(82, y); ctx!.lineTo(998, y); ctx!.stroke();
+      };
+      preparedEntries.forEach((entry) => drawRow(entry.label, entry.lines, entry.height));
+
       const loadImage = async (url: string) => {
         try {
           const response = await fetch(url); if (!response.ok) return null;
-          const objectUrl = URL.createObjectURL(await response.blob());
-          const image = new Image(); image.src = objectUrl;
+          const objectUrl = URL.createObjectURL(await response.blob()); const image = new Image(); image.src = objectUrl;
           await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Image failed to load')); });
           return { image, objectUrl };
         } catch { return null; }
       };
-      const loaded = await Promise.all(booking.referencePhotoUrls.slice(0, 3).map(loadImage));
-      loaded.forEach((loadedImage, index) => {
-        const column = index % 3, row = Math.floor(index / 3); const x = 100 + column * (imageWidth + gap); const top = y + row * (imageHeight + 28);
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(x, top, imageWidth, imageHeight);
-        ctx.strokeStyle = '#ded4c9'; ctx.lineWidth = 2; ctx.strokeRect(x, top, imageWidth, imageHeight);
-        if (loadedImage) {
-          const scale = Math.min(imageWidth / loadedImage.image.naturalWidth, imageHeight / loadedImage.image.naturalHeight);
-          const width = loadedImage.image.naturalWidth * scale, height = loadedImage.image.naturalHeight * scale;
-          ctx.drawImage(loadedImage.image, x + (imageWidth - width) / 2, top + (imageHeight - height) / 2, width, height);
-          URL.revokeObjectURL(loadedImage.objectUrl);
-        } else {
-          ctx.fillStyle = '#8b7d72'; ctx.font = '22px Arial'; ctx.textAlign = 'center'; ctx.fillText(`Selection ${index + 1}`, x + imageWidth / 2, top + imageHeight / 2);
-        }
-      });
-      y += Math.ceil(Math.min(3, booking.referencePhotoUrls.length) / 3) * (imageHeight + 28);
-    }
-    if ((booking.inspirationReferencePhotoUrls?.length || 0) > 0) {
-      y += 36;
-      ctx.textAlign = 'left'; ctx.fillStyle = '#6b6152'; ctx.font = '700 25px Arial'; ctx.fillText('Inspirational Reference', 100, y);
-      y += 28;
-      const imageWidth = 270, imageHeight = 310, gap = 35;
-      const loadImage = async (url: string) => {
-        try {
-          const response = await fetch(url); if (!response.ok) return null;
-          const objectUrl = URL.createObjectURL(await response.blob());
-          const image = new Image(); image.src = objectUrl;
-          await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Image failed to load')); });
-          return { image, objectUrl };
-        } catch { return null; }
+      const drawPhotoBlock = async (label: string, photos: string[]) => {
+        drawRow(label, [String(photos.length)], 52);
+        if (!photos.length) return;
+        const loaded = await Promise.all(photos.map(loadImage)); const imageWidth = 270, imageHeight = 190, gap = 35;
+        loaded.forEach((loadedImage, index) => {
+          const x = 82 + index * (imageWidth + gap); const imageTop = y + 14;
+          ctx!.fillStyle = '#ffffff'; ctx!.fillRect(x, imageTop, imageWidth, imageHeight);
+          ctx!.strokeStyle = '#ded4c9'; ctx!.lineWidth = 2; ctx!.strokeRect(x, imageTop, imageWidth, imageHeight);
+          if (loadedImage) {
+            const scale = Math.min(imageWidth / loadedImage.image.naturalWidth, imageHeight / loadedImage.image.naturalHeight);
+            const width = loadedImage.image.naturalWidth * scale, height = loadedImage.image.naturalHeight * scale;
+            ctx!.drawImage(loadedImage.image, x + (imageWidth - width) / 2, imageTop + (imageHeight - height) / 2, width, height);
+            URL.revokeObjectURL(loadedImage.objectUrl);
+          }
+        });
+        y += 218;
       };
-      const loaded = await Promise.all((booking.inspirationReferencePhotoUrls || []).slice(0, 3).map(loadImage));
-      loaded.forEach((loadedImage, index) => {
-        const x = 100 + index * (imageWidth + gap); const imageTop = y;
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(x, imageTop, imageWidth, imageHeight);
-        ctx.strokeStyle = '#ded4c9'; ctx.lineWidth = 2; ctx.strokeRect(x, imageTop, imageWidth, imageHeight);
-        if (loadedImage) {
-          const scale = Math.min(imageWidth / loadedImage.image.naturalWidth, imageHeight / loadedImage.image.naturalHeight);
-          const width = loadedImage.image.naturalWidth * scale, height = loadedImage.image.naturalHeight * scale;
-          ctx.drawImage(loadedImage.image, x + (imageWidth - width) / 2, imageTop + (imageHeight - height) / 2, width, height);
-          URL.revokeObjectURL(loadedImage.objectUrl);
-        }
-      });
-      y += imageHeight + 28;
-    }
-    if (booking.ref) { ctx.textAlign = 'center'; ctx.fillStyle = '#8c6d3f'; ctx.font = '23px Arial'; ctx.fillText(`Booking reference: ${booking.ref}`, 540, Math.min(canvas.height - 70, y + 45)); }
-    if (!cancelled) setImageDataUrl(canvas.toDataURL('image/png'));
+      await drawPhotoBlock('Setup Selection Photos', setupPhotos);
+      await drawPhotoBlock('Inspirational Reference Photos', inspirationPhotos);
+      if (additionalLines.length) drawRow('Additional notes', additionalLines, additionalHeight);
+      if (booking.ref) { ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#8c6d3f'; ctx.font = '23px Arial'; ctx.fillText(`Booking reference: ${booking.ref}`, 540, canvas.height - 58); }
+      if (!cancelled) setImageDataUrl(canvas.toDataURL('image/png'));
     }
     buildSummary();
     return () => { cancelled = true; };
-  }, [booking, selectionLabel, noteParts.gender, noteParts.sibling, noteParts.other]);
+  }, [booking, selectionLabel, noteParts.gender, noteParts.sibling, noteParts.siblingCount, noteParts.other]);
 
   useEffect(() => {
     let cancelled = false;
