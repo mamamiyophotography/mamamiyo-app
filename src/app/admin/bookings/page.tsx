@@ -161,12 +161,39 @@ export default function AdminBookingsPage() {
     return `${window.location.origin}/g/${galleryId.slice(0,12)}?preview=2`;
   }
 
-  async function copyClientGalleryLink(bookingId: string, galleryId: string) {
+  async function shareClientGallery(bookingId: string, galleryId: string, kind: 'basic'|'further') {
+    const galleryUrl = shortGalleryUrl(galleryId);
     try {
-      await navigator.clipboard.writeText(`Your Further Retouch photos are ready ♡\n\nView and download them from your private Gallery:\n${shortGalleryUrl(galleryId)}`);
-      setActionSuccess({ id: bookingId, message: 'Further Retouch WhatsApp message copied.' });
-    } catch {
-      setActionError({ id: bookingId, message: 'Could not copy automatically. Open Client Gallery, then copy the address from your browser.' });
+      const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 630;
+      const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('Could not create the Gallery image.');
+      const roundedRect = (x:number,y:number,w:number,h:number,r:number) => {ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();};
+      const gradient=ctx.createLinearGradient(0,0,1200,630);gradient.addColorStop(0,'#f7ded9');gradient.addColorStop(.34,'#f8e8bf');gradient.addColorStop(.68,'#d7ead8');gradient.addColorStop(1,'#d9d8f1');ctx.fillStyle=gradient;ctx.fillRect(0,0,1200,630);
+      ctx.fillStyle='#fbfaf6';roundedRect(52,52,1096,526,38);ctx.fill();ctx.strokeStyle='#66877d';ctx.lineWidth=4;ctx.stroke();
+      ctx.textAlign='center';ctx.fillStyle='#6d857b';ctx.font='700 30px Arial';ctx.fillText('MAMAMIYO PHOTOGRAPHY',600,150);
+      ctx.fillStyle='#3a2e28';
+      if(kind==='basic'){
+        ctx.font='700 62px Georgia';ctx.fillText('Your Photos Are Ready',600,292);
+        ctx.font='700 46px Georgia';ctx.fillText('View Your Photos with Basic Retouch',600,398);
+      }else{
+        ctx.font='700 47px Georgia';ctx.fillText('View Your Photos with Further Retouch',600,298);
+        ctx.fillStyle='#6d857b';ctx.font='700 40px Arial';ctx.fillText('Download All the Photos',600,408);
+      }
+      ctx.fillStyle='#8c6d3f';ctx.font='24px Arial';ctx.fillText('Open your private Gallery to view and download',600,518);
+      const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Could not create the Gallery image.')),'image/png'));
+      const file=new File([blob],`Mamamiyo-${kind==='basic'?'Basic':'Further'}-Retouch-${galleryId.slice(0,12)}.png`,{type:'image/png'});
+      const shareText=kind==='basic'
+        ? `Your photos are ready.\nView your photos with Basic Retouch:\n${galleryUrl}`
+        : `View your photos with Further Retouch ♡\nDownload all the photos:\n${galleryUrl}`;
+      if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
+        await navigator.share({title:`MamaMiyo ${kind==='basic'?'Basic':'Further'} Retouch Gallery`,text:shareText,files:[file]});
+        setActionSuccess({id:bookingId,message:`Choose WhatsApp and send the ${kind==='basic'?'Basic':'Further'} Retouch image to the client.`});return;
+      }
+      const objectUrl=URL.createObjectURL(file);const link=document.createElement('a');link.href=objectUrl;link.download=file.name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
+      await navigator.clipboard.writeText(shareText);
+      setActionSuccess({id:bookingId,message:`${kind==='basic'?'Basic':'Further'} Retouch image downloaded and Gallery message copied. Attach the image in WhatsApp and paste the message.`});
+    } catch (error) {
+      if((error as Error).name==='AbortError'){setActionSuccess({id:bookingId,message:'Sharing cancelled.'});return;}
+      setActionError({ id: bookingId, message: 'Could not open the share menu. Open Client Gallery, then copy the address from your browser.' });
     }
   }
 
@@ -243,7 +270,8 @@ export default function AdminBookingsPage() {
                     {(g.submitted||g.locked||g.deliveredAt) ? <a href={photoSelectGalleryActionUrl(b,g.galleryId,'update-basic')} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Update Basic Retouch</a> : <button type="button" onClick={()=>setManageGallery({bookingId:b.id,galleryId:g.galleryId})} style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Manage Gallery</button>}
                     {g.submitted&&<a href={photoSelectGalleryActionUrl(b,g.galleryId,'unlock-selection')} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #b87962',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#704333',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Allow Client to Change Selection</a>}
                     {(g.submitted||g.locked)&&<a href={photoSelectGalleryActionUrl(b,g.galleryId,'upload-further')} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #8d6fa8',background:'#8d6fa8',padding:'7px 10px',borderRadius:6,color:'#fff',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Upload Further Retouch</a>}
-                    {g.deliveredAt&&<button type="button" onClick={()=>copyClientGalleryLink(b.id,g.galleryId)} style={{border:'1px solid #557970',background:'#557970',padding:'7px 10px',borderRadius:6,color:'#fff',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Copy Further Retouch WhatsApp Message</button>}
+                    <button type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'basic')} style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Share Basic Retouch WhatsApp Image</button>
+                    {g.deliveredAt&&<button type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'further')} style={{border:'1px solid #557970',background:'#557970',padding:'7px 10px',borderRadius:6,color:'#fff',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Share Further Retouch WhatsApp Image</button>}
                     <a href={`/g/${g.galleryId.slice(0,12)}`} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #7d918b',background:'#f8fbfa',padding:'7px 10px',borderRadius:6,color:'#415e58',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Open Client Gallery</a>
                   </div> : <span style={{color:'#8b5b43'}}>Link this Gallery again in PhotoSelect Pro to enable the mobile client link.</span>}
                 </div>)}
