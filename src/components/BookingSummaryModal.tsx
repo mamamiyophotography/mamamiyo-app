@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
+import { prepLinkFor } from '@/lib/constants';
+import QRCode from 'qrcode';
 
 type SummaryBooking = {
   clientName: string;
@@ -17,7 +19,64 @@ type SummaryBooking = {
   notes: string;
   setupChoiceNotes?: string;
   ref?: string;
+  sessionTypeId: string;
+  bundleSessionNumber?: number | null;
 };
+
+type PreparationGuide = {
+  title: string;
+  intro: string;
+  items: string[];
+  url: string;
+};
+
+export function preparationGuideFor(booking: Pick<SummaryBooking, 'sessionTypeId' | 'sessionLabel' | 'bundleSessionNumber'>): PreparationGuide {
+  const prep = prepLinkFor(booking);
+  const type = booking.sessionTypeId === 'bundle'
+    ? ((booking.bundleSessionNumber || 1) === 1 ? 'newborn' : 'baby')
+    : booking.sessionTypeId;
+  if (type === 'maternity') {
+    return {
+      title: 'Maternity Session',
+      intro: 'A few simple preparations will help you feel comfortable and camera-ready.',
+      items: [
+        'Choose your preferred style and outfits before the session.',
+        'Bring nude and black strapless underwear; heels are optional.',
+        'Bring meaningful baby items, such as an ultrasound photo or tiny shoes.',
+        'Partner and family outfits should be plain and colour-coordinated.',
+      ],
+      url: prep?.url || 'https://www.mamamiyo-photography.com/maternityprep',
+    };
+  }
+  if (type === 'newborn' || type === 'fullmonth') {
+    return {
+      title: type === 'fullmonth' ? 'Full Month Baby Session' : 'Newborn Session',
+      intro: 'Please bring these essentials so baby stays comfortable throughout the session.',
+      items: [
+        'Bring extra milk, diapers and a pacifier if baby uses one.',
+        'Trim baby’s nails before the photoshoot.',
+        'Bring meaningful keepsakes you would like photographed.',
+        'Choose plain family outfits without busy prints.',
+        'For siblings, bring a favourite snack or quiet toy.',
+      ],
+      url: prep?.url || 'https://www.mamamiyo-photography.com/newbornprep',
+    };
+  }
+  return {
+    title: booking.sessionTypeId === 'bundle'
+      ? `Bundle Milestone ${booking.bundleSessionNumber || 1}`
+      : 'Baby & Family Session',
+    intro: 'A rested and comfortable baby makes the session smoother and more enjoyable.',
+    items: [
+      'Help baby rest or sleep well before the photoshoot.',
+      'Bring milk, water and age-appropriate snacks.',
+      'Bring favourite toys and anything that reliably makes baby smile.',
+      'Choose plain or pastel family outfits without busy prints.',
+      'Tell us about favourite games, songs or videos that get baby’s attention.',
+    ],
+    url: prep?.url || 'https://www.mamamiyo-photography.com/babyprep',
+  };
+}
 
 function splitBookingNotes(notes: string) {
   let remaining = notes || '';
@@ -35,6 +94,7 @@ function splitBookingNotes(notes: string) {
 
 export default function BookingSummaryModal({ booking, onClose }: { booking: SummaryBooking; onClose: () => void }) {
   const [imageDataUrl, setImageDataUrl] = useState('');
+  const [preparationImageDataUrl, setPreparationImageDataUrl] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
   const selectionLabel = /maternity/i.test(booking.sessionLabel) ? 'Outfit selections' : 'Setup selections';
   const noteParts = splitBookingNotes(booking.notes);
@@ -128,26 +188,105 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
     return () => { cancelled = true; };
   }, [booking, selectionLabel, noteParts.gender, noteParts.sibling, noteParts.other]);
 
-  async function saveOrShare() {
-    if (!imageDataUrl) return;
+  useEffect(() => {
+    let cancelled = false;
+    async function buildPreparationImage() {
+      const guide = preparationGuideFor(booking);
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 1450;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const roundedRect = (x: number, y: number, width: number, height: number, radius: number) => {
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, radius);
+      };
+      const wrap = (text: string, maxWidth: number) => {
+        const words = text.split(/\s+/); const lines: string[] = []; let line = '';
+        words.forEach((word) => { const next = line ? `${line} ${word}` : word; if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = word; } else line = next; });
+        if (line) lines.push(line); return lines;
+      };
+
+      ctx.fillStyle = '#f5f0e8'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#2e2a22'; roundedRect(54, 54, 972, 230, 34); ctx.fill();
+      ctx.textAlign = 'center'; ctx.fillStyle = '#c5a87c'; ctx.font = '700 30px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY', 540, 130);
+      ctx.fillStyle = '#b08d57'; ctx.font = '58px Georgia'; ctx.fillText('What to Prepare', 540, 216);
+
+      ctx.fillStyle = '#6f8f84'; roundedRect(72, 324, 936, 142, 28); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.font = '700 39px Arial'; ctx.fillText(guide.title, 540, 382);
+      ctx.font = '27px Arial';
+      const introLines = wrap(guide.intro, 820);
+      introLines.forEach((line, index) => ctx.fillText(line, 540, 425 + index * 32));
+
+      let y = 520;
+      ctx.textAlign = 'left';
+      guide.items.forEach((item, index) => {
+        ctx.fillStyle = index % 2 === 0 ? '#ead9d0' : '#e3dccb'; roundedRect(72, y, 936, 112, 24); ctx.fill();
+        ctx.fillStyle = '#8c6d3f'; ctx.beginPath(); ctx.arc(126, y + 56, 24, 0, Math.PI * 2); ctx.fill();
+        ctx.textAlign = 'center'; ctx.fillStyle = '#ffffff'; ctx.font = '700 25px Arial'; ctx.fillText(String(index + 1), 126, y + 65);
+        ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '29px Arial';
+        const lines = wrap(item, 790); const first = y + 49 - ((lines.length - 1) * 34) / 2;
+        lines.forEach((line, lineIndex) => ctx.fillText(line, 174, first + lineIndex * 34));
+        y += 128;
+      });
+
+      const qrDataUrl = await QRCode.toDataURL(guide.url, { width: 190, margin: 1, color: { dark: '#2e2a22', light: '#ffffff' } });
+      const qr = new Image(); qr.src = qrDataUrl;
+      await new Promise<void>((resolve, reject) => { qr.onload = () => resolve(); qr.onerror = () => reject(new Error('QR code failed to load')); });
+      const footerTop = Math.max(y + 12, 1170);
+      ctx.fillStyle = '#ffffff'; roundedRect(72, footerTop, 936, 218, 28); ctx.fill();
+      ctx.drawImage(qr, 100, footerTop + 14, 190, 190);
+      ctx.textAlign = 'left'; ctx.fillStyle = '#8c6d3f'; ctx.font = '700 31px Arial'; ctx.fillText('View Full Preparation Guide', 326, footerTop + 70);
+      ctx.fillStyle = '#6b6152'; ctx.font = '24px Arial';
+      const urlLines = wrap(guide.url.replace(/^https?:\/\//, ''), 620);
+      urlLines.forEach((line, index) => ctx.fillText(line, 326, footerTop + 113 + index * 30));
+      ctx.fillStyle = '#8b7d72'; ctx.font = '22px Arial'; ctx.fillText('Scan the QR code or open the link above.', 326, footerTop + 174);
+      if (!cancelled) setPreparationImageDataUrl(canvas.toDataURL('image/png'));
+    }
+    buildPreparationImage().catch(() => { if (!cancelled) setPreparationImageDataUrl(''); });
+    return () => { cancelled = true; };
+  }, [booking]);
+
+  function imageFile(dataUrl: string, filename: string) {
+    return fetch(dataUrl).then((response) => response.blob()).then((blob) => new File([blob], filename, { type: 'image/png' }));
+  }
+
+  async function shareOne(dataUrl: string, filename: string, title: string) {
+    if (!dataUrl) return;
     setSaveMessage('Preparing image…');
     try {
-      const blob = await (await fetch(imageDataUrl)).blob();
-      const safeRef = (booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-');
-      const filename = `Mamamiyo-Booking-${safeRef}.png`;
-      const file = new File([blob], filename, { type: 'image/png' });
+      const file = await imageFile(dataUrl, filename);
       if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
-        await navigator.share({ title: 'Mamamiyo Booking Summary', files: [file] });
-        setSaveMessage('Choose Save Image, Save to Files, WhatsApp, or another app from the share menu.');
+        await navigator.share({ title, files: [file] });
+        setSaveMessage('Choose WhatsApp or another app from the share menu.');
         return;
       }
-      const objectUrl = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(file);
       const link = document.createElement('a'); link.href = objectUrl; link.download = filename; link.target = '_blank'; link.rel = 'noopener';
       document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
-      setSaveMessage('The image was opened or downloaded. On iPhone, long-press it and choose Save to Photos.');
+      setSaveMessage('The image was opened or downloaded.');
     } catch (error) {
-      if ((error as Error).name !== 'AbortError') setSaveMessage('Could not open the save menu. Long-press the summary image above and choose Save to Photos.');
-      else setSaveMessage('Save cancelled.');
+      setSaveMessage((error as Error).name === 'AbortError' ? 'Share cancelled.' : 'Could not open the share menu. Long-press the image and save it instead.');
+    }
+  }
+
+  async function saveOrShare() {
+    if (!imageDataUrl || !preparationImageDataUrl) return;
+    setSaveMessage('Preparing images…');
+    try {
+      const safeRef = (booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-');
+      const files = await Promise.all([
+        imageFile(imageDataUrl, `Mamamiyo-Booking-${safeRef}.png`),
+        imageFile(preparationImageDataUrl, `Mamamiyo-What-to-Prepare-${safeRef}.png`),
+      ]);
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files }))) {
+        await navigator.share({ title: 'Mamamiyo Booking Summary and What to Prepare', files });
+        setSaveMessage('Choose WhatsApp or another app from the share menu.');
+        return;
+      }
+      setSaveMessage('This device cannot share two images together. Please use the two separate Share buttons below.');
+    } catch (error) {
+      setSaveMessage((error as Error).name === 'AbortError' ? 'Share cancelled.' : 'Could not open the share menu. Please use the two separate Share buttons below.');
     }
   }
 
@@ -161,11 +300,17 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         style={{ maxWidth: 420, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Booking Summary</div>
-        {imageDataUrl && <>
-          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 8 }}>Tap Save / Share below. You can save it to Photos or Files, or send it through WhatsApp.</div>
+        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Booking Summary + What to Prepare</div>
+        {imageDataUrl && preparationImageDataUrl && <>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 8 }}>Share both images with the client through WhatsApp. If your device cannot share them together, use the separate buttons below.</div>
           <img className="invoice-image-preview" src={imageDataUrl} alt={`Booking summary for ${booking.clientName}`} />
-          <button type="button" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 10 }} onClick={saveOrShare}>Save / Share booking summary</button>
+          <div style={{ fontWeight: 700, fontSize: 14, margin: '16px 0 8px' }}>What to Prepare</div>
+          <img className="invoice-image-preview" src={preparationImageDataUrl} alt={`What to prepare for ${booking.sessionLabel}`} />
+          <button type="button" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={saveOrShare}>Share Booking Summary + What to Prepare</button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+            <button type="button" className="btn btn-ghost" style={{ justifyContent: 'center', whiteSpace: 'normal' }} onClick={() => shareOne(imageDataUrl, `Mamamiyo-Booking-${(booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-')}.png`, 'Mamamiyo Booking Summary')}>Share Booking Summary</button>
+            <button type="button" className="btn btn-ghost" style={{ justifyContent: 'center', whiteSpace: 'normal' }} onClick={() => shareOne(preparationImageDataUrl, `Mamamiyo-What-to-Prepare-${(booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-')}.png`, 'Mamamiyo What to Prepare')}>Share What to Prepare</button>
+          </div>
           {saveMessage && <div role="status" style={{ fontSize: 12.5, color: 'var(--ink-soft)', lineHeight: 1.45, marginTop: 8 }}>{saveMessage}</div>}
         </>}
         <div style={{ fontWeight: 700, fontSize: 13, margin: '20px 0 8px' }}>Details</div>
