@@ -201,6 +201,15 @@ export default function AdminBookingsPage() {
     return `http://127.0.0.1:8766/?${params.toString()}`;
   }
 
+  function photoSelectGetSelectedUrl(booking: Booking, galleryId: string) {
+    const params = new URLSearchParams({
+      action: 'get-selected',
+      gallery: galleryId,
+      booking: booking.ref,
+    });
+    return `http://127.0.0.1:8766/?${params.toString()}`;
+  }
+
   async function generateInvoice(booking: Booking, sendEmail: boolean) {
     setInvoiceGenerating({ id: booking.id, sendEmail });
     try {
@@ -233,7 +242,7 @@ export default function AdminBookingsPage() {
                 {!hasClientGallery && (b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <a href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer" title="Create a Gallery in PhotoSelect Pro on your studio computer" style={{display:'inline-block',marginTop:8,padding:'8px 12px',background:'#657e76',color:'#fff',borderRadius:7,textDecoration:'none',fontSize:13,fontWeight:600}}>Open PhotoSelect Pro · Create Gallery</a>}
                 {b.gallerySelections?.map(g => <div key={g.galleryId} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginTop:8,padding:'8px 10px',background:'#e3eee9',borderRadius:6,fontSize:13}}>
                   {(g.deliveredAt || g.locked || g.submitted) && <span>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : 'Client selection received'}</span>}
-                  {g.clientUrl ? <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><a href={`/g/${g.galleryId.slice(0,12)}`} target="_blank" rel="noopener noreferrer" style={{color:'#415e58',fontWeight:700,whiteSpace:'nowrap'}}>Open Client Gallery</a><button type="button" onClick={()=>copyClientGalleryLink(b.id,g.galleryId)} style={{border:0,background:'transparent',padding:0,color:'#415e58',fontWeight:700,textDecoration:'underline',cursor:'pointer'}}>Copy WhatsApp Gallery Message</button><button type="button" onClick={()=>setManageGallery({bookingId:b.id,galleryId:g.galleryId})} style={{border:'1px solid #557970',background:'#fff',padding:'5px 9px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer'}}>Manage Gallery</button></div> : <span style={{color:'#8b5b43'}}>Link this Gallery again in PhotoSelect Pro to enable the mobile client link.</span>}
+                  {g.clientUrl ? <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><a href={`/g/${g.galleryId.slice(0,12)}`} target="_blank" rel="noopener noreferrer" style={{color:'#415e58',fontWeight:700,whiteSpace:'nowrap'}}>Open Client Gallery</a>{g.submitted&&<a href={photoSelectGetSelectedUrl(b,g.galleryId)} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #557970',background:'#557970',padding:'5px 9px',borderRadius:6,color:'#fff',fontWeight:700,textDecoration:'none',whiteSpace:'nowrap'}}>Get Selected Photos</a>}<button type="button" onClick={()=>copyClientGalleryLink(b.id,g.galleryId)} style={{border:0,background:'transparent',padding:0,color:'#415e58',fontWeight:700,textDecoration:'underline',cursor:'pointer'}}>Copy WhatsApp Gallery Message</button><button type="button" onClick={()=>setManageGallery({bookingId:b.id,galleryId:g.galleryId})} style={{border:'1px solid #557970',background:'#fff',padding:'5px 9px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer'}}>Manage Gallery</button></div> : <span style={{color:'#8b5b43'}}>Link this Gallery again in PhotoSelect Pro to enable the mobile client link.</span>}
                 </div>)}
                 {b.additionalOrders?.map(order=><div key={order.id} style={{marginTop:8,padding:'10px 12px',background:order.status==='paid'?'#e4eadf':'#fff0d8',borderRadius:7,fontSize:13}}><div style={{display:'flex',justifyContent:'space-between',gap:8,fontWeight:700}}><span>Additional Order · {order.status==='paid'?'Paid':'Payment pending'}</span><span>${order.total}</span></div><div style={{marginTop:5,color:'#6f6258'}}>{order.items.map(item=>`${item.name} ×${item.quantity}`).join(' · ')}</div><div style={{marginTop:4}}>Ref: {order.invoiceRef} · +{order.bonusRetouches} complimentary retouch{order.bonusRetouches===1?'':'es'}</div>{order.status!=='paid'&&<button className="btn btn-sm" style={{marginTop:8}} disabled={busyId===b.id} onClick={()=>runAction(b.id,'confirm-additional-order',{orderId:order.id})}>Payment received</button>}</div>)}
                 <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>
