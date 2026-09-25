@@ -14,9 +14,9 @@ const BOOKING_STEPS: {id:Exclude<Step,'result'>;label:string}[] = [
 ];
 
 const PRODUCT_GROUPS = [
-  {key:'album',name:'Layflat Photo Album',detail:'20 pages · up to 30 images',bonus:'+20 Bonus Further Retouch',ids:['album8x8','album10x10','album12x12']},
-  {key:'canvas',name:'Canvas',detail:'Ready-to-display wall art',bonus:'+5 Bonus Further Retouch',ids:['canvas11x14','canvas16x24']},
-  {key:'plaque',name:'Wooden / Crystal Plaque',detail:'Tabletop display',bonus:'+2 Bonus Further Retouch',ids:['plaque5x7','plaque6x8']},
+  {key:'album',name:'Layflat Photo Album',detail:'20 pages · up to 30 images',bonus:'+20 Bonus Further Retouch',sampleUrl:'https://www.mamamiyo-photography.com/products',ids:['album8x8','album10x10','album12x12']},
+  {key:'canvas',name:'Canvas',detail:'Ready-to-display wall art',bonus:'+5 Bonus Further Retouch',sampleUrl:'https://www.mamamiyo-photography.com/products',ids:['canvas11x14','canvas16x24']},
+  {key:'plaque',name:'Wooden / Crystal Plaque',detail:'Tabletop display',bonus:'+2 Bonus Further Retouch',sampleUrl:'https://www.mamamiyo-photography.com/products',ids:['plaque5x7','plaque6x8']},
 ] as const;
 
 export default function BookPage() {
@@ -390,7 +390,8 @@ export default function BookPage() {
           {step==='addons'&&<h3 style={{ fontSize: 15 }}>Choose Add-ons</h3>}
           {step==='addons'&&(
           <div className="card">
-            <a className="btn btn-ghost" href="https://www.mamamiyo-photography.com/products" target="_blank" rel="noopener" style={{display:'inline-flex',textDecoration:'none',marginBottom:10}}>View MamaMiyo Products</a>
+            <a className="btn" href="https://www.mamamiyo-photography.com/products" target="_blank" rel="noopener" style={{display:'inline-flex',textDecoration:'none',marginBottom:5,background:'var(--gold)',border:'1.5px solid var(--gold-deep)',color:'#2e2a22',fontWeight:700}}>View My Products</a>
+            <div style={{fontSize:11.5,color:'var(--ink-faint)',marginBottom:10}}>Opens in a new tab. Close that tab to return to this booking.</div>
             {selectedSlot.isWeekend && (
               <div style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--rust-pale)', padding: '10px 12px', borderRadius: 8, marginBottom: 8, fontSize: 13.5 }}>
                 <span>Weekend / PH surcharge — applies automatically</span>
@@ -411,11 +412,8 @@ export default function BookPage() {
               </div>
             ))}
             {/* Products: photo albums, canvas, plaques */}
-            <div style={{ marginTop: 10, marginBottom: 4, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--ink-soft)', letterSpacing: 0.5 }}>
-              Products — <a href="https://www.mamamiyo-photography.com/products" target="_blank" rel="noopener" style={{ color: 'var(--gold-deep)', fontWeight: 400, textTransform: 'none' }}>view all options</a>
-            </div>
             {PRODUCT_GROUPS.map(group=>{const id=productVariants[group.key];const quantity=addOns[id]||0;return <div key={group.key} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:12,padding:'12px 0',borderBottom:'1px dashed var(--line)',alignItems:'center'}}>
-              <div style={{minWidth:0}}><div style={{fontWeight:700,fontSize:14}}>{group.name}</div><div style={{fontSize:11.5,color:'var(--ink-soft)',marginTop:2}}>{group.detail}</div><div style={{fontSize:11.5,color:'var(--sage)',fontWeight:700,marginTop:2}}>{group.bonus}</div><select value={id} onChange={event=>{const nextId=event.target.value;setProductVariants(current=>({...current,[group.key]:nextId}));setAddOns(current=>{const next={...current};const qty=group.ids.reduce((sum,item)=>sum+(next[item]||0),0);group.ids.forEach(item=>delete next[item]);if(qty)next[nextId]=qty;return next;});}} style={{marginTop:7,width:'100%',maxWidth:250,padding:'7px 9px',border:'1.5px solid var(--line)',borderRadius:8,background:'var(--paper)'}}>{group.ids.map(optionId=><option key={optionId} value={optionId}>{ADDONS[optionId].name.replace(group.name,'').trim().replace(/^·\s*/, '')}</option>)}</select></div>
+              <div style={{minWidth:0}}><div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}><span style={{fontWeight:700,fontSize:14}}>{group.name}</span><a href={group.sampleUrl} target="_blank" rel="noopener" style={{fontSize:11.5,color:'var(--gold-deep)',fontWeight:700}}>View Sample Details</a></div><div style={{fontSize:11.5,color:'var(--ink-soft)',marginTop:2}}>{group.detail}</div><div style={{fontSize:11.5,color:'var(--sage)',fontWeight:700,marginTop:2}}>{group.bonus}</div><select value={id} onChange={event=>{const nextId=event.target.value;setProductVariants(current=>({...current,[group.key]:nextId}));setAddOns(current=>{const next={...current};const qty=group.ids.reduce((sum,item)=>sum+(next[item]||0),0);group.ids.forEach(item=>delete next[item]);if(qty)next[nextId]=qty;return next;});}} style={{marginTop:7,width:'100%',maxWidth:250,padding:'7px 9px',border:'1.5px solid var(--line)',borderRadius:8,background:'var(--paper)'}}>{group.ids.map(optionId=><option key={optionId} value={optionId}>{ADDONS[optionId].name.replace(group.name,'').trim().replace(/^·\s*/, '')}</option>)}</select></div>
               <div style={{display:'grid',justifyItems:'end',gap:8}}><strong style={{fontSize:20,color:'var(--gold-deep)'}}>${ADDONS[id].price}</strong><div style={{display:'flex',alignItems:'center',gap:10}}><button type="button" onClick={()=>setAddOns(current=>({...current,[id]:Math.max(0,(current[id]||0)-1)}))} style={{width:28,height:28,borderRadius:8,border:'1.5px solid var(--line)',background:'var(--paper)'}}>−</button><strong style={{minWidth:16,textAlign:'center'}}>{quantity}</strong><button type="button" onClick={()=>setAddOns(current=>({...current,[id]:(current[id]||0)+1}))} style={{width:28,height:28,borderRadius:8,border:'1.5px solid var(--line)',background:'var(--paper)'}}>+</button></div></div>
             </div>})}
           </div>
@@ -440,7 +438,7 @@ export default function BookPage() {
           </>}
           {step==='setup'&&<>
           <div className="field">
-            <div className="notice" style={{fontSize:12,lineHeight:1.55,marginBottom:10}}><p style={{margin:'0 0 8px'}}><b>One Setup = one outfit + one background setting.</b></p><p style={{margin:'0 0 8px'}}>Your package includes <b>{includedSetupCount} {includedSetupCount===1?'Setup':'Setups'}</b>. Each Additional Setup is <b>$100</b>.</p><p style={{margin:'0 0 8px'}}>Please choose your preferred Setup from the <a href={sessionType.id==='maternity'?'https://www.mamamiyo-photography.com/sensual-maternity/':sessionType.id==='newborn'?'https://www.mamamiyo-photography.com/cutie-newborn':'https://www.mamamiyo-photography.com/'} target="_blank" rel="noopener" style={{color:'var(--gold-deep)',fontWeight:700}}>MamaMiyo Photography Portfolio here</a> and upload screenshots.</p><p style={{margin:0}}>You may bring your own outfit. Please add a note in advance; its suitability is subject to fit, safety, styling and the backgrounds or props available in the studio.</p></div>
+            <div className="notice" style={{fontSize:12,lineHeight:1.55,marginBottom:10}}><p style={{margin:'0 0 8px'}}><b>One Setup = one outfit + one background setting.</b></p><p style={{margin:'0 0 8px'}}>Your package includes <b>{includedSetupCount} {includedSetupCount===1?'Setup':'Setups'}</b>. Each Additional Setup is <b>$100</b>.</p><p style={{margin:'0 0 8px'}}>Please choose your preferred Setup from the <a href={sessionType.id==='maternity'?'https://www.mamamiyo-photography.com/sensual-maternity/':sessionType.id==='newborn'?'https://www.mamamiyo-photography.com/cutie-newborn':'https://www.mamamiyo-photography.com/'} target="_blank" rel="noopener" style={{color:'var(--gold-deep)',fontWeight:700}}>MamaMiyo Photography Portfolio here</a> and upload screenshots.</p><p style={{margin:0}}>You may bring your own outfit. Please add a note in advance; its suitability is subject to fit, styling and the backgrounds or props available in the studio.</p></div>
             <div style={{ display: 'grid', gap: 10 }}>
               {[0,1,2].map((slotIndex) => { const slot=slotIndex+1; const included=slot<=includedSetupCount; const active=slot<=activeSetupCount; return <div key={slot} style={{ border:'1.5px solid var(--line)',borderRadius:10,padding:12,background:active?'var(--paper)':'#f6f2ee' }}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><b>Setup {slot}</b><span style={{fontSize:11.5,color:included?'var(--ink-soft)':'var(--rust)',fontWeight:700}}>{included?'Included':'Additional Setup ($100)'}</span></div>
