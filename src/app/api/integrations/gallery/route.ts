@@ -128,6 +128,8 @@ export async function POST(req: NextRequest) {
       await tx.booking.update({where:{id:booking.id},data:{status:'completed'}});
     } else if (p.locked && p.submitted && ['basic_retouch','pending_balance'].includes(booking.status)) {
       await tx.booking.update({where:{id:booking.id},data:{status:'further_retouch'}});
+    } else if (!p.locked && p.submitted && booking.status === 'further_retouch') {
+      await tx.booking.update({where:{id:booking.id},data:{status:'basic_retouch'}});
     }
     return result;
   });
