@@ -181,16 +181,14 @@ export default function AdminBookingsPage() {
       ctx.fillStyle='#8c6d3f';ctx.font='24px Arial';ctx.fillText('Open your private Gallery to view and download',600,518);
       const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Could not create the Gallery image.')),'image/png'));
       const file=new File([blob],`Mamamiyo-${kind==='basic'?'Basic':'Further'}-Retouch-${galleryId.slice(0,12)}.png`,{type:'image/png'});
-      const shareText=kind==='basic'
-        ? `Your photos are ready.\nView your photos with Basic Retouch:\n${galleryUrl}`
-        : `View your photos with Further Retouch ♡\nDownload all the photos:\n${galleryUrl}`;
+      const shareText=galleryUrl;
       if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
         await navigator.share({title:`MamaMiyo ${kind==='basic'?'Basic':'Further'} Retouch Gallery`,text:shareText,files:[file]});
         setActionSuccess({id:bookingId,message:`Choose WhatsApp and send the ${kind==='basic'?'Basic':'Further'} Retouch image to the client.`});return;
       }
       const objectUrl=URL.createObjectURL(file);const link=document.createElement('a');link.href=objectUrl;link.download=file.name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
       await navigator.clipboard.writeText(shareText);
-      setActionSuccess({id:bookingId,message:`${kind==='basic'?'Basic':'Further'} Retouch image downloaded and Gallery message copied. Attach the image in WhatsApp and paste the message.`});
+      setActionSuccess({id:bookingId,message:`${kind==='basic'?'Basic':'Further'} Retouch image downloaded and Gallery link copied. Attach the image first, then paste the link below it.`});
     } catch (error) {
       if((error as Error).name==='AbortError'){setActionSuccess({id:bookingId,message:'Sharing cancelled.'});return;}
       setActionError({ id: bookingId, message: 'Could not open the share menu. Open Client Gallery, then copy the address from your browser.' });
