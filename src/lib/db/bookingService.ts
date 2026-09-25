@@ -15,7 +15,7 @@
 // awkwardly across phases.
 
 import { Db, Settings } from './types';
-import { sessionById, BUNDLE_SESSION_BALANCES, STATUS_ORDER } from '../constants';
+import { sessionById, BUNDLE_SESSION_BALANCES, STATUS_ORDER, hasBookedPhysicalProduct } from '../constants';
 import { computeAddOnsTotal, computeBookingPricing, currentBalanceDue } from '../pricing';
 import { generateCandidateSlots, CandidateSlot } from '../availability';
 import {
@@ -787,16 +787,24 @@ export async function purgeExpiredHolds(db: any) {
 }
 
 /** Editing pipeline only — moving a booking from 'basic_retouch' to
- *  'further_retouch' to final 'completed'. Earlier stages have
+ *  'further_retouch', then 'soft_copy_delivered' when products remain,
+ *  and finally 'completed'. Earlier stages have
  *  their own dedicated transitions (confirmDepositAndNotify, markCompleted,
  *  confirmBalanceAndNotify) and are intentionally not reachable here. */
-const ADVANCEABLE_STATUSES = ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch'];
+const ADVANCEABLE_STATUSES = ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'soft_copy_delivered'];
 const REVERSIBLE_POST_PROCESSING_STATUSES: Record<string, string> = {
   pending_basic_retouch: 'confirmed',
   basic_retouch: 'pending_basic_retouch',
   further_retouch: 'basic_retouch',
-  completed: 'further_retouch',
+  soft_copy_delivered: 'further_retouch',
 };
+
+export async function bookingHasPhysicalProducts(db: any, booking: any): Promise<boolean> {
+  if (hasBookedPhysicalProduct(booking.addOns)) return true;
+  return (await db.additionalOrder.count({
+    where: { bookingId: booking.id, status: { in: ['pending', 'paid'] } },
+  })) > 0;
+}
 
 export async function advanceStage(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
@@ -806,7 +814,9 @@ export async function advanceStage(db: any, bookingId: string) {
   const isEarlyBundleSession = booking.sessionTypeId === 'bundle'
     && booking.bundleSessionNumber !== null
     && booking.bundleSessionNumber < 3;
-  const nextStatus = booking.status === 'pending_basic_retouch' && isEarlyBundleSession
+  const nextStatus = booking.status === 'soft_copy_delivered'
+    ? 'completed'
+    : booking.status === 'pending_basic_retouch' && isEarlyBundleSession
     ? 'completed'
     : booking.status === 'pending_balance'
     ? 'basic_retouch'
@@ -819,10 +829,9 @@ export async function advanceStage(db: any, bookingId: string) {
 export async function revertStage(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
   const previousStatus = booking.status === 'completed'
-    && booking.sessionTypeId === 'bundle'
-    && booking.bundleSessionNumber !== null
-    && booking.bundleSessionNumber < 3
-    ? 'pending_basic_retouch'
+    ? (await bookingHasPhysicalProducts(db, booking) ? 'soft_copy_delivered'
+      : booking.sessionTypeId === 'bundle' && booking.bundleSessionNumber !== null && booking.bundleSessionNumber < 3
+        ? 'pending_basic_retouch' : 'further_retouch')
     : REVERSIBLE_POST_PROCESSING_STATUSES[booking.status];
   if (!previousStatus) {
     throw new Error(`Cannot go back from status "${booking.status}".`);
@@ -837,7 +846,8 @@ export async function skipFurtherRetouch(db: any, bookingId: string) {
   if (booking.status !== 'basic_retouch' && booking.status !== 'pending_balance') {
     throw new Error(`Cannot skip further retouch from status "${booking.status}".`);
   }
-  return db.booking.update({ where: { id: bookingId }, data: { status: 'completed' } });
+  const status = await bookingHasPhysicalProducts(db, booking) ? 'soft_copy_delivered' : 'completed';
+  return db.booking.update({ where: { id: bookingId }, data: { status } });
 }
 
 function oneCalendarMonthAfter(value: Date): Date {
@@ -928,7 +938,7 @@ function singaporeDateString(now: Date): string {
  * route controls the time; this function protects against duplicates. */
 export async function sendShootDayBalanceInvoices(db: any, now = new Date()) {
   const commonWhere = {
-      status: { in: ['confirmed', 'pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'completed'] },
+      status: { in: ['confirmed', 'pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'soft_copy_delivered', 'completed'] },
       balanceStatus: 'pending',
       invoiceGeneratedAt: null,
   };

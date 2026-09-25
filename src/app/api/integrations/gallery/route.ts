@@ -4,6 +4,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Resend } from 'resend';
 import { buildPayNowPayload } from '@/lib/paynow';
 import QRCode from 'qrcode';
+import { hasBookedPhysicalProduct } from '@/lib/constants';
 
 const prisma = new PrismaClient();
 function authorized(req: NextRequest) {
@@ -125,7 +126,9 @@ export async function POST(req: NextRequest) {
       create:{galleryId:p.galleryId, bookingId:booking.id, version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt,expiresAt:p.expiresAt ? new Date(p.expiresAt) : null,selectionEnabled:p.selectionEnabled},
       update:{version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt,expiresAt:p.expiresAt ? new Date(p.expiresAt) : null,selectionEnabled:p.selectionEnabled}});
     if (deliveredAt && ['basic_retouch','pending_balance','further_retouch'].includes(booking.status)) {
-      await tx.booking.update({where:{id:booking.id},data:{status:'completed'}});
+      const additionalProductCount = await tx.additionalOrder.count({where:{bookingId:booking.id,status:{in:['pending','paid']}}});
+      const nextStatus = hasBookedPhysicalProduct(booking.addOns) || additionalProductCount > 0 ? 'soft_copy_delivered' : 'completed';
+      await tx.booking.update({where:{id:booking.id},data:{status:nextStatus}});
     } else if (p.locked && p.submitted && ['basic_retouch','pending_balance'].includes(booking.status)) {
       await tx.booking.update({where:{id:booking.id},data:{status:'further_retouch'}});
     } else if (!p.locked && p.submitted && booking.status === 'further_retouch') {

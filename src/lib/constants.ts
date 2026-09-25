@@ -136,6 +136,18 @@ export const ADDONS: Record<string, { name: string; price: number }> = {
   plaque6x8: { name: 'Wooden/Crystal Plaque 6×8in / 15×20cm\nIncludes 2 Bonus Further Retouch', price: 68 },
 };
 
+export const PHYSICAL_PRODUCT_IDS = new Set([
+  'album8x8', 'album10x10', 'album12x12',
+  'canvas11x14', 'canvas16x24',
+  'plaque5x7', 'plaque6x8',
+]);
+
+export function hasBookedPhysicalProduct(addOns: unknown): boolean {
+  if (!addOns || typeof addOns !== 'object' || Array.isArray(addOns)) return false;
+  return Object.entries(addOns as Record<string, unknown>)
+    .some(([id, quantity]) => PHYSICAL_PRODUCT_IDS.has(id) && Number(quantity) > 0);
+}
+
 export const STUDIO_INFO = {
   name: 'Home Studio @ K-Lodge',
   addressLines: ['32 Lorong K Telok Kurau', '#01-01', 'Singapore 425641'],
@@ -191,6 +203,7 @@ export const STATUS_ORDER = [
   'pending_basic_retouch',
   'basic_retouch',
   'further_retouch',
+  'soft_copy_delivered',
   'completed',
 ] as const;
 
@@ -203,7 +216,8 @@ export const STATUS_LABELS: Record<string, { label: string; color: string; bg: s
   pending_basic_retouch:{ label: '3. Pending basic retouch',  color: '#FFFFFF', bg: '#8FB4D4' },
   basic_retouch:        { label: '4. Awaiting client selection', color: '#FFFFFF', bg: '#7898AA' },
   further_retouch:      { label: '5. Further retouch',        color: '#FFFFFF', bg: '#5FA89A' },
-  completed:            { label: '6. Photoshoot complete',    color: '#5A4B7A', bg: '#D0C4DD' },
+  soft_copy_delivered:  { label: '6. Soft Copy Delivered',    color: '#4E5F48', bg: '#DCE9D5' },
+  completed:            { label: '7. Photoshoot complete',    color: '#5A4B7A', bg: '#D0C4DD' },
   cancelled:       { label: 'Cancelled',              color: '#7A6F62', bg: '#E4DED6' },
 };
 
