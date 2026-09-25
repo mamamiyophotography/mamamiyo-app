@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { prepLinkFor } from '@/lib/constants';
-import QRCode from 'qrcode';
 
 type SummaryBooking = {
   clientName: string;
@@ -31,7 +30,7 @@ type PreparationGuide = {
   url: string;
 };
 
-export function preparationGuideFor(booking: Pick<SummaryBooking, 'sessionTypeId' | 'sessionLabel' | 'bundleSessionNumber'>): PreparationGuide {
+export function preparationGuideFor(booking: Pick<SummaryBooking, 'sessionTypeId' | 'sessionLabel' | 'bundleSessionNumber'>, hasSibling = false): PreparationGuide {
   const prep = prepLinkFor(booking);
   const type = booking.sessionTypeId === 'bundle'
     ? ((booking.bundleSessionNumber || 1) === 1 ? 'newborn' : 'baby')
@@ -45,6 +44,7 @@ export function preparationGuideFor(booking: Pick<SummaryBooking, 'sessionTypeId
         'Bring nude and black strapless underwear; heels are optional.',
         'Bring meaningful baby items, such as an ultrasound photo or tiny shoes.',
         'Partner and family outfits should be plain and colour-coordinated.',
+        ...(hasSibling ? ['If a sibling is joining, bring their favourite snacks to help them feel settled and cooperate.'] : []),
       ],
       url: prep?.url || 'https://www.mamamiyo-photography.com/maternityprep',
     };
@@ -58,7 +58,7 @@ export function preparationGuideFor(booking: Pick<SummaryBooking, 'sessionTypeId
         'Trim baby’s nails before the photoshoot.',
         'Bring meaningful keepsakes you would like photographed.',
         'Choose plain family outfits without busy prints.',
-        'For siblings, bring a favourite snack or quiet toy.',
+        ...(hasSibling ? ['If a sibling is joining, bring their favourite snacks or a quiet toy to help them feel settled and cooperate.'] : []),
       ],
       url: prep?.url || 'https://www.mamamiyo-photography.com/newbornprep',
     };
@@ -70,7 +70,7 @@ export function preparationGuideFor(booking: Pick<SummaryBooking, 'sessionTypeId
     intro: 'A rested and comfortable baby makes the session smoother and more enjoyable.',
     items: [
       'Help baby rest or sleep well before the photoshoot.',
-      'Bring milk, water and age-appropriate snacks.',
+      'Bring milk, water and your child’s favourite age-appropriate snacks to help them feel settled and cooperate.',
       'Bring favourite toys and anything that reliably makes baby smile.',
       'Choose plain or pastel family outfits without busy prints.',
       'Tell us about favourite games, songs or videos that get baby’s attention.',
@@ -223,7 +223,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
   useEffect(() => {
     let cancelled = false;
     async function buildPreparationImage() {
-      const guide = preparationGuideFor(booking);
+      const guide = preparationGuideFor(booking, noteParts.sibling === 'Yes');
       const canvas = document.createElement('canvas');
       canvas.width = 1080;
       canvas.height = 1450;
@@ -244,18 +244,21 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         if (line) lines.push(line); return lines;
       };
 
+      const contentHeight = 230 + 40 + 142 + 54 + guide.items.length * 128;
+      const top = Math.max(54, Math.round((canvas.height - contentHeight) / 2));
       ctx.fillStyle = '#f5f0e8'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#2e2a22'; roundedRect(54, 54, 972, 230, 34); ctx.fill();
-      ctx.textAlign = 'center'; ctx.fillStyle = '#c5a87c'; ctx.font = '700 30px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY', 540, 130);
-      ctx.fillStyle = '#b08d57'; ctx.font = '58px Georgia'; ctx.fillText('What to Prepare', 540, 216);
+      ctx.fillStyle = '#2e2a22'; roundedRect(54, top, 972, 230, 34); ctx.fill();
+      ctx.textAlign = 'center'; ctx.fillStyle = '#c5a87c'; ctx.font = '700 30px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY', 540, top + 76);
+      ctx.fillStyle = '#b08d57'; ctx.font = '58px Georgia'; ctx.fillText('What to Prepare', 540, top + 162);
 
-      ctx.fillStyle = '#6f8f84'; roundedRect(72, 324, 936, 142, 28); ctx.fill();
-      ctx.fillStyle = '#ffffff'; ctx.font = '700 39px Arial'; ctx.fillText(guide.title, 540, 382);
+      const sessionTop = top + 270;
+      ctx.fillStyle = '#6f8f84'; roundedRect(72, sessionTop, 936, 142, 28); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.font = '700 39px Arial'; ctx.fillText(guide.title, 540, sessionTop + 58);
       ctx.font = '27px Arial';
       const introLines = wrap(guide.intro, 820);
-      introLines.forEach((line, index) => ctx.fillText(line, 540, 425 + index * 32));
+      introLines.forEach((line, index) => ctx.fillText(line, 540, sessionTop + 101 + index * 32));
 
-      let y = 520;
+      let y = sessionTop + 196;
       ctx.textAlign = 'left';
       guide.items.forEach((item, index) => {
         ctx.fillStyle = index % 2 === 0 ? '#ead9d0' : '#e3dccb'; roundedRect(72, y, 936, 112, 24); ctx.fill();
@@ -267,26 +270,11 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         y += 128;
       });
 
-      const footerTop = Math.max(y + 12, 1170);
-      ctx.fillStyle = '#ffffff'; roundedRect(72, footerTop, 936, 218, 28); ctx.fill();
-      let footerTextX = 118;
-      try {
-        const qrDataUrl = await QRCode.toDataURL(guide.url, { width: 190, margin: 1, color: { dark: '#2e2a22', light: '#ffffff' } });
-        const qr = new Image(); qr.src = qrDataUrl;
-        await new Promise<void>((resolve, reject) => { qr.onload = () => resolve(); qr.onerror = () => reject(new Error('QR code failed to load')); });
-        ctx.drawImage(qr, 100, footerTop + 14, 190, 190);
-        footerTextX = 326;
-      } catch { /* The readable URL below remains available if QR generation is unsupported. */ }
-      ctx.textAlign = 'left'; ctx.fillStyle = '#8c6d3f'; ctx.font = '700 31px Arial'; ctx.fillText('View Full Preparation Guide', footerTextX, footerTop + 70);
-      ctx.fillStyle = '#6b6152'; ctx.font = '24px Arial';
-      const urlLines = wrap(guide.url.replace(/^https?:\/\//, ''), footerTextX === 326 ? 620 : 820);
-      urlLines.forEach((line, index) => ctx.fillText(line, footerTextX, footerTop + 113 + index * 30));
-      ctx.fillStyle = '#8b7d72'; ctx.font = '22px Arial'; ctx.fillText(footerTextX === 326 ? 'Scan the QR code or open the link above.' : 'Open the link above for the complete guide.', footerTextX, footerTop + 174);
       if (!cancelled) setPreparationImageDataUrl(canvas.toDataURL('image/png'));
     }
     buildPreparationImage().catch(() => { if (!cancelled) setPreparationImageDataUrl(''); });
     return () => { cancelled = true; };
-  }, [booking]);
+  }, [booking, noteParts.sibling]);
 
   function imageFile(dataUrl: string, filename: string) {
     return fetch(dataUrl).then((response) => response.blob()).then((blob) => new File([blob], filename, { type: 'image/png' }));
