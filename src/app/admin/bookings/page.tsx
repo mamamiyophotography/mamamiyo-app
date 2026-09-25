@@ -198,12 +198,12 @@ export default function AdminBookingsPage() {
       date: booking.date,
       selection: selectionEnabled ? '1' : '0',
     });
-    return `http://127.0.0.1:8766/?${params.toString()}`;
+    return `http://127.0.0.1:8766/restart?${params.toString()}`;
   }
 
   function photoSelectGalleryActionUrl(booking: Booking, galleryId: string, action: 'update-basic'|'unlock-selection'|'upload-further') {
     const params = new URLSearchParams({ action, gallery: galleryId, booking: booking.ref });
-    return `http://127.0.0.1:8766/?${params.toString()}`;
+    return `http://127.0.0.1:8766/restart?${params.toString()}`;
   }
 
   async function generateInvoice(booking: Booking, sendEmail: boolean) {
