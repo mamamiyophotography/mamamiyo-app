@@ -15,6 +15,7 @@ type SummaryBooking = {
   clientEmail: string;
   clientPhone: string;
   referencePhotoUrls: string[];
+  inspirationReferencePhotoUrls?: string[];
   setupSelectionCount?: number;
   notes: string;
   setupChoiceNotes?: string;
@@ -116,14 +117,15 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       ...(noteParts.other ? [['Other notes', noteParts.other]] : []),
       ...(booking.setupChoiceNotes ? [[`${/maternity/i.test(booking.sessionLabel) ? 'Outfit' : 'Setup'} notes`, booking.setupChoiceNotes]] : []),
       [selectionLabel, String(booking.setupSelectionCount || 0)],
-      ['Reference photos', String(booking.referencePhotoUrls.length)],
+      ['Setup reference photos', String(booking.referencePhotoUrls.length)],
+      ['Inspirational reference photos', String(booking.inspirationReferencePhotoUrls?.length || 0)],
     ];
     const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
       const words = text.split(/\s+/); const lines: string[] = []; let line = '';
       words.forEach((word) => { const next = line ? `${line} ${word}` : word; if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = word; } else line = next; });
       if (line) lines.push(line); return lines;
     };
-    const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 1800;
+    const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 2200;
     const ctx = canvas.getContext('2d'); if (!ctx) return;
     ctx.font = '700 31px Arial';
     const preparedEntries = entries.map(([label, value]) => {
@@ -131,11 +133,13 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       return { label, lines, height: Math.max(68, lines.length * 42 + 22) };
     });
     const photoRows = booking.referencePhotoUrls.length > 0
-      ? Math.ceil(Math.min(6, booking.referencePhotoUrls.length) / 3)
+      ? Math.ceil(Math.min(3, booking.referencePhotoUrls.length) / 3)
       : 0;
+    const inspirationRows = (booking.inspirationReferencePhotoUrls?.length || 0) > 0 ? 1 : 0;
     const contentHeight = 230 + 66
       + preparedEntries.reduce((total, entry) => total + entry.height, 0)
-      + (photoRows ? 28 + photoRows * 338 : 0)
+      + (photoRows ? 72 + photoRows * 338 : 0)
+      + (inspirationRows ? 72 + inspirationRows * 338 : 0)
       + (booking.ref ? 72 : 24);
     const top = Math.max(54, Math.round((canvas.height - contentHeight) / 2));
     ctx.fillStyle = '#f5f0e8'; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -152,8 +156,8 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
     });
     ctx.textBaseline = 'alphabetic';
     if (booking.referencePhotoUrls.length > 0) {
-      // The table row immediately above already names the selection type and
-      // shows its count, so the photo grid does not need a second heading.
+      y += 36;
+      ctx.textAlign = 'left'; ctx.fillStyle = '#6b6152'; ctx.font = '700 25px Arial'; ctx.fillText('Setup Reference', 100, y);
       y += 28;
       const imageWidth = 270, imageHeight = 310, gap = 35;
       const loadImage = async (url: string) => {
@@ -165,7 +169,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
           return { image, objectUrl };
         } catch { return null; }
       };
-      const loaded = await Promise.all(booking.referencePhotoUrls.slice(0, 6).map(loadImage));
+      const loaded = await Promise.all(booking.referencePhotoUrls.slice(0, 3).map(loadImage));
       loaded.forEach((loadedImage, index) => {
         const column = index % 3, row = Math.floor(index / 3); const x = 100 + column * (imageWidth + gap); const top = y + row * (imageHeight + 28);
         ctx.fillStyle = '#ffffff'; ctx.fillRect(x, top, imageWidth, imageHeight);
@@ -179,7 +183,35 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
           ctx.fillStyle = '#8b7d72'; ctx.font = '22px Arial'; ctx.textAlign = 'center'; ctx.fillText(`Selection ${index + 1}`, x + imageWidth / 2, top + imageHeight / 2);
         }
       });
-      y += Math.ceil(Math.min(6, booking.referencePhotoUrls.length) / 3) * (imageHeight + 28);
+      y += Math.ceil(Math.min(3, booking.referencePhotoUrls.length) / 3) * (imageHeight + 28);
+    }
+    if ((booking.inspirationReferencePhotoUrls?.length || 0) > 0) {
+      y += 36;
+      ctx.textAlign = 'left'; ctx.fillStyle = '#6b6152'; ctx.font = '700 25px Arial'; ctx.fillText('Inspirational Reference', 100, y);
+      y += 28;
+      const imageWidth = 270, imageHeight = 310, gap = 35;
+      const loadImage = async (url: string) => {
+        try {
+          const response = await fetch(url); if (!response.ok) return null;
+          const objectUrl = URL.createObjectURL(await response.blob());
+          const image = new Image(); image.src = objectUrl;
+          await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Image failed to load')); });
+          return { image, objectUrl };
+        } catch { return null; }
+      };
+      const loaded = await Promise.all((booking.inspirationReferencePhotoUrls || []).slice(0, 3).map(loadImage));
+      loaded.forEach((loadedImage, index) => {
+        const x = 100 + index * (imageWidth + gap); const imageTop = y;
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(x, imageTop, imageWidth, imageHeight);
+        ctx.strokeStyle = '#ded4c9'; ctx.lineWidth = 2; ctx.strokeRect(x, imageTop, imageWidth, imageHeight);
+        if (loadedImage) {
+          const scale = Math.min(imageWidth / loadedImage.image.naturalWidth, imageHeight / loadedImage.image.naturalHeight);
+          const width = loadedImage.image.naturalWidth * scale, height = loadedImage.image.naturalHeight * scale;
+          ctx.drawImage(loadedImage.image, x + (imageWidth - width) / 2, imageTop + (imageHeight - height) / 2, width, height);
+          URL.revokeObjectURL(loadedImage.objectUrl);
+        }
+      });
+      y += imageHeight + 28;
     }
     if (booking.ref) { ctx.textAlign = 'center'; ctx.fillStyle = '#8c6d3f'; ctx.font = '23px Arial'; ctx.fillText(`Booking reference: ${booking.ref}`, 540, Math.min(canvas.height - 70, y + 45)); }
     if (!cancelled) setImageDataUrl(canvas.toDataURL('image/png'));
@@ -199,7 +231,12 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       if (!ctx) return;
       const roundedRect = (x: number, y: number, width: number, height: number, radius: number) => {
         ctx.beginPath();
-        ctx.roundRect(x, y, width, height, radius);
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y); ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius); ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height); ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius); ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
       };
       const wrap = (text: string, maxWidth: number) => {
         const words = text.split(/\s+/); const lines: string[] = []; let line = '';
@@ -230,17 +267,21 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         y += 128;
       });
 
-      const qrDataUrl = await QRCode.toDataURL(guide.url, { width: 190, margin: 1, color: { dark: '#2e2a22', light: '#ffffff' } });
-      const qr = new Image(); qr.src = qrDataUrl;
-      await new Promise<void>((resolve, reject) => { qr.onload = () => resolve(); qr.onerror = () => reject(new Error('QR code failed to load')); });
       const footerTop = Math.max(y + 12, 1170);
       ctx.fillStyle = '#ffffff'; roundedRect(72, footerTop, 936, 218, 28); ctx.fill();
-      ctx.drawImage(qr, 100, footerTop + 14, 190, 190);
-      ctx.textAlign = 'left'; ctx.fillStyle = '#8c6d3f'; ctx.font = '700 31px Arial'; ctx.fillText('View Full Preparation Guide', 326, footerTop + 70);
+      let footerTextX = 118;
+      try {
+        const qrDataUrl = await QRCode.toDataURL(guide.url, { width: 190, margin: 1, color: { dark: '#2e2a22', light: '#ffffff' } });
+        const qr = new Image(); qr.src = qrDataUrl;
+        await new Promise<void>((resolve, reject) => { qr.onload = () => resolve(); qr.onerror = () => reject(new Error('QR code failed to load')); });
+        ctx.drawImage(qr, 100, footerTop + 14, 190, 190);
+        footerTextX = 326;
+      } catch { /* The readable URL below remains available if QR generation is unsupported. */ }
+      ctx.textAlign = 'left'; ctx.fillStyle = '#8c6d3f'; ctx.font = '700 31px Arial'; ctx.fillText('View Full Preparation Guide', footerTextX, footerTop + 70);
       ctx.fillStyle = '#6b6152'; ctx.font = '24px Arial';
-      const urlLines = wrap(guide.url.replace(/^https?:\/\//, ''), 620);
-      urlLines.forEach((line, index) => ctx.fillText(line, 326, footerTop + 113 + index * 30));
-      ctx.fillStyle = '#8b7d72'; ctx.font = '22px Arial'; ctx.fillText('Scan the QR code or open the link above.', 326, footerTop + 174);
+      const urlLines = wrap(guide.url.replace(/^https?:\/\//, ''), footerTextX === 326 ? 620 : 820);
+      urlLines.forEach((line, index) => ctx.fillText(line, footerTextX, footerTop + 113 + index * 30));
+      ctx.fillStyle = '#8b7d72'; ctx.font = '22px Arial'; ctx.fillText(footerTextX === 326 ? 'Scan the QR code or open the link above.' : 'Open the link above for the complete guide.', footerTextX, footerTop + 174);
       if (!cancelled) setPreparationImageDataUrl(canvas.toDataURL('image/png'));
     }
     buildPreparationImage().catch(() => { if (!cancelled) setPreparationImageDataUrl(''); });
@@ -301,46 +342,20 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Booking Summary + What to Prepare</div>
-        {imageDataUrl && preparationImageDataUrl && <>
+        {imageDataUrl && <>
           <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 8 }}>Share both images with the client through WhatsApp. If your device cannot share them together, use the separate buttons below.</div>
           <img className="invoice-image-preview" src={imageDataUrl} alt={`Booking summary for ${booking.clientName}`} />
           <div style={{ fontWeight: 700, fontSize: 14, margin: '16px 0 8px' }}>What to Prepare</div>
-          <img className="invoice-image-preview" src={preparationImageDataUrl} alt={`What to prepare for ${booking.sessionLabel}`} />
-          <button type="button" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={saveOrShare}>Share Booking Summary + What to Prepare</button>
+          {preparationImageDataUrl
+            ? <img className="invoice-image-preview" src={preparationImageDataUrl} alt={`What to prepare for ${booking.sessionLabel}`} />
+            : <div className="notice" role="status" style={{ marginTop: 0 }}>Preparing the session checklist…</div>}
+          <button type="button" className="btn btn-primary" disabled={!preparationImageDataUrl} style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={saveOrShare}>Share Booking Summary + What to Prepare</button>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
             <button type="button" className="btn btn-ghost" style={{ justifyContent: 'center', whiteSpace: 'normal' }} onClick={() => shareOne(imageDataUrl, `Mamamiyo-Booking-${(booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-')}.png`, 'Mamamiyo Booking Summary')}>Share Booking Summary</button>
-            <button type="button" className="btn btn-ghost" style={{ justifyContent: 'center', whiteSpace: 'normal' }} onClick={() => shareOne(preparationImageDataUrl, `Mamamiyo-What-to-Prepare-${(booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-')}.png`, 'Mamamiyo What to Prepare')}>Share What to Prepare</button>
+            <button type="button" className="btn btn-ghost" disabled={!preparationImageDataUrl} style={{ justifyContent: 'center', whiteSpace: 'normal' }} onClick={() => shareOne(preparationImageDataUrl, `Mamamiyo-What-to-Prepare-${(booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-')}.png`, 'Mamamiyo What to Prepare')}>Share What to Prepare</button>
           </div>
           {saveMessage && <div role="status" style={{ fontSize: 12.5, color: 'var(--ink-soft)', lineHeight: 1.45, marginTop: 8 }}>{saveMessage}</div>}
         </>}
-        <div style={{ fontWeight: 700, fontSize: 13, margin: '20px 0 8px' }}>Details</div>
-        <div className="ticket-row"><span>Client</span><b>{booking.clientName}</b></div>
-        <div className="ticket-row"><span>Session</span><b>{booking.sessionLabel}</b></div>
-        <div className="ticket-row"><span>Date</span><b>{fmtDatePretty(booking.date)}</b></div>
-        <div className="ticket-row"><span>Time</span><b>{fmtTime12(booking.startTime)}</b></div>
-        <div className="ticket-row"><span>Location</span><b>{booking.location === 'home' ? "Client's home" : 'Studio'}</b></div>
-        <div className="ticket-row"><span>Email</span><b>{booking.clientEmail}</b></div>
-        <div className="ticket-row"><span>Phone</span><b>{booking.clientPhone}</b></div>
-        {booking.address && <div className="ticket-row"><span>Address</span><b>{booking.address}</b></div>}
-        {noteParts.gender && <div className="ticket-row" style={{ alignItems: 'center' }}><span>Baby&apos;s gender</span><b>{noteParts.gender}</b></div>}
-        {noteParts.sibling && <div className="ticket-row" style={{ alignItems: 'center' }}><span>Sibling joining</span><b>{noteParts.sibling}</b></div>}
-        {noteParts.other && <div className="ticket-row" style={{ alignItems: 'center' }}><span>Other notes</span><b style={{ overflowWrap: 'anywhere' }}>{noteParts.other}</b></div>}
-        {booking.setupChoiceNotes && <div className="ticket-row" style={{ alignItems: 'center' }}><span>{/maternity/i.test(booking.sessionLabel) ? 'Outfit' : 'Setup'} notes</span><b style={{ overflowWrap: 'anywhere' }}>{booking.setupChoiceNotes}</b></div>}
-        <div className="ticket-row" style={{ alignItems: 'center' }}><span>{selectionLabel}</span><b>{booking.setupSelectionCount || 0}</b></div>
-
-        {booking.referencePhotoUrls.length > 0 && (
-          <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', marginBottom: 6 }}>Reference photos ({booking.referencePhotoUrls.length})</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {booking.referencePhotoUrls.map((url) => (
-                <a key={url} href={url} target="_blank" rel="noopener" style={{ display: 'block', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', border: '1.5px solid var(--line)' }}>
-                  <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
         <button className="btn btn-ghost" style={{ marginTop: 16, width: '100%' }} onClick={onClose}>Close</button>
       </div>
     </div>

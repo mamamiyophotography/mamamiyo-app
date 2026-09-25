@@ -5,7 +5,6 @@ import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { ADDONS, STATUS_LABELS } from '@/lib/constants';
 import BookingSummaryModal from '@/components/BookingSummaryModal';
 import EditBookingModal from '@/components/EditBookingModal';
-import EditAddOnsModal from '@/components/EditAddOnsModal';
 
 type Booking = {
   additionalOrders?: {id:string;galleryId:string;version:number;items:{name:string;quantity:number;amount:number;bonusRetouches:number}[];total:number;bonusRetouches:number;status:string;invoiceRef:string;createdAt:string;paidAt:string|null}[];
@@ -48,7 +47,6 @@ export default function AdminBookingsPage() {
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
   const [summaryBooking, setSummaryBooking] = useState<Booking | null>(null);
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
-  const [editAddOnsBooking, setEditAddOnsBooking] = useState<Booking | null>(null);
   const [actionSuccess, setActionSuccess] = useState<{ id: string; message: string } | null>(null);
   const [invoiceGenerating, setInvoiceGenerating] = useState<{ id: string; sendEmail: boolean } | null>(null);
 
@@ -304,7 +302,6 @@ export default function AdminBookingsPage() {
                   return (
                   <div className="final-bill-panel">
                     <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Final bill</div>
-                    <button className="btn btn-ghost" style={{ marginBottom: 10 }} disabled={isBusy} onClick={() => setEditAddOnsBooking(b)}>Edit Add-ons</button>
                     {b.invoiceStale && <div className="notice" style={{ marginBottom: 10 }}>Add-ons changed after invoice {b.invoiceRef}. Please generate and send a new invoice.</div>}
 
                     {/* Full breakdown */}
@@ -407,11 +404,8 @@ export default function AdminBookingsPage() {
 
                 {/* Action buttons */}
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-                  {(b.status === 'pending' || b.status === 'confirmed') && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Edit booking</button>
-                  )}
                   {b.status !== 'cancelled' && b.balanceStatus !== 'paid' && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => setEditAddOnsBooking(b)}>Edit Add-ons</button>
+                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Edit booking</button>
                   )}
                   {b.status === 'pending' && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-deposit')}>Confirm deposit received</button>
@@ -553,19 +547,6 @@ export default function AdminBookingsPage() {
           onClose={() => setEditBooking(null)}
           onSaved={async () => {
             setEditBooking(null);
-            await load();
-          }}
-        />
-      )}
-      {editAddOnsBooking && (
-        <EditAddOnsModal
-          booking={editAddOnsBooking}
-          onClose={() => setEditAddOnsBooking(null)}
-          onSaved={async (invoiceNeedsRegeneration) => {
-            const id = editAddOnsBooking.id;
-            setEditAddOnsBooking(null);
-            setInvoiceQr((current) => current?.bookingId === id ? null : current);
-            setActionSuccess({ id, message: invoiceNeedsRegeneration ? 'Changes saved. Please generate and send a new invoice.' : 'Changes saved.' });
             await load();
           }}
         />
