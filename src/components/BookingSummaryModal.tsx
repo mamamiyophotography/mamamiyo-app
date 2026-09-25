@@ -228,19 +228,22 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
 
       const sessionTop = top + 270;
       ctx.fillStyle = '#6f8f84'; roundedRect(72, sessionTop, 936, 142, 28); ctx.fill();
-      ctx.fillStyle = '#ffffff'; ctx.font = '700 39px Arial'; ctx.fillText(guide.title, 540, sessionTop + 58);
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ffffff'; ctx.font = '700 39px Arial'; ctx.fillText(guide.title, 540, sessionTop + 43);
       ctx.font = '27px Arial';
       const introLines = wrap(guide.intro, 820);
-      introLines.forEach((line, index) => ctx.fillText(line, 540, sessionTop + 101 + index * 32));
+      const introCentre = sessionTop + 99;
+      const introFirst = introCentre - ((introLines.length - 1) * 30) / 2;
+      introLines.forEach((line, index) => ctx.fillText(line, 540, introFirst + index * 30));
 
       let y = sessionTop + 196;
       ctx.textAlign = 'left';
       guide.items.forEach((item, index) => {
         ctx.fillStyle = index % 2 === 0 ? '#ead9d0' : '#e3dccb'; roundedRect(72, y, 936, 112, 24); ctx.fill();
         ctx.fillStyle = '#8c6d3f'; ctx.beginPath(); ctx.arc(126, y + 56, 24, 0, Math.PI * 2); ctx.fill();
-        ctx.textAlign = 'center'; ctx.fillStyle = '#ffffff'; ctx.font = '700 25px Arial'; ctx.fillText(String(index + 1), 126, y + 65);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffffff'; ctx.font = '700 25px Arial'; ctx.fillText(String(index + 1), 126, y + 56);
         ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '29px Arial';
-        const lines = wrap(item, 790); const first = y + 49 - ((lines.length - 1) * 34) / 2;
+        const lines = wrap(item, 790); const first = y + 56 - ((lines.length - 1) * 34) / 2;
         lines.forEach((line, lineIndex) => ctx.fillText(line, 174, first + lineIndex * 34));
         y += 128;
       });
