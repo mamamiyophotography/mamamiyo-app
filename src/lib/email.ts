@@ -16,6 +16,12 @@ export type EmailAttachment = {
   content: string; // base64-encoded
 };
 
+export function brandedFromAddress(configuredAddress: string): string {
+  const addressInBrackets = configuredAddress.match(/<([^>]+)>/)?.[1];
+  const emailAddress = (addressInBrackets || configuredAddress).trim();
+  return `MamaMiyo Photography <${emailAddress}>`;
+}
+
 export async function sendEmail(
   to: string,
   subject: string,
@@ -32,7 +38,7 @@ export async function sendEmail(
   const adminEmail = process.env.PHOTOGRAPHER_EMAIL?.trim();
   const bcc = adminEmail && adminEmail.toLowerCase() !== to.trim().toLowerCase() ? adminEmail : undefined;
   const { error } = await getClient().emails.send({
-    from,
+    from: brandedFromAddress(from),
     to,
     bcc,
     subject,
