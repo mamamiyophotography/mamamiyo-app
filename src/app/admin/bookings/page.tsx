@@ -46,7 +46,7 @@ export default function AdminBookingsPage() {
   const [lineDesc, setLineDesc] = useState('');
   const [lineAmount, setLineAmount] = useState('');
   const [discountInputs, setDiscountInputs] = useState<Record<string, string>>({});
-  const [invoiceQr, setInvoiceQr] = useState<{ bookingId: string; qrDataUrl: string; imageDataUrl: string; due: number; emailed: boolean } | null>(null);
+  const [invoiceQr, setInvoiceQr] = useState<{ bookingId: string; qrDataUrl: string | null; imageDataUrl: string; due: number; emailed: boolean } | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
   const [summaryBooking, setSummaryBooking] = useState<Booking | null>(null);
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
@@ -102,7 +102,7 @@ export default function AdminBookingsPage() {
     if (data?.booking) setSummaryBooking(data.booking);
   }
 
-  async function createInvoiceImage(booking: Booking, qrDataUrl: string, due: number) {
+  async function createInvoiceImage(booking: Booking, qrDataUrl: string | null, due: number) {
     const rows: { label: string; amount: string }[] = [];
     const addOnsTotal = Object.entries(booking.addOns || {}).filter(([, q]) => q > 0).reduce((sum, [id, q]) => sum + (ADDONS[id]?.price || 0) * q, 0);
     const weekendFee = booking.isWeekend ? 50 : 0;
@@ -152,10 +152,20 @@ export default function AdminBookingsPage() {
     const balanceCenterY = y + 24;
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillStyle = '#2e2a22'; ctx.font = '700 36px Arial'; ctx.fillText('Balance due', 100, balanceCenterY);
     ctx.textAlign = 'right'; ctx.fillStyle = '#8c6d3f'; ctx.font = '60px Georgia'; ctx.fillText(`$${due}`, 980, balanceCenterY);
-    const qr = new Image(); qr.src = qrDataUrl; await new Promise<void>((resolve, reject) => { qr.onload = () => resolve(); qr.onerror = () => reject(new Error('Unable to render QR code.')); });
-    const qrY = y + 90; ctx.drawImage(qr, 390, qrY, 300, 300);
-    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center'; ctx.fillStyle = '#6b6152'; ctx.font = '24px Arial'; ctx.fillText('Scan with your banking app to pay', 540, qrY + 345);
+    const qrY = y + 90;
+    if (qrDataUrl) {
+      const qr = new Image(); qr.src = qrDataUrl; await new Promise<void>((resolve, reject) => { qr.onload = () => resolve(); qr.onerror = () => reject(new Error('Unable to render QR code.')); });
+      ctx.drawImage(qr, 390, qrY, 300, 300);
+      ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center'; ctx.fillStyle = '#6b6152'; ctx.font = '24px Arial'; ctx.fillText('Scan with your banking app to pay', 540, qrY + 345);
+    } else {
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.fillStyle = '#f1e9dc'; roundedInvoiceBox(ctx, 250, qrY + 38, 580, 150, 22); ctx.fill();
+      ctx.fillStyle = '#6b6152'; ctx.font = '700 30px Arial'; ctx.fillText(due === 0 ? 'No payment due' : 'PayNow QR unavailable', 540, qrY + 113);
+    }
     return canvas.toDataURL('image/png');
+  }
+
+  function roundedInvoiceBox(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+    ctx.beginPath(); ctx.roundRect(x, y, width, height, radius);
   }
 
   function shortGalleryUrl(galleryId: string) {
@@ -235,14 +245,17 @@ export default function AdminBookingsPage() {
 
   async function generateInvoice(booking: Booking, sendEmail: boolean) {
     setInvoiceGenerating({ id: booking.id, sendEmail });
+    setActionError(null);
     try {
       const data = await runAction(booking.id, 'generate-invoice', { sendEmail });
-      if (data?.payNowPayload) {
-        const QRCode = (await import('qrcode')).default;
-        const qrDataUrl = await QRCode.toDataURL(data.payNowPayload, { margin: 1, width: 320 });
-        const imageDataUrl = await createInvoiceImage(booking, qrDataUrl, data.due);
-        setInvoiceQr({ bookingId: booking.id, qrDataUrl, imageDataUrl, due: data.due, emailed: data.emailed });
-      }
+      if (!data) return;
+      const qrDataUrl = data.payNowPayload
+        ? await (await import('qrcode')).default.toDataURL(data.payNowPayload, { margin: 1, width: 320 })
+        : null;
+      const imageDataUrl = await createInvoiceImage(booking, qrDataUrl, data.due);
+      setInvoiceQr({ bookingId: booking.id, qrDataUrl, imageDataUrl, due: data.due, emailed: data.emailed });
+    } catch (error) {
+      setActionError({ id: booking.id, message: `Could not create the invoice image: ${(error as Error).message}` });
     } finally {
       setInvoiceGenerating(null);
     }
@@ -454,7 +467,7 @@ export default function AdminBookingsPage() {
                       <img className="invoice-image-preview" src={invoiceQr.imageDataUrl} alt={`Invoice for ${b.clientName}`} />
                       <div className="invoice-image-actions">
                         <a className="btn btn-primary" href={invoiceQr.imageDataUrl} download={`Mamamiyo-Invoice-${b.ref}.png`}>Download invoice image</a>
-                        <a className="btn btn-ghost" href={invoiceQr.qrDataUrl} download={`Mamamiyo-PayNow-QR-${b.ref}.png`}>Download QR code only</a>
+                        {invoiceQr.qrDataUrl && <a className="btn btn-ghost" href={invoiceQr.qrDataUrl} download={`Mamamiyo-PayNow-QR-${b.ref}.png`}>Download QR code only</a>}
                       </div>
                     </div>}
                   </div>
