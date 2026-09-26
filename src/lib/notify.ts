@@ -226,7 +226,7 @@ function receiptRows(r: Receipt): { label: string; value: string }[] {
   if (r.discountCode && r.discountAmount > 0)
     rows.push({ label: 'Discount (' + r.discountCode + ')', value: '-$' + r.discountAmount });
   if (r.extraLineItems?.length)
-    r.extraLineItems.forEach(item => rows.push({ label: item.description, value: '+$' + item.amount }));
+    r.extraLineItems.forEach(item => rows.push({ label: item.description, value: item.amount < 0 ? '-$' + Math.abs(item.amount) : '+$' + item.amount }));
 
   const totalDue = r.balanceDue;
   rows.push({ label: '**Total due**', value: '**$' + totalDue + '**' });

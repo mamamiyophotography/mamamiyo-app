@@ -68,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // For bundle invoices: total = pure session balance ($330/$330/$328)
       // receiptRows adds weekendFee and addOns on top separately
       total: String(booking.sessionTypeId) === 'bundle'
-        ? (booking.balanceDue as number) - weekendFee - addOnsTotal
+        ? (booking.total as number) - weekendFee - addOnsTotal + ((booking.discountAmount as number) || 0)
         : (booking.total as number),
       depositAmount: booking.depositAmount,
       balanceDue: due,

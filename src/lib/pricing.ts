@@ -17,7 +17,7 @@ export function currentBalanceDue(booking: {
   extraLineItems?: { description: string; amount: number }[] | null;
 }): number {
   const extra = (booking.extraLineItems || []).reduce((sum, item) => sum + item.amount, 0);
-  return booking.balanceDue + extra;
+  return Math.max(0, booking.balanceDue + extra);
 }
 
 export function recalculateForAddOns(booking: {

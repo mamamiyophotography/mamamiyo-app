@@ -45,6 +45,7 @@ export default function AdminBookingsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [lineDesc, setLineDesc] = useState('');
   const [lineAmount, setLineAmount] = useState('');
+  const [discountInputs, setDiscountInputs] = useState<Record<string, string>>({});
   const [invoiceQr, setInvoiceQr] = useState<{ bookingId: string; qrDataUrl: string; imageDataUrl: string; due: number; emailed: boolean } | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
   const [summaryBooking, setSummaryBooking] = useState<Booking | null>(null);
@@ -105,14 +106,14 @@ export default function AdminBookingsPage() {
     const rows: { label: string; amount: string }[] = [];
     const addOnsTotal = Object.entries(booking.addOns || {}).filter(([, q]) => q > 0).reduce((sum, [id, q]) => sum + (ADDONS[id]?.price || 0) * q, 0);
     const weekendFee = booking.isWeekend ? 50 : 0;
-    const basePrice = booking.sessionTypeId === 'bundle' ? booking.balanceDue - addOnsTotal - weekendFee : booking.total - addOnsTotal - weekendFee + booking.discountAmount;
+    const basePrice = booking.total - addOnsTotal - weekendFee + booking.discountAmount;
     rows.push({ label: booking.sessionTypeId === 'bundle' ? `Session ${booking.bundleSessionNumber || 1} balance` : 'Package price', amount: `$${basePrice}` });
     Object.entries(booking.addOns || {}).filter(([, q]) => q > 0).forEach(([id, q]) => rows.push({ label: `${ADDONS[id]?.name || id} ×${q}`, amount: `+$${(ADDONS[id]?.price || 0) * q}` }));
     if (weekendFee) rows.push({ label: 'Weekend / PH surcharge', amount: `+$${weekendFee}` });
     if (booking.discountAmount) rows.push({ label: `Discount (${booking.discountCode || ''})`, amount: `−$${booking.discountAmount}` });
-    booking.extraLineItems.forEach((item) => rows.push({ label: item.description, amount: `+$${item.amount}` }));
+    booking.extraLineItems.forEach((item) => rows.push({ label: item.description, amount: item.amount < 0 ? `−$${Math.abs(item.amount)}` : `+$${item.amount}` }));
     const extraTotal = booking.extraLineItems.reduce((sum, item) => sum + item.amount, 0);
-    const invoiceTotal = (booking.sessionTypeId === 'bundle' ? booking.balanceDue : booking.total) + extraTotal;
+    const invoiceTotal = booking.total + extraTotal;
     rows.push({ label: 'Total', amount: `$${invoiceTotal}` });
     if (booking.sessionTypeId !== 'bundle' && booking.depositAmount > 0) {
       rows.push({ label: 'Deposit paid', amount: `−$${booking.depositAmount}` });
@@ -331,14 +332,12 @@ export default function AdminBookingsPage() {
                   const addOnsTotal = Object.entries(addOnsRecord).filter(([,q]) => q > 0).reduce((s, [id, q]) => s + (ADDONS[id]?.price || 0) * q, 0);
                   const weekendFee = b.isWeekend ? 50 : 0;
                   const isBundle = b.sessionTypeId === 'bundle';
-                  const basePrice = isBundle
-                    ? b.balanceDue - addOnsTotal - weekendFee  // session balance only (e.g. $330)
-                    : b.total - addOnsTotal - weekendFee + b.discountAmount;
+                  const basePrice = b.total - addOnsTotal - weekendFee + b.discountAmount;
                   const baseLabel = isBundle
                     ? `Session ${b.bundleSessionNumber || 1} balance`
                     : 'Package price';
                   const extraTotal = b.extraLineItems.reduce((s, i) => s + i.amount, 0);
-                  const totalDue = b.balanceDue + extraTotal;
+                  const totalDue = Math.max(0, b.balanceDue + extraTotal);
                   return (
                   <div className="final-bill-panel">
                     <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Final bill</div>
@@ -352,10 +351,29 @@ export default function AdminBookingsPage() {
                     {weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${weekendFee}</b></div>}
                     {b.discountAmount > 0 && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount ({b.discountCode})</span><b>−${b.discountAmount}</b></div>}
 
+                    <div style={{ marginTop: 8, padding: '9px', border: '1px solid var(--line)', borderRadius: 8, background: '#fffdf9' }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 6 }}>Promotion code</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          value={discountInputs[b.id] ?? b.discountCode ?? ''}
+                          onChange={(e) => setDiscountInputs(current => ({ ...current, [b.id]: e.target.value.toUpperCase() }))}
+                          placeholder="Enter code"
+                          style={{ flex: 1, minWidth: 0, border: '1.5px solid var(--line)', borderRadius: 7, padding: '7px 9px', fontSize: 12.5 }}
+                        />
+                        <button className="btn btn-ghost" disabled={isBusy} onClick={async () => {
+                          const code = (discountInputs[b.id] ?? b.discountCode ?? '').trim();
+                          if (!code) return;
+                          const result = await runAction(b.id, 'apply-discount', { code });
+                          if (result) setActionSuccess({ id: b.id, message: `${result.booking.discountCode} applied. Balance due updated to $${result.booking.balanceDue}.` });
+                        }}>Apply</button>
+                      </div>
+                      <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--ink-faint)' }}>Apply before generating the final invoice.</div>
+                    </div>
+
                     {/* Extra line items added post-session */}
                     {b.extraLineItems.length > 0 && (
                       <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed var(--line)' }}>
-                        <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginBottom: 4 }}>Additional charges</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginBottom: 4 }}>Bill adjustments</div>
                         {b.extraLineItems.map((item, i) => (
                           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px dashed var(--line)' }}>
                             <input
@@ -395,7 +413,7 @@ export default function AdminBookingsPage() {
                     )}
 
                     <div style={{ borderTop: '1.5px solid var(--ink)', margin: '8px 0 6px', paddingTop: 6 }}>
-                      <div className="ticket-row"><span>Total</span><b>${(isBundle ? b.balanceDue : b.total) + extraTotal}</b></div>
+                      <div className="ticket-row"><span>Total</span><b>${b.total + extraTotal}</b></div>
                       {!isBundle && <div className="ticket-row"><span>Deposit paid</span><b>−${b.depositAmount}</b></div>}
                       <div className="ticket-total" style={{ marginTop: 6 }}>
                         <span style={{ fontWeight: 700 }}>Balance due</span>
@@ -405,14 +423,15 @@ export default function AdminBookingsPage() {
 
                     {/* Add extra line items */}
                     <div className="final-bill-add-charge">
-                      <input placeholder="Description" value={lineDesc} onChange={(e) => setLineDesc(e.target.value)} style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontSize: 12.5 }} />
-                      <input placeholder="$" type="number" value={lineAmount} onChange={(e) => setLineAmount(e.target.value)} style={{ width: 70, border: '1.5px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontSize: 12.5 }} />
+                      <input placeholder="Charge or discount description" value={lineDesc} onChange={(e) => setLineDesc(e.target.value)} style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontSize: 12.5 }} />
+                      <input aria-label="Amount; use a negative number for a discount" title="Use a negative number for a discount, for example -30" placeholder="e.g. -30" type="number" value={lineAmount} onChange={(e) => setLineAmount(e.target.value)} style={{ width: 82, border: '1.5px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontSize: 12.5 }} />
                       <button className="btn btn-ghost" onClick={async () => {
                         if (!lineDesc || !lineAmount) return;
                         await runAction(b.id, 'extra-line-item', { description: lineDesc, amount: Number(lineAmount) });
                         setLineDesc(''); setLineAmount('');
                       }}>Add</button>
                     </div>
+                    <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--ink-faint)' }}>Use a positive amount for an extra charge or a negative amount for a one-off discount.</div>
                     <div className="final-bill-actions">
                       <button className="btn btn-primary" disabled={isBusy || invoiceGenerating?.id === b.id} onClick={() => generateInvoice(b, true)}>
                         Send invoice by email
