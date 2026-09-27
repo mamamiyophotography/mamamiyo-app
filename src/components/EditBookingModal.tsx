@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ADDONS, SESSION_TYPES } from '@/lib/constants';
+import { ADDONS, BUNDLE_SESSION_BALANCES, SESSION_TYPES } from '@/lib/constants';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { addMonths, CandidateSlot, MonthCalendar, startOfMonth } from '@/components/MonthCalendar';
 import { uploadPhotoFromBrowser } from '@/lib/uploadClient';
@@ -29,6 +29,10 @@ export type EditableBooking = {
   version: number;
   status: string;
   balanceStatus: string;
+  subtotal: number;
+  total: number;
+  depositAmount: number;
+  balanceDue: number;
 };
 
 export default function EditBookingModal({
@@ -55,6 +59,10 @@ export default function EditBookingModal({
   const [calMonth, setCalMonth] = useState(startOfMonth(new Date(`${booking.date}T00:00:00`)));
   const [addOns, setAddOns] = useState<Record<string, number>>(booking.addOns || {});
   const [discountCode, setDiscountCode] = useState(booking.discountCode || '');
+  const [discountCheck, setDiscountCheck] = useState<{ status: 'empty' | 'checking' | 'valid' | 'invalid'; amount: number }>({
+    status: booking.discountCode ? 'valid' : 'empty',
+    amount: booking.discountAmount || 0,
+  });
   const [address, setAddress] = useState(booking.address || '');
   const [siblingJoining, setSiblingJoining] = useState(
     booking.notes.match(/^Sibling joining:\s*(yes|no)$/im)?.[1]?.toLowerCase() || '',
@@ -75,6 +83,47 @@ export default function EditBookingModal({
   const [error, setError] = useState<string | null>(null);
 
   const sessionType = SESSION_TYPES.find((item) => item.id === sessionTypeId)!;
+
+  useEffect(() => {
+    const code = discountCode.trim();
+    if (!code) {
+      setDiscountCheck({ status: 'empty', amount: 0 });
+      return;
+    }
+    setDiscountCheck((current) => ({ ...current, status: 'checking' }));
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/discounts/${encodeURIComponent(code)}`);
+        const data = await response.json();
+        setDiscountCheck(response.ok && data.valid
+          ? { status: 'valid', amount: Number(data.amount) || 0 }
+          : { status: 'invalid', amount: 0 });
+      } catch {
+        setDiscountCheck({ status: 'invalid', amount: 0 });
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [discountCode]);
+
+  const pricePreview = useMemo(() => {
+    const originalAddOnsTotal = Object.entries(booking.addOns || {}).reduce((sum, [id, qty]) => sum + (ADDONS[id]?.price || 0) * qty, 0);
+    const originalWeekendFee = booking.isWeekend ? 50 : 0;
+    const originalBasePrice = Math.max(0, booking.subtotal - originalAddOnsTotal - originalWeekendFee);
+    const packagePrice = sessionTypeId === booking.sessionTypeId
+      ? originalBasePrice
+      : sessionTypeId === 'bundle'
+        ? (BUNDLE_SESSION_BALANCES[0] + booking.depositAmount)
+        : sessionType.price;
+    const addOnsTotal = Object.entries(addOns).reduce((sum, [id, qty]) => sum + (ADDONS[id]?.price || 0) * qty, 0);
+    const weekendFee = (selectedSlot?.isWeekend ?? booking.isWeekend) ? 50 : 0;
+    const subtotal = packagePrice + addOnsTotal + weekendFee;
+    const discountAmount = discountCheck.status === 'valid' ? Math.min(discountCheck.amount, subtotal) : 0;
+    const total = Math.max(0, subtotal - discountAmount);
+    const balanceDue = Math.max(0, total - booking.depositAmount);
+    return { packagePrice, addOnsTotal, weekendFee, subtotal, discountAmount, total, balanceDue };
+  }, [addOns, booking, discountCheck, selectedSlot, sessionType.price, sessionTypeId]);
+
+  const selectedAddOns = Object.entries(addOns).filter(([, quantity]) => quantity > 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -271,6 +320,12 @@ export default function EditBookingModal({
         <section style={{ margin: '20px 0 16px', padding: 16, border: '2px solid #b08d57', borderRadius: 12, background: '#fffaf0' }}>
           <div style={{ fontWeight: 800, fontSize: 17, color: '#6f542d', marginBottom: 4 }}>Add-ons &amp; Discount</div>
           <div style={{ color: 'var(--ink-soft)', fontSize: 12, marginBottom: 12 }}>Update the products, service add-ons and promotion code before saving the booking.</div>
+          <div style={{ padding: '9px 11px', borderRadius: 8, background: '#f3ead8', marginBottom: 12, fontSize: 12.5 }}>
+            <b>Currently selected:</b>{' '}
+            {selectedAddOns.length
+              ? selectedAddOns.map(([id, quantity]) => `${ADDONS[id]?.name.split('\n')[0] || id} ×${quantity}`).join(' · ')
+              : 'No add-ons selected'}
+          </div>
           <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
             {sessionType.addOns.map((id) => {
               const addOn = ADDONS[id];
@@ -286,11 +341,30 @@ export default function EditBookingModal({
                 </div>
               );
             })}
+            {sessionType.addOns.length === 0 && <div className="notice warn">No add-ons are configured for this package.</div>}
           </div>
           <div className="field" style={{ marginBottom: 0 }}>
             <label>Discount code <span style={{ color: 'var(--ink-faint)', fontWeight: 500 }}>(optional)</span></label>
             <input value={discountCode} onChange={(event) => setDiscountCode(event.target.value.toUpperCase())} placeholder="Enter promotion code" />
-            <div style={{ marginTop: 6, color: 'var(--ink-faint)', fontSize: 11.5 }}>Leave blank to remove the current promotion code. For a one-off discount without a code, use a negative adjustment in Final Bill.</div>
+            <div style={{ marginTop: 6, fontSize: 11.5, fontWeight: 700, color: discountCheck.status === 'invalid' ? 'var(--rust)' : discountCheck.status === 'valid' ? 'var(--sage)' : 'var(--ink-faint)' }}>
+              {discountCheck.status === 'checking' && 'Checking code…'}
+              {discountCheck.status === 'valid' && `Valid code · −$${discountCheck.amount}`}
+              {discountCheck.status === 'invalid' && 'Code not found'}
+              {discountCheck.status === 'empty' && 'No promotion code applied'}
+            </div>
+            <div style={{ marginTop: 4, color: 'var(--ink-faint)', fontSize: 11.5 }}>Leave blank to remove the current promotion code. For a one-off discount without a code, use a negative adjustment in Final Bill.</div>
+          </div>
+
+          <div style={{ marginTop: 16, paddingTop: 12, borderTop: '2px solid #d7c29a' }}>
+            <div style={{ fontWeight: 800, marginBottom: 7 }}>Updated price preview</div>
+            <div className="ticket-row"><span>Package / session</span><b>${pricePreview.packagePrice}</b></div>
+            <div className="ticket-row"><span>Add-ons</span><b>+${pricePreview.addOnsTotal}</b></div>
+            {pricePreview.weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${pricePreview.weekendFee}</b></div>}
+            <div className="ticket-row"><span>Subtotal</span><b>${pricePreview.subtotal}</b></div>
+            <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount{discountCode.trim() ? ` (${discountCode.trim()})` : ''}</span><b>−${pricePreview.discountAmount}</b></div>
+            <div className="ticket-row"><span>Total</span><b>${pricePreview.total}</b></div>
+            <div className="ticket-row"><span>Deposit</span><b>−${booking.depositAmount}</b></div>
+            <div className="ticket-total" style={{ marginTop: 7 }}><span>Balance due</span><span className="amt">${pricePreview.balanceDue}</span></div>
           </div>
         </section>
 
