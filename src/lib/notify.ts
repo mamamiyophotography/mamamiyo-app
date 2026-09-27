@@ -228,7 +228,9 @@ function receiptRows(r: Receipt): { label: string; value: string }[] {
   if (r.extraLineItems?.length)
     r.extraLineItems.forEach(item => rows.push({ label: item.description, value: item.amount < 0 ? '-$' + Math.abs(item.amount) : '+$' + item.amount }));
 
-  const totalDue = r.balanceDue;
+  const totalDue = Math.max(0, r.isBundle && r.bundleSessionNumber
+    ? r.total + weekendFee + addOnsTotal - (r.discountAmount || 0) + extraTotal
+    : r.total + extraTotal);
   rows.push({ label: '**Total due**', value: '**$' + totalDue + '**' });
   return rows;
 }
