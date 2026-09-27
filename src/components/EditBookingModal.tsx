@@ -248,30 +248,6 @@ export default function EditBookingModal({
 
         {postSessionEdit && <div className="notice" style={{ marginBottom: 16 }}>After the photoshoot, Edit Booking updates the final bill. Package, date, client details and Setup choices remain unchanged.</div>}
 
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>Add-ons</div>
-        <div style={{ display: 'grid', gap: 8, marginBottom: 18 }}>
-          {sessionType.addOns.map((id) => {
-            const addOn = ADDONS[id];
-            const qty = addOns[id] || 0;
-            return (
-              <div key={id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--line)' }}>
-                <div><div style={{ fontSize: 13.5, fontWeight: 600 }}>{addOn.name}</div><div style={{ color: 'var(--ink-faint)', fontSize: 12 }}>${addOn.price} each</div></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button className="btn btn-ghost" type="button" style={{ padding: '5px 10px' }} onClick={() => setAddOn(id, qty - 1)}>−</button>
-                  <strong style={{ minWidth: 18, textAlign: 'center' }}>{qty}</strong>
-                  <button className="btn btn-ghost" type="button" style={{ padding: '5px 10px' }} onClick={() => setAddOn(id, qty + 1)}>+</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="field">
-          <label>Discount code <span style={{ color: 'var(--ink-faint)', fontWeight: 500 }}>(optional)</span></label>
-          <input value={discountCode} onChange={(event) => setDiscountCode(event.target.value.toUpperCase())} placeholder="Enter promotion code" />
-          <div style={{ marginTop: 6, color: 'var(--ink-faint)', fontSize: 11.5 }}>Leave blank to remove the current promotion code. For a one-off discount without a code, use a negative adjustment in Final Bill.</div>
-        </div>
-
         {!postSessionEdit && <>
         <div style={{fontWeight:700,margin:'20px 0 6px'}}>Setup choices</div>
         <div style={{fontSize:12,color:'var(--ink-soft)',marginBottom:10}}><b>One Setup = one outfit + one background setting.</b> This package includes {includedSetups} {includedSetups===1?'Setup':'Setups'}; each Additional Setup is $100. Each Setup can contain up to 3 reference photos and its own outfit note.</div>
@@ -291,6 +267,32 @@ export default function EditBookingModal({
         </div>
         <div className="field"><label>Notes</label><textarea value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
         </>}
+
+        <section style={{ margin: '20px 0 16px', padding: 16, border: '2px solid #b08d57', borderRadius: 12, background: '#fffaf0' }}>
+          <div style={{ fontWeight: 800, fontSize: 17, color: '#6f542d', marginBottom: 4 }}>Add-ons &amp; Discount</div>
+          <div style={{ color: 'var(--ink-soft)', fontSize: 12, marginBottom: 12 }}>Update the products, service add-ons and promotion code before saving the booking.</div>
+          <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
+            {sessionType.addOns.map((id) => {
+              const addOn = ADDONS[id];
+              const qty = addOns[id] || 0;
+              return (
+                <div key={id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 12, alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--line)' }}>
+                  <div><div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'pre-line' }}>{addOn.name}</div><div style={{ color: 'var(--ink-faint)', fontSize: 12 }}>${addOn.price} each</div></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button className="btn btn-ghost" type="button" style={{ padding: '5px 10px' }} onClick={() => setAddOn(id, qty - 1)}>−</button>
+                    <strong style={{ minWidth: 18, textAlign: 'center' }}>{qty}</strong>
+                    <button className="btn btn-ghost" type="button" style={{ padding: '5px 10px' }} onClick={() => setAddOn(id, qty + 1)}>+</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Discount code <span style={{ color: 'var(--ink-faint)', fontWeight: 500 }}>(optional)</span></label>
+            <input value={discountCode} onChange={(event) => setDiscountCode(event.target.value.toUpperCase())} placeholder="Enter promotion code" />
+            <div style={{ marginTop: 6, color: 'var(--ink-faint)', fontSize: 11.5 }}>Leave blank to remove the current promotion code. For a one-off discount without a code, use a negative adjustment in Final Bill.</div>
+          </div>
+        </section>
 
         {selectedSlot && <div className="notice" style={{ marginBottom: 16 }}>
           New session: <strong>{sessionType.name}</strong><br />
