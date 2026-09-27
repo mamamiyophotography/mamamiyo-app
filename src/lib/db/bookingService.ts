@@ -287,6 +287,7 @@ export type UpdateBookingInput = {
   addOns: Record<string, number>;
   address?: string;
   notes?: string;
+  discountCode?: string | null;
 };
 
 /** Admin-only edit flow for pre-shoot bookings. Revalidates availability,
@@ -340,20 +341,21 @@ export async function updateBookingAndNotify(db: any, bookingId: string, input: 
   let total: number;
   let balanceDue: number;
   let discountAmount = existing.discountAmount;
+  const requestedDiscountCode = input.discountCode === undefined
+    ? (existing.discountCode || null)
+    : (input.discountCode?.trim().toUpperCase() || null);
+  const requestedDiscount = requestedDiscountCode
+    ? await db.discountCode.findUnique({ where: { code: requestedDiscountCode } })
+    : null;
+  if (requestedDiscountCode && !requestedDiscount) throw new Error('Promotion code not found.');
   if (input.sessionTypeId === 'bundle' && existing.bundleSessionNumber && existing.bundleSessionNumber > 1) {
     const baseBalance = BUNDLE_SESSION_BALANCES[existing.bundleSessionNumber - 1] || 0;
-    balanceDue = baseBalance + computeAddOnsTotal(cleanedAddOns) + (isWeekend ? settings.weekendSurcharge : 0);
-    subtotal = balanceDue;
-    total = balanceDue;
-    discountAmount = 0;
+    subtotal = baseBalance + computeAddOnsTotal(cleanedAddOns) + (isWeekend ? settings.weekendSurcharge : 0);
+    discountAmount = requestedDiscount ? Math.min(requestedDiscount.amount, subtotal) : 0;
+    total = Math.max(0, subtotal - discountAmount);
+    balanceDue = total;
   } else {
-    let discount: { code: string; amount: number } | null = null;
-    if (existing.discountCode) {
-      const savedDiscount = await db.discountCode.findUnique({ where: { code: existing.discountCode } });
-      discount = savedDiscount
-        ? { code: savedDiscount.code, amount: savedDiscount.amount }
-        : { code: existing.discountCode, amount: existing.discountAmount };
-    }
+    const discount = requestedDiscount ? { code: requestedDiscount.code, amount: requestedDiscount.amount } : null;
     const pricing = computeBookingPricing({
       sessionType,
       addOns: cleanedAddOns,
@@ -429,10 +431,12 @@ export async function updateBookingAndNotify(db: any, bookingId: string, input: 
         total,
         balanceDue,
         discountAmount,
+        discountCode: requestedDiscount?.code || null,
         balanceStatus: balanceDue > 0 ? 'pending' : 'n/a',
         bundleParentId: input.sessionTypeId === 'bundle' ? bundleParentId : null,
         bundleSessionNumber: sessionNumber,
         remindersSent: [],
+        invoiceStale: Boolean(existing.invoiceRef),
       },
     });
 
@@ -446,6 +450,7 @@ export async function updateBookingAndNotify(db: any, bookingId: string, input: 
   if (previous.sessionTypeId !== updated.sessionTypeId) changedFields.push('package');
   if (previous.date !== updated.date || previous.startTime !== updated.startTime) changedFields.push('date and time');
   if (JSON.stringify(previous.addOns) !== JSON.stringify(cleanedAddOns)) changedFields.push('add-ons');
+  if ((existing.discountCode || null) !== (updated.discountCode || null)) changedFields.push('discount');
   if (previous.address !== updated.address) changedFields.push('address');
   if (previous.notes !== updated.notes) changedFields.push('notes');
 

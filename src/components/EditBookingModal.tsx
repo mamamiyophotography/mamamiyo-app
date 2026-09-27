@@ -24,6 +24,11 @@ export type EditableBooking = {
   setupSelectionCount?: number;
   setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string;outfitSource?:'mamamiyo'|'own'|null}[];
   setupChoiceNotes?: string;
+  discountCode?: string | null;
+  discountAmount?: number;
+  version: number;
+  status: string;
+  balanceStatus: string;
 };
 
 export default function EditBookingModal({
@@ -36,6 +41,7 @@ export default function EditBookingModal({
   onSaved: () => void | Promise<void>;
 }) {
   const lockedBundleSession = booking.sessionTypeId === 'bundle' && (booking.bundleSessionNumber || 1) > 1;
+  const postSessionEdit = !['pending', 'confirmed'].includes(booking.status);
   const [sessionTypeId, setSessionTypeId] = useState(booking.sessionTypeId);
   const [slots, setSlots] = useState<CandidateSlot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(true);
@@ -48,6 +54,7 @@ export default function EditBookingModal({
   const [selectedDate, setSelectedDate] = useState<string | null>(booking.date);
   const [calMonth, setCalMonth] = useState(startOfMonth(new Date(`${booking.date}T00:00:00`)));
   const [addOns, setAddOns] = useState<Record<string, number>>(booking.addOns || {});
+  const [discountCode, setDiscountCode] = useState(booking.discountCode || '');
   const [address, setAddress] = useState(booking.address || '');
   const [siblingJoining, setSiblingJoining] = useState(
     booking.notes.match(/^Sibling joining:\s*(yes|no)$/im)?.[1]?.toLowerCase() || '',
@@ -120,15 +127,15 @@ export default function EditBookingModal({
   }
 
   async function save() {
-    if (!selectedSlot) {
+    if (!postSessionEdit && !selectedSlot) {
       setError('Please select an available date and time.');
       return;
     }
-    if (sessionType.location === 'home' && !address.trim()) {
+    if (!postSessionEdit && sessionType.location === 'home' && !address.trim()) {
       setError('Please enter the client’s home address.');
       return;
     }
-    if (!siblingJoining) {
+    if (!postSessionEdit && !siblingJoining) {
       setError('Please choose whether a sibling will be joining.');
       return;
     }
@@ -140,15 +147,34 @@ export default function EditBookingModal({
     setSaving(true);
     setError(null);
     try {
+      if (postSessionEdit) {
+        const addOnResponse = await fetch(`/api/admin/bookings/${booking.id}/update-addons`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ addOns, version: booking.version }),
+        });
+        const addOnData = await addOnResponse.json();
+        if (!addOnResponse.ok) throw new Error(addOnData.error || 'Could not update add-ons.');
+        const discountResponse = await fetch(`/api/admin/bookings/${booking.id}/apply-discount`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: discountCode.trim() || null }),
+        });
+        const discountData = await discountResponse.json();
+        if (!discountResponse.ok) throw new Error(discountData.error || 'Could not update the discount code.');
+        await onSaved();
+        return;
+      }
       const response = await fetch(`/api/admin/bookings/${booking.id}/update-booking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionTypeId,
-          date: selectedSlot.date,
-          startTime: selectedSlot.startTime,
-          endTime: selectedSlot.endTime,
+          date: selectedSlot!.date,
+          startTime: selectedSlot!.startTime,
+          endTime: selectedSlot!.endTime,
           addOns,
+          discountCode: discountCode.trim() || null,
           address,
           notes: [`Sibling joining: ${siblingJoining}`, notesWithoutSibling].filter(Boolean).join('\n'),
         }),
@@ -185,13 +211,13 @@ export default function EditBookingModal({
 
         <div className="field">
           <label>Package</label>
-          <select value={sessionTypeId} disabled={lockedBundleSession} onChange={(event) => changePackage(event.target.value)}>
+          <select value={sessionTypeId} disabled={lockedBundleSession || postSessionEdit} onChange={(event) => changePackage(event.target.value)}>
             {SESSION_TYPES.map((item) => <option key={item.id} value={item.id}>{item.name} — ${item.price}</option>)}
           </select>
           {lockedBundleSession && <div style={{ marginTop: 6, color: 'var(--ink-faint)', fontSize: 12 }}>Bundle sessions 2 and 3 must remain part of the First Year Bundle.</div>}
         </div>
 
-        <div style={{ margin: '20px 0' }}>
+        {!postSessionEdit && <div style={{ margin: '20px 0' }}>
           <div style={{ fontWeight: 700, marginBottom: 10 }}>Date and time</div>
           {loadingSlots ? <div style={{ color: 'var(--ink-faint)', fontSize: 13 }}>Loading available dates…</div> : (
             <div className="edit-booking-schedule">
@@ -218,7 +244,9 @@ export default function EditBookingModal({
               </div>
             </div>
           )}
-        </div>
+        </div>}
+
+        {postSessionEdit && <div className="notice" style={{ marginBottom: 16 }}>After the photoshoot, Edit Booking updates the final bill. Package, date, client details and Setup choices remain unchanged.</div>}
 
         <div style={{ fontWeight: 700, marginBottom: 8 }}>Add-ons</div>
         <div style={{ display: 'grid', gap: 8, marginBottom: 18 }}>
@@ -238,6 +266,13 @@ export default function EditBookingModal({
           })}
         </div>
 
+        <div className="field">
+          <label>Discount code <span style={{ color: 'var(--ink-faint)', fontWeight: 500 }}>(optional)</span></label>
+          <input value={discountCode} onChange={(event) => setDiscountCode(event.target.value.toUpperCase())} placeholder="Enter promotion code" />
+          <div style={{ marginTop: 6, color: 'var(--ink-faint)', fontSize: 11.5 }}>Leave blank to remove the current promotion code. For a one-off discount without a code, use a negative adjustment in Final Bill.</div>
+        </div>
+
+        {!postSessionEdit && <>
         <div style={{fontWeight:700,margin:'20px 0 6px'}}>Setup choices</div>
         <div style={{fontSize:12,color:'var(--ink-soft)',marginBottom:10}}><b>One Setup = one outfit + one background setting.</b> This package includes {includedSetups} {includedSetups===1?'Setup':'Setups'}; each Additional Setup is $100. Each Setup can contain up to 3 reference photos and its own outfit note.</div>
         <div style={{display:'grid',gap:10,marginBottom:18}}>{[0,1,2].map(index=>{const slot=index+1;const active=slot<=setupCount;const included=slot<=includedSetups;return <div key={slot} style={{border:'1.5px solid var(--line)',borderRadius:9,padding:10}}><div style={{display:'flex',justifyContent:'space-between'}}><b>Setup {slot}</b><span style={{fontSize:11,fontWeight:700,color:included?'var(--ink-soft)':'var(--rust)'}}>{included?'Included':'Additional Setup ($100)'}</span></div>{!active?<button type="button" className="btn btn-ghost" style={{marginTop:8}} onClick={()=>setSetupCount(slot)}>Add Setup {slot} · $100</button>:<><div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:8}}>{[{value:'mamamiyo',label:'MamaMiyo outfit'},{value:'own',label:'Own outfit'},{value:null,label:'Not selected'}].map(option=><button key={String(option.value)} type="button" className={`chip ${setupOutfitSources[index]===option.value?'selected':''}`} onClick={()=>setSetupOutfitSources(values=>values.map((value,i)=>i===index?(option.value===null?null:option.value==='own'?'own':'mamamiyo'):value))}>{option.label}</button>)}</div><div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap'}}>{setupExisting[index].map(url=><div key={url} style={{position:'relative',width:58,height:58}}><img src={url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:7}}/><button type="button" onClick={()=>setSetupExisting(groups=>groups.map((items,i)=>i===index?items.filter(item=>item!==url):items))} style={{position:'absolute',right:1,top:1,border:0,borderRadius:99,background:'#3a2e28dd',color:'#fff'}}>×</button></div>)}{setupPending[index].map((item,photoIndex)=><div key={item.previewUrl} style={{position:'relative',width:58,height:58}}><img src={item.previewUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:7}}/><button type="button" onClick={()=>setSetupPending(groups=>groups.map((items,i)=>i===index?items.filter((_,p)=>p!==photoIndex):items))} style={{position:'absolute',right:1,top:1,border:0,borderRadius:99,background:'#3a2e28dd',color:'#fff'}}>×</button></div>)}</div><label className="btn btn-ghost" style={{display:'inline-flex',marginTop:8}}>Add reference photos<input hidden type="file" accept="image/*" multiple disabled={setupExisting[index].length+setupPending[index].length>=3} onChange={event=>{const room=3-setupExisting[index].length-setupPending[index].length;const added=Array.from(event.target.files||[]).slice(0,room).map(file=>({file,previewUrl:URL.createObjectURL(file)}));setSetupPending(groups=>groups.map((items,i)=>i===index?[...items,...added]:items));event.target.value='';}}/></label><input value={setupNotes[index]} maxLength={300} onChange={event=>setSetupNotes(values=>values.map((value,i)=>i===index?event.target.value:value))} placeholder="Outfit / Setup note (e.g. Client will bring this outfit)" style={{width:'100%',marginTop:8,padding:'8px 10px',border:'1.5px solid var(--line)',borderRadius:8}}/>{!included&&slot===setupCount&&<button type="button" className="btn btn-ghost" style={{marginTop:8}} onClick={()=>setSetupCount(count=>count-1)}>Remove Additional Setup</button>}</>}</div>})}</div>
@@ -255,6 +290,7 @@ export default function EditBookingModal({
           <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 6 }}>Sibling participation is free. The additional family / grandparents add-on is charged separately.</div>
         </div>
         <div className="field"><label>Notes</label><textarea value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
+        </>}
 
         {selectedSlot && <div className="notice" style={{ marginBottom: 16 }}>
           New session: <strong>{sessionType.name}</strong><br />
@@ -266,7 +302,7 @@ export default function EditBookingModal({
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-ghost" type="button" disabled={saving} onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" type="button" disabled={saving || !selectedSlot} onClick={save}>
-            {saving ? 'Saving…' : 'Save changes & email client'}
+            {saving ? 'Saving…' : postSessionEdit ? 'Save bill changes' : 'Save changes & email client'}
           </button>
         </div>
       </div>
