@@ -4,10 +4,9 @@
 // paragraph format, Subject lines, prep links, receipt language, bundle
 // milestone logic). Don't rewrite this wording; port it as-is.
 //
-// Each function returns content for BOTH channels. Only sendEmail() is
-// wired up right now (email-only launch) — sendWhatsApp() is a safe no-op
-// stub. When the Twilio/WhatsApp application clears, wiring it up means
-// implementing whatsapp.ts's stub — nothing here needs to change.
+// Each function returns content for email and WhatsApp. Client email is
+// always delivered through Resend; Whapi.Cloud sends private studio alerts
+// to the photographer. Customer WhatsApp delivery remains explicitly opt-in.
 
 import { fmtDatePretty, fmtTime12 } from './format';
 import { studioAddressText } from './studio';

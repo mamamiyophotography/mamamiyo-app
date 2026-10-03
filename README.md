@@ -7,8 +7,8 @@ This is the real backend + frontend build, following the plan in
 **Status: functionally complete.** Every planned page, API route, and admin tab is built and
 tested. Two things remain genuinely open — both are flagged explicitly below, not glossed over.
 
-**Launching email-only.** WhatsApp is fully designed and ready to plug in the moment the Twilio/
-Meta approval clears — see "Adding WhatsApp later" below.
+**Messaging:** transactional client emails use Resend. Private studio WhatsApp alerts use
+Whapi.Cloud and are sent only to the photographer unless customer delivery is explicitly enabled.
 
 ## What's built
 
@@ -96,8 +96,8 @@ real `PrismaClient` satisfies — see `src/lib/db/mockDb.ts` and
 2. **Create a Supabase project** (free tier). Copy the connection string into `.env` as
    `DATABASE_URL`. Create a public storage bucket named `reference-photos`.
 3. **Push the schema**: `cp .env.example .env` (fill in `DATABASE_URL`), then `npm run db:push`
-4. **Sign up for Resend**, set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `PHOTOGRAPHER_EMAIL`,
-   `PHOTOGRAPHER_PHONE` in `.env`
+4. **Sign up for Resend and Whapi.Cloud**, then set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`,
+   `PHOTOGRAPHER_EMAIL`, `PHOTOGRAPHER_PHONE`, and `WHAPI_TOKEN` in `.env`
 5. **Set up admin login**: `ADMIN_EMAIL`; `ADMIN_PASSWORD_HASH` (run
    `npx tsx scripts/hash-password.ts "your-chosen-password"`); `ADMIN_SESSION_SECRET` (e.g.
    `openssl rand -base64 32`)

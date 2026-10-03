@@ -1,7 +1,7 @@
 // Uploads reference photos to Supabase Storage. UNLIKE everything else in
 // this codebase, this file has NOT been executed/verified here — this
-// sandbox has no network path to Supabase at all (unlike Resend/Twilio,
-// which were at least reachable in principle; Supabase isn't in the
+// sandbox has no network path to Supabase at all (unlike the messaging
+// providers, which were at least reachable in principle; Supabase isn't in the
 // network allowlist either). It's written carefully against Supabase's
 // documented SDK patterns, but treat it as unverified until a real
 // smoke test is run against an actual Supabase project — upload one real
