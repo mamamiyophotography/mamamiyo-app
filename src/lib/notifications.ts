@@ -269,6 +269,14 @@ export function reminderNotification(b: NotifyBooking, threshold: ReminderThresh
   const photographerPrepLine = (threshold.key === '3day' || threshold.key === '1day') && prep
     ? `Client preparation list: ${prep.url}`
     : '';
+  const setupSelections = Array.isArray(b.setupSelections) ? b.setupSelections : [];
+  const legacySetupPhotos = Array.isArray(b.referencePhotoUrls) ? b.referencePhotoUrls : [];
+  const hasSetupPhotos = legacySetupPhotos.length > 0 || setupSelections.some(
+    (selection) => Array.isArray(selection.referencePhotoUrls) && selection.referencePhotoUrls.length > 0,
+  );
+  const missingSetupPhotosAlert = threshold.key === '3day' && !hasSetupPhotos
+    ? `⚠️ Setup photos not uploaded — please follow up with ${b.clientName} before the photoshoot.`
+    : '';
 
   const waParts = [`Hi ${firstName}!\n${intro}`, studioLine, prepLine, `See you soon!`, businessName].filter(Boolean);
   const emailParts = [`Hi ${firstName}!`, intro, studioLine, prepLine, `See you soon!`, businessName].filter(Boolean);
@@ -290,7 +298,7 @@ export function reminderNotification(b: NotifyBooking, threshold: ReminderThresh
             `Location: ${b.location === 'home' ? 'Client home' : 'Studio'}`,
             `Ref: ${b.ref}`,
           ].join('\n')
-        : [photographerBookingSummary(b), photographerPrepLine].filter(Boolean).join('\n\n'),
+        : [missingSetupPhotosAlert, photographerBookingSummary(b), photographerPrepLine].filter(Boolean).join('\n\n'),
     },
   };
 }

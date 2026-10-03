@@ -99,6 +99,11 @@ check('only the 3-day reminder includes the prep-guide nudge', threeDayReminder.
 check('photographer 3-day WhatsApp reminder includes the client preparation list', threeDayReminder.photographer.whatsappBody.includes('newbornprep'));
 check('photographer 3-day reminder includes booking balance and add-ons', threeDayReminder.photographer.whatsappBody.includes('Balance: $618') && threeDayReminder.photographer.whatsappBody.includes('Additional setup: $100'));
 check('photographer 3-day reminder includes outfit selection', threeDayReminder.photographer.whatsappBody.includes('Client own outfit') && threeDayReminder.photographer.whatsappBody.includes('Cream dress'));
+check('photographer 3-day reminder does not warn when Setup photos are uploaded', !threeDayReminder.photographer.whatsappBody.includes('Setup photos not uploaded'));
+const threeDayMissingSetupPhotos = reminderNotification({ ...newborn, referencePhotoUrls: [], setupSelections: [{ slot: 1, outfitSource: 'own', note: 'Cream dress', referencePhotoUrls: [] }] }, REMINDER_THRESHOLDS[0], business);
+check('photographer 3-day reminder warns when Setup photos are missing', threeDayMissingSetupPhotos.photographer.whatsappBody.includes('Setup photos not uploaded'));
+const oneDayMissingSetupPhotos = reminderNotification({ ...newborn, referencePhotoUrls: [], setupSelections: [] }, REMINDER_THRESHOLDS[1], business);
+check('missing Setup photo warning is only sent at 3 days', !oneDayMissingSetupPhotos.photographer.whatsappBody.includes('Setup photos not uploaded'));
 const oneDayReminder = reminderNotification(newborn, REMINDER_THRESHOLDS[1], business);
 check('photographer 1-day reminder repeats the preparation list', oneDayReminder.photographer.whatsappBody.includes('newbornprep'));
 const twoHourReminder = reminderNotification(newborn, REMINDER_THRESHOLDS[2], business);
