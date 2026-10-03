@@ -211,6 +211,9 @@ export function reminderNotification(b: NotifyBooking, threshold: ReminderThresh
   else intro = `Quick reminder — your ${b.sessionLabel} starts in about 2 hours, at ${fmtTime12(b.startTime)} today.`;
 
   const prepLine = threshold.key === '3day' && prep ? `Haven't checked our prep guide yet? ${prep.url}` : '';
+  const photographerPrepLine = threshold.key === '3day' && prep
+    ? `Client preparation list: ${prep.url}`
+    : '';
 
   const waParts = [`Hi ${firstName}!\n${intro}`, studioLine, prepLine, `See you soon!`, businessName].filter(Boolean);
   const emailParts = [`Hi ${firstName}!`, intro, studioLine, prepLine, `See you soon!`, businessName].filter(Boolean);
@@ -224,7 +227,14 @@ export function reminderNotification(b: NotifyBooking, threshold: ReminderThresh
     photographer: {
       emailSubject: `Upcoming session reminder`,
       emailBody: `Session with ${b.clientName} is ${threshold.label} — ${whenStr}. Ref ${b.ref}.`,
-      whatsappBody: `Reminder: session with ${b.clientName} is ${threshold.label} — ${whenStr}. Ref ${b.ref}.`,
+      whatsappBody: [
+        `📅 Appointment reminder`,
+        `${b.clientName} — ${b.sessionLabel}`,
+        `${whenStr}`,
+        `Location: ${b.location === 'home' ? 'Client home' : 'Studio'}`,
+        `Ref: ${b.ref}`,
+        photographerPrepLine,
+      ].filter(Boolean).join('\n'),
     },
   };
 }
@@ -255,6 +265,9 @@ export function invoiceNotification(
 ): NotificationPair {
   const firstName = firstNameOf(b.clientName);
   const whenStr = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
+  const extraSummary = extraLineItems.length
+    ? `\nAdditional items:\n${extraLineItems.map((item) => `• ${item.description}: $${item.amount}`).join('\n')}`
+    : '';
 
   // Bundle payment schedule — shown for all bundle sessions so client understands the structure
   // Payment schedule shown in yellow box section — not repeated in email body
@@ -273,7 +286,13 @@ export function invoiceNotification(
     photographer: {
       emailSubject: `Invoice for balance payment sent — ${b.clientName}`,
       emailBody: `Invoice sent to ${b.clientName}.\n\nSession: ${b.sessionLabel}\nDate: ${whenStr}\nRef: ${invoiceRef}\nAmount due: $${due}`,
-      whatsappBody: `Invoice sent to ${b.clientName} — ${b.sessionLabel}, ref ${invoiceRef}, $${due} due.`,
+      whatsappBody: [
+        `🧾 Client invoice ready`,
+        `${b.clientName} — ${b.sessionLabel}`,
+        `Session: ${whenStr}`,
+        `Invoice ref: ${invoiceRef}`,
+        `Balance due: $${due}${extraSummary}`,
+      ].join('\n'),
     },
   };
 }

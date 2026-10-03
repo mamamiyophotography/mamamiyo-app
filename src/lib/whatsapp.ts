@@ -1,29 +1,33 @@
-// Deliberately NOT wired to Twilio yet — this app is launching email-only
-// while the WhatsApp Business Platform application is pending Meta approval
-// (see mamamiyo-backend-technical-scope.md). This stub keeps the same
-// function signature the real implementation will use, so every caller
-// (notify.ts) already works correctly today and needs zero changes once
-// WhatsApp is ready — only this one file gets filled in.
-//
-// TO ACTIVATE LATER: once TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN /
-// TWILIO_WHATSAPP_FROM are set (see .env.example), replace the body below
-// with a real Twilio client call, e.g.:
-//
-//   import twilio from 'twilio';
-//   const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-//   await client.messages.create({
-//     from: process.env.TWILIO_WHATSAPP_FROM,
-//     to: `whatsapp:${toPhoneE164}`,
-//     body,
-//   });
+const WHAPI_TEXT_ENDPOINT = 'https://gate.whapi.cloud/messages/text';
+
+function whapiRecipient(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 8 || digits.length > 15) {
+    throw new Error('WhatsApp recipient must be an international phone number.');
+  }
+  return digits;
+}
 
 export async function sendWhatsApp(toPhoneE164: string, body: string): Promise<void> {
-  if (!process.env.TWILIO_ACCOUNT_SID) {
-    // Expected while WhatsApp isn't wired up yet — not an error.
-    console.log(`[WhatsApp not yet active] Would have sent to ${toPhoneE164}:\n${body}\n`);
-    return;
+  const token = process.env.WHAPI_TOKEN?.trim();
+  if (!token || !body.trim()) return;
+
+  const response = await fetch(WHAPI_TEXT_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      to: whapiRecipient(toPhoneE164),
+      body,
+      no_link_preview: false,
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 500);
+    throw new Error(`Whapi.Cloud rejected the WhatsApp alert (${response.status}): ${detail}`);
   }
-  throw new Error(
-    'Twilio credentials are set but sendWhatsApp() is still a stub — implement the real Twilio call here (see the comment at the top of this file).'
-  );
 }

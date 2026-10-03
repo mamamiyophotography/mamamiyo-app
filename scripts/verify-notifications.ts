@@ -4,6 +4,7 @@ import {
   bookingConfirmedNotification,
   bundleSessionConfirmedNotification,
   balanceReceivedNotification,
+  invoiceNotification,
   reminderNotification,
   bundleContextAfterBalance,
   REMINDER_THRESHOLDS,
@@ -87,8 +88,18 @@ REMINDER_THRESHOLDS.forEach((t) => {
 });
 const threeDayReminder = reminderNotification(newborn, REMINDER_THRESHOLDS[0], business);
 check('only the 3-day reminder includes the prep-guide nudge', threeDayReminder.client.emailBody.includes('prep guide'));
+check('photographer 3-day WhatsApp reminder includes the client preparation list', threeDayReminder.photographer.whatsappBody.includes('newbornprep'));
 const twoHourReminder = reminderNotification(newborn, REMINDER_THRESHOLDS[2], business);
 check('the 2-hour reminder does NOT repeat the prep-guide nudge', !twoHourReminder.client.emailBody.includes('prep guide'));
+check('photographer 2-hour WhatsApp reminder does NOT repeat the preparation list', !twoHourReminder.photographer.whatsappBody.includes('newbornprep'));
+
+const invoice = invoiceNotification(newborn, 388, 'BAL-JANE-2210', [
+  { description: 'Extra person', amount: 50 },
+  { description: 'Weekend surcharge', amount: 30 },
+]);
+check('photographer WhatsApp invoice contains the client name', invoice.photographer.whatsappBody.includes('Jane Tan'));
+check('photographer WhatsApp invoice contains the balance and reference', invoice.photographer.whatsappBody.includes('$388') && invoice.photographer.whatsappBody.includes('BAL-JANE-2210'));
+check('photographer WhatsApp invoice contains additional item details', invoice.photographer.whatsappBody.includes('Extra person: $50'));
 
 console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'}`);
 process.exit(failures === 0 ? 0 : 1);

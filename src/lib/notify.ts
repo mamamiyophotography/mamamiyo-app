@@ -345,7 +345,12 @@ export async function dispatchNotification(
   if (pair.client.emailSubject && clientEmail) {
     sends.push(sendEmail(clientEmail, pair.client.emailSubject.replace('\n', ' — '), pair.client.emailBody, att, clientHtml));
   }
-  if (clientPhoneE164) sends.push(sendWhatsApp(clientPhoneE164, pair.client.whatsappBody));
+  // Whapi is connected for private studio alerts by default. Client WhatsApp
+  // delivery remains opt-in so enabling the token cannot unexpectedly message
+  // every customer.
+  if (clientPhoneE164 && process.env.WHATSAPP_CLIENT_NOTIFICATIONS === 'true') {
+    sends.push(sendWhatsApp(clientPhoneE164, pair.client.whatsappBody));
+  }
   if (photographerPhoneE164) sends.push(sendWhatsApp(photographerPhoneE164, pair.photographer.whatsappBody));
 
   const results = await Promise.allSettled(sends);

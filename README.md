@@ -82,12 +82,13 @@ real `PrismaClient` satisfies — see `src/lib/db/mockDb.ts` and
   rather than continuing to guess at design decisions that should involve the person running the
   business.
 
-## Adding WhatsApp later (when Twilio/Meta approval clears)
+## Internal WhatsApp alerts (Whapi.Cloud)
 
-1. Fill in `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM` in `.env`
-2. Open `src/lib/whatsapp.ts` — replace the stub body with the real Twilio call (exact code is in
-   a comment at the top of that file)
-3. Nothing else needs to change.
+1. Create a Whapi.Cloud channel and link the studio WhatsApp number.
+2. Add `WHAPI_TOKEN` and `PHOTOGRAPHER_PHONE` to the server environment.
+3. Keep `WHATSAPP_CLIENT_NOTIFICATIONS=false` to send appointment, preparation-list and invoice
+   alerts only to the photographer. Customer WhatsApp delivery is opt-in and remains disabled.
+4. Never place the Whapi token in a `NEXT_PUBLIC_` variable or browser code.
 
 ## Setup, in order
 
