@@ -28,6 +28,14 @@ const newborn: NotifyBooking = {
   date: '2026-08-22',
   startTime: '09:00',
   clientName: 'Jane Tan',
+  clientPhone: '+6591234567',
+  address: '12 Example Road',
+  total: 718,
+  depositAmount: 100,
+  balanceDue: 618,
+  extraLineItems: [{ description: 'Additional setup', amount: 100 }],
+  setupSelections: [{ slot: 1, outfitSource: 'own', note: 'Cream dress', referencePhotoUrls: ['https://example.com/outfit.jpg'] }],
+  notes: 'Sibling joining: yes',
 };
 const n = bookingConfirmedNotification(newborn, business);
 check('email has a Subject-appropriate string', n.client.emailSubject.includes('Newborn Photoshoot'));
@@ -89,6 +97,10 @@ REMINDER_THRESHOLDS.forEach((t) => {
 const threeDayReminder = reminderNotification(newborn, REMINDER_THRESHOLDS[0], business);
 check('only the 3-day reminder includes the prep-guide nudge', threeDayReminder.client.emailBody.includes('prep guide'));
 check('photographer 3-day WhatsApp reminder includes the client preparation list', threeDayReminder.photographer.whatsappBody.includes('newbornprep'));
+check('photographer 3-day reminder includes booking balance and add-ons', threeDayReminder.photographer.whatsappBody.includes('Balance: $618') && threeDayReminder.photographer.whatsappBody.includes('Additional setup: $100'));
+check('photographer 3-day reminder includes outfit selection', threeDayReminder.photographer.whatsappBody.includes('Client own outfit') && threeDayReminder.photographer.whatsappBody.includes('Cream dress'));
+const oneDayReminder = reminderNotification(newborn, REMINDER_THRESHOLDS[1], business);
+check('photographer 1-day reminder repeats the preparation list', oneDayReminder.photographer.whatsappBody.includes('newbornprep'));
 const twoHourReminder = reminderNotification(newborn, REMINDER_THRESHOLDS[2], business);
 check('the 2-hour reminder does NOT repeat the prep-guide nudge', !twoHourReminder.client.emailBody.includes('prep guide'));
 check('photographer 2-hour WhatsApp reminder does NOT repeat the preparation list', !twoHourReminder.photographer.whatsappBody.includes('newbornprep'));
@@ -100,6 +112,8 @@ const invoice = invoiceNotification(newborn, 388, 'BAL-JANE-2210', [
 check('photographer WhatsApp invoice contains the client name', invoice.photographer.whatsappBody.includes('Jane Tan'));
 check('photographer WhatsApp invoice contains the balance and reference', invoice.photographer.whatsappBody.includes('$388') && invoice.photographer.whatsappBody.includes('BAL-JANE-2210'));
 check('photographer WhatsApp invoice contains additional item details', invoice.photographer.whatsappBody.includes('Extra person: $50'));
+check('photographer WhatsApp invoice includes the booking summary and preparation list', invoice.photographer.whatsappBody.includes('Booking summary') && invoice.photographer.whatsappBody.includes('newbornprep'));
+check('photographer WhatsApp invoice includes outfit selection', invoice.photographer.whatsappBody.includes('Client own outfit'));
 
 console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'}`);
 process.exit(failures === 0 ? 0 : 1);

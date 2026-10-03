@@ -23,6 +23,18 @@ export type NotifyBooking = {
   clientName: string;
   bundleSessionNumber?: number | null;
   clientEmail?: string;
+  clientPhone?: string;
+  address?: string;
+  notes?: string;
+  setupChoiceNotes?: string;
+  setupSelections?: { slot: number; referencePhotoUrls: string[]; note?: string; outfitSource?: 'mamamiyo' | 'own' | null }[];
+  inspirationReferencePhotoUrls?: string[];
+  referencePhotoUrls?: string[];
+  total?: number;
+  depositAmount?: number;
+  balanceDue?: number;
+  discountAmount?: number;
+  extraLineItems?: { description: string; amount: number }[];
 };
 
 type Message = { emailSubject: string; emailBody: string; whatsappBody: string };
@@ -30,6 +42,50 @@ export type NotificationPair = { client: Message; photographer: Message };
 
 function firstNameOf(fullName: string): string {
   return fullName.split(' ')[0];
+}
+
+function photographerBookingSummary(b: NotifyBooking): string {
+  const location = b.location === 'home'
+    ? `Client home${b.address ? ` — ${b.address}` : ''}`
+    : studioAddressText();
+  const selections = Array.isArray(b.setupSelections) ? b.setupSelections : [];
+  const outfitLines = selections.length
+    ? selections.flatMap((selection, index) => {
+        const source = selection.outfitSource === 'mamamiyo'
+          ? 'Mamamiyo outfit'
+          : selection.outfitSource === 'own'
+            ? 'Client own outfit'
+            : 'Not selected';
+        return [
+          `Setup ${selection.slot || index + 1}: ${source}${selection.note?.trim() ? ` — ${selection.note.trim()}` : ''}`,
+          ...(selection.referencePhotoUrls || []).map((url) => `  Reference: ${url}`),
+        ];
+      })
+    : ['No outfit/setup selection submitted'];
+  const extras = Array.isArray(b.extraLineItems) ? b.extraLineItems : [];
+  const inspiration = Array.isArray(b.inspirationReferencePhotoUrls) ? b.inspirationReferencePhotoUrls : [];
+  const references = Array.isArray(b.referencePhotoUrls) ? b.referencePhotoUrls : [];
+
+  return [
+    `📋 Booking summary`,
+    `Client: ${b.clientName}`,
+    b.clientPhone ? `Phone: ${b.clientPhone}` : '',
+    `Package: ${b.sessionLabel}`,
+    `Date: ${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`,
+    `Location: ${location}`,
+    typeof b.total === 'number' ? `Package total: $${b.total}` : '',
+    typeof b.depositAmount === 'number' ? `Deposit: $${b.depositAmount}` : '',
+    typeof b.balanceDue === 'number' ? `Balance: $${b.balanceDue}` : '',
+    typeof b.discountAmount === 'number' && b.discountAmount > 0 ? `Discount: -$${b.discountAmount}` : '',
+    extras.length ? `Additional items:\n${extras.map((item) => `• ${item.description}: $${item.amount}`).join('\n')}` : 'Additional items: None',
+    `\n👗 Outfit / setup selection`,
+    ...outfitLines,
+    b.setupChoiceNotes?.trim() ? `Setup notes: ${b.setupChoiceNotes.trim()}` : '',
+    inspiration.length ? `Inspiration photos:\n${inspiration.join('\n')}` : '',
+    references.length ? `Reference photos:\n${references.join('\n')}` : '',
+    b.notes?.trim() ? `Notes:\n${b.notes.trim()}` : '',
+    `Ref: ${b.ref}`,
+  ].filter(Boolean).join('\n');
 }
 
 /** Session 1 of a bundle, or any standalone package's deposit confirmation.
@@ -211,7 +267,7 @@ export function reminderNotification(b: NotifyBooking, threshold: ReminderThresh
   else intro = `Quick reminder — your ${b.sessionLabel} starts in about 2 hours, at ${fmtTime12(b.startTime)} today.`;
 
   const prepLine = threshold.key === '3day' && prep ? `Haven't checked our prep guide yet? ${prep.url}` : '';
-  const photographerPrepLine = threshold.key === '3day' && prep
+  const photographerPrepLine = (threshold.key === '3day' || threshold.key === '1day') && prep
     ? `Client preparation list: ${prep.url}`
     : '';
 
@@ -227,14 +283,15 @@ export function reminderNotification(b: NotifyBooking, threshold: ReminderThresh
     photographer: {
       emailSubject: `Upcoming session reminder`,
       emailBody: `Session with ${b.clientName} is ${threshold.label} — ${whenStr}. Ref ${b.ref}.`,
-      whatsappBody: [
-        `📅 Appointment reminder`,
-        `${b.clientName} — ${b.sessionLabel}`,
-        `${whenStr}`,
-        `Location: ${b.location === 'home' ? 'Client home' : 'Studio'}`,
-        `Ref: ${b.ref}`,
-        photographerPrepLine,
-      ].filter(Boolean).join('\n'),
+      whatsappBody: threshold.key === '2hr'
+        ? [
+            `📅 Appointment reminder — in about 2 hours`,
+            `${b.clientName} — ${b.sessionLabel}`,
+            `${whenStr}`,
+            `Location: ${b.location === 'home' ? 'Client home' : 'Studio'}`,
+            `Ref: ${b.ref}`,
+          ].join('\n')
+        : [photographerBookingSummary(b), photographerPrepLine].filter(Boolean).join('\n\n'),
     },
   };
 }
@@ -265,9 +322,7 @@ export function invoiceNotification(
 ): NotificationPair {
   const firstName = firstNameOf(b.clientName);
   const whenStr = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
-  const extraSummary = extraLineItems.length
-    ? `\nAdditional items:\n${extraLineItems.map((item) => `• ${item.description}: $${item.amount}`).join('\n')}`
-    : '';
+  const prep = prepLinkFor(b);
 
   // Bundle payment schedule — shown for all bundle sessions so client understands the structure
   // Payment schedule shown in yellow box section — not repeated in email body
@@ -287,12 +342,10 @@ export function invoiceNotification(
       emailSubject: `Invoice for balance payment sent — ${b.clientName}`,
       emailBody: `Invoice sent to ${b.clientName}.\n\nSession: ${b.sessionLabel}\nDate: ${whenStr}\nRef: ${invoiceRef}\nAmount due: $${due}`,
       whatsappBody: [
-        `🧾 Client invoice ready`,
-        `${b.clientName} — ${b.sessionLabel}`,
-        `Session: ${whenStr}`,
-        `Invoice ref: ${invoiceRef}`,
-        `Balance due: $${due}${extraSummary}`,
-      ].join('\n'),
+        `🧾 Client invoice ready — ${invoiceRef}`,
+        photographerBookingSummary({ ...b, balanceDue: due, extraLineItems }),
+        prep ? `Client preparation list: ${prep.url}` : '',
+      ].filter(Boolean).join('\n\n'),
     },
   };
 }

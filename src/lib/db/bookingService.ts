@@ -217,8 +217,20 @@ export async function createBooking(db: any, input: CreateBookingInput) {
 
 }
 
-function toNotifyBooking(b: { ref: string; sessionTypeId: string; sessionLabel: string; location: string; date: string; startTime: string; clientName: string; bundleSessionNumber: number | null }): NotifyBooking {
-  return { ...b };
+function toNotifyBooking(b: {
+  ref: string; sessionTypeId: string; sessionLabel: string; location: string; date: string; startTime: string;
+  clientName: string; bundleSessionNumber: number | null; clientEmail?: string; clientPhone?: string;
+  address?: string; notes?: string; setupChoiceNotes?: string; setupSelections?: unknown;
+  inspirationReferencePhotoUrls?: unknown; referencePhotoUrls?: unknown; total?: number;
+  depositAmount?: number; balanceDue?: number; discountAmount?: number; extraLineItems?: unknown;
+}): NotifyBooking {
+  return {
+    ...b,
+    setupSelections: Array.isArray(b.setupSelections) ? b.setupSelections as NotifyBooking['setupSelections'] : [],
+    inspirationReferencePhotoUrls: Array.isArray(b.inspirationReferencePhotoUrls) ? b.inspirationReferencePhotoUrls as string[] : [],
+    referencePhotoUrls: Array.isArray(b.referencePhotoUrls) ? b.referencePhotoUrls as string[] : [],
+    extraLineItems: Array.isArray(b.extraLineItems) ? b.extraLineItems as { description: string; amount: number }[] : [],
+  };
 }
 
 export async function confirmDepositAndNotify(db: any, bookingId: string) {

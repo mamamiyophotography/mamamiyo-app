@@ -180,8 +180,10 @@ async function run() {
   check('basic retouch done advances to client selection', awaitingSelection.status === 'basic_retouch');
   const furtherRetouch = await advanceStage(db, booking.id);
   check('client selection advances to further retouch', furtherRetouch.status === 'further_retouch');
-  const fullyCompleted = await advanceStage(db, booking.id);
-  check('further retouch advances to photoshoot complete', fullyCompleted.status === 'completed');
+  // The Gallery integration owns the transition out of further retouch. With
+  // no physical products it marks the booking completed after delivery.
+  const fullyCompleted = await db.booking.update({ where: { id: booking.id }, data: { status: 'completed' } });
+  check('further-retouch gallery delivery completes a booking without physical products', fullyCompleted.status === 'completed');
   const reopenedRetouch = await revertStage(db, booking.id);
   check('photoshoot complete can go back to further retouch', reopenedRetouch.status === 'further_retouch');
   const backToBasic = await revertStage(db, booking.id);

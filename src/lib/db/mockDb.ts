@@ -236,5 +236,13 @@ export function createMockDb(seed: {
     },
   };
 
+  // The production Prisma client exposes this model. Most service tests do
+  // not seed physical-product orders, so the in-memory adapter returns zero.
+  (db as any).additionalOrder = {
+    async count() {
+      return 0;
+    },
+  };
+
   return db;
 }
