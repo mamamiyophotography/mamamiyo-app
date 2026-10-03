@@ -6,6 +6,8 @@ import { buildPayNowPayload } from '@/lib/paynow';
 import QRCode from 'qrcode';
 import { hasBookedPhysicalProduct } from '@/lib/constants';
 import { brandedFromAddress } from '@/lib/email';
+import { socialMediaUploadReminder } from '@/lib/notifications';
+import { sendWhatsApp } from '@/lib/whatsapp';
 
 const prisma = new PrismaClient();
 function authorized(req: NextRequest) {
@@ -167,6 +169,9 @@ export async function POST(req: NextRequest) {
     attachments:[{filename:`${booking.ref}-retouch-notes.html`,content:Buffer.from(html).toString('base64')}]},
     {idempotencyKey:`gallery-${entry.galleryId}-${eventKey}`});
   if (result.error) return NextResponse.json({error:'Email pending retry; selection is saved'}, {status:503});
+  if (entry.deliveredAt && process.env.PHOTOGRAPHER_PHONE) {
+    await sendWhatsApp(process.env.PHOTOGRAPHER_PHONE, socialMediaUploadReminder(booking));
+  }
   await prisma.galleryInbox.updateMany({where:{galleryId:entry.galleryId,version:entry.version},data:{emailKey:eventKey,emailSentAt:new Date()}});
   return NextResponse.json({ok:true,bundleRetention});
 }

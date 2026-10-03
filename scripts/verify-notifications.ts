@@ -6,6 +6,7 @@ import {
   balanceReceivedNotification,
   invoiceNotification,
   reminderNotification,
+  socialMediaUploadReminder,
   bundleContextAfterBalance,
   REMINDER_THRESHOLDS,
   NotifyBooking,
@@ -109,6 +110,9 @@ check('photographer 1-day reminder repeats the preparation list', oneDayReminder
 const twoHourReminder = reminderNotification(newborn, REMINDER_THRESHOLDS[2], business);
 check('the 2-hour reminder does NOT repeat the prep-guide nudge', !twoHourReminder.client.emailBody.includes('prep guide'));
 check('photographer 2-hour WhatsApp reminder does NOT repeat the preparation list', !twoHourReminder.photographer.whatsappBody.includes('newbornprep'));
+const socialMediaReminder = socialMediaUploadReminder(newborn);
+check('completed further-retouch reminder asks for a Google Drive upload', socialMediaReminder.includes('Google Drive') && socialMediaReminder.includes('social media posting'));
+check('completed further-retouch reminder identifies the booking', socialMediaReminder.includes(newborn.clientName) && socialMediaReminder.includes(newborn.ref));
 
 const invoice = invoiceNotification(newborn, 388, 'BAL-JANE-2210', [
   { description: 'Extra person', amount: 50 },

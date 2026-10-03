@@ -87,6 +87,15 @@ function photographerBookingSummary(b: NotifyBooking): string {
   ].filter(Boolean).join('\n');
 }
 
+export function socialMediaUploadReminder(b: Pick<NotifyBooking, 'clientName' | 'sessionLabel' | 'ref'>): string {
+  return [
+    '📤 Google Drive upload reminder',
+    `Further retouch is complete for ${b.clientName} — ${b.sessionLabel}.`,
+    'Please upload the finished photos to Google Drive for social media posting.',
+    `Ref: ${b.ref}`,
+  ].join('\n');
+}
+
 /** Session 1 of a bundle, or any standalone package's deposit confirmation.
  *  Deliberately says nothing about bundle sessions 2/3 or activation —
  *  that only belongs in the balance-confirmation message (see below). */
