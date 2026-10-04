@@ -1,0 +1,33 @@
+scripts/verify-booking-service.ts(199,90): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/app/api/admin/bookings/[id]/apply-discount/route.ts(28,9): error TS2322: Type '{ increment: number; }' is not assignable to type 'number'.
+src/app/api/admin/bookings/route.ts(30,8): error TS2339: Property 'galleryInbox' does not exist on type 'Db'.
+src/app/api/admin/bookings/route.ts(36,8): error TS2339: Property 'additionalOrder' does not exist on type 'Db'.
+src/app/api/admin/bookings/route.ts(38,112): error TS7006: Parameter 'g' implicitly has an 'any' type.
+src/app/api/admin/bookings/route.ts(38,167): error TS7006: Parameter 'o' implicitly has an 'any' type.
+src/app/g/[code]/route.ts(7,28): error TS2339: Property 'galleryInbox' does not exist on type 'Db'.
+src/lib/bookingService.ts(17,30): error TS2307: Cannot find module './types' or its corresponding type declarations.
+src/lib/bookingService.ts(18,54): error TS2307: Cannot find module '../constants' or its corresponding type declarations.
+src/lib/bookingService.ts(19,58): error TS2307: Cannot find module '../pricing' or its corresponding type declarations.
+src/lib/bookingService.ts(20,55): error TS2307: Cannot find module '../availability' or its corresponding type declarations.
+src/lib/bookingService.ts(31,8): error TS2307: Cannot find module '../notifications' or its corresponding type declarations.
+src/lib/bookingService.ts(32,38): error TS2307: Cannot find module '../notify' or its corresponding type declarations.
+src/lib/bookingService.ts(33,42): error TS2307: Cannot find module '../ics' or its corresponding type declarations.
+src/lib/bookingService.ts(123,33): error TS7006: Parameter 'tx' implicitly has an 'any' type.
+src/lib/bookingService.ts(328,47): error TS2307: Cannot find module '../pricing' or its corresponding type declarations.
+src/lib/bookingService.ts(382,32): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/lib/bookingService.ts(383,30): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/lib/db/bookingService.ts(146,33): error TS7006: Parameter 'tx' implicitly has an 'any' type.
+src/lib/db/bookingService.ts(792,32): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/lib/db/bookingService.ts(793,30): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/lib/db/mockDb.ts(133,5): error TS2741: Property 'delete' is missing in type '{ findFirst(args: { where: unknown; }): Promise<Booking | null>; findMany(args: { where?: unknown; select?: unknown; orderBy?: unknown; } | undefined): Promise<Booking[]>; findUniqueOrThrow(args: { ...; }): Promise<...>; create(args: { ...; }): Promise<...>; update(args: { ...; }): Promise<...>; updateMany(args: { ....' but required in type '{ findFirst(args: { where: unknown; }): Promise<Booking | null>; findMany(args?: { where?: unknown; select?: unknown; orderBy?: unknown; } | undefined): Promise<Booking[]>; findUniqueOrThrow(args: { ...; }): Promise<...>; ... 4 more ...; count(args: { ...; }): Promise<...>; }'.
+src/src/lib/notify.ts(1,27): error TS2307: Cannot find module './email' or its corresponding type declarations.
+src/src/lib/notify.ts(2,30): error TS2307: Cannot find module './whatsapp' or its corresponding type declarations.
+src/src/lib/notify.ts(3,34): error TS2307: Cannot find module './notifications' or its corresponding type declarations.
+src/src/lib/notify.ts(4,52): error TS2307: Cannot find module './ics' or its corresponding type declarations.
+src/src/lib/notify.ts(6,33): error TS2307: Cannot find module './format' or its corresponding type declarations.
+src/update_breakdown/src/lib/notify.ts(1,27): error TS2307: Cannot find module './email' or its corresponding type declarations.
+src/update_breakdown/src/lib/notify.ts(2,30): error TS2307: Cannot find module './whatsapp' or its corresponding type declarations.
+src/update_breakdown/src/lib/notify.ts(3,34): error TS2307: Cannot find module './notifications' or its corresponding type declarations.
+src/update_breakdown/src/lib/notify.ts(4,52): error TS2307: Cannot find module './ics' or its corresponding type declarations.
+src/update_breakdown/src/lib/notify.ts(5,29): error TS2307: Cannot find module './constants' or its corresponding type declarations.
+src/update_breakdown/src/lib/notify.ts(6,33): error TS2307: Cannot find module './format' or its corresponding type declarations.

@@ -1,3 +1,4 @@
+import { withoutPrivateAnalytics } from '@/lib/analytics/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/client';
 import { cancelBooking } from '@/lib/db/bookingService';
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   try {
     const booking = await cancelBooking(db, id, undefined, body.email);
-    return NextResponse.json({ booking });
+    return NextResponse.json(withoutPrivateAnalytics({ booking }));
   } catch (err) {
     const message = (err as Error).message;
     if (message === 'EMAIL_MISMATCH') {

@@ -149,6 +149,8 @@ export function createMockDb(seed: {
         const booking: Booking = {
           id: newId(),
           notes: '',
+          photoSharingConsent: 'not_recorded',
+          photoSharingConsentAt: null,
           discountCode: null,
           discountAmount: 0,
           extraLineItems: [],

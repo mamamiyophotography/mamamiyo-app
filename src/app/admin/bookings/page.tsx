@@ -6,6 +6,7 @@ import { ADDONS, STATUS_LABELS } from '@/lib/constants';
 import BookingSummaryModal from '@/components/BookingSummaryModal';
 import EditBookingModal from '@/components/EditBookingModal';
 import ManageGalleryModal from '@/components/ManageGalleryModal';
+import { photoSharingConsentLabel } from '@/lib/photoConsent';
 
 type Booking = {
   additionalOrders?: {id:string;galleryId:string;version:number;items:{name:string;quantity:number;amount:number;bonusRetouches:number}[];total:number;bonusRetouches:number;status:string;invoiceRef:string;createdAt:string;paidAt:string|null}[];
@@ -14,6 +15,7 @@ type Booking = {
   date: string; startTime: string; endTime: string; isWeekend: boolean; addOns: Record<string, number>;
   notes: string; setupChoiceNotes: string; address: string; discountCode: string | null; discountAmount: number;
   clientName: string; clientEmail: string; clientPhone: string;
+  photoSharingConsent?: string;
   subtotal: number; total: number; depositAmount: number; balanceDue: number;
   extraLineItems: { description: string; amount: number }[]; invoiceRef: string | null;
   invoiceStale: boolean; version: number;
@@ -162,6 +164,52 @@ export default function AdminBookingsPage() {
       ctx.fillStyle = '#6b6152'; ctx.font = '700 30px Arial'; ctx.fillText(due === 0 ? 'No payment due' : 'PayNow QR unavailable', 540, qrY + 113);
     }
     return canvas.toDataURL('image/png');
+  }
+
+  function safeFolderPart(value: string) {
+    return value.replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/g, '');
+  }
+
+  async function createLocalJobFolder(booking: Booking) {
+    const picker = (window as Window & {
+      showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
+    }).showDirectoryPicker;
+    if (!picker) {
+      setActionError({ id: booking.id, message: 'Local folder creation requires Chrome or Edge on a desktop computer.' });
+      return false;
+    }
+    try {
+      const root = await picker({ mode: 'readwrite' });
+      const consentSuffix = booking.photoSharingConsent === 'all'
+        ? 'SOCIAL APPROVED'
+        : booking.photoSharingConsent === 'children_only'
+          ? 'CHILDREN ONLY FOR SOCIAL'
+          : 'PRIVATE — DO NOT POST';
+      const folderName = safeFolderPart(`${booking.date} ${booking.clientName} ${booking.sessionLabel} — ${consentSuffix}`);
+      const jobFolder = await root.getDirectoryHandle(folderName, { create: true });
+      const socialFolder = booking.photoSharingConsent === 'all'
+        ? '04 SOCIAL CANDIDATES'
+        : booking.photoSharingConsent === 'children_only'
+          ? '04 SOCIAL CANDIDATES — CHILDREN ONLY'
+          : '04 DO NOT USE FOR SOCIAL MEDIA';
+      for (const name of ['01 RAW', '02 BASIC EDIT', '03 FURTHER RETOUCH', socialFolder, '05 CLIENT DELIVERY']) {
+        await jobFolder.getDirectoryHandle(name, { create: true });
+      }
+      return true;
+    } catch (error) {
+      if ((error as DOMException).name !== 'AbortError') {
+        setActionError({ id: booking.id, message: `Could not create the local job folder: ${(error as Error).message}` });
+      }
+      return false;
+    }
+  }
+
+  async function finishSessionAndCreateFolder(booking: Booking) {
+    setActionError(null);
+    const created = await createLocalJobFolder(booking);
+    if (!created) return;
+    const result = await runAction(booking.id, 'mark-completed');
+    if (result) setActionSuccess({ id: booking.id, message: 'Session marked done and the complete local folder structure was created.' });
   }
 
   function roundedInvoiceBox(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
@@ -315,6 +363,7 @@ export default function AdminBookingsPage() {
                 <div className="ticket-row"><span>Location</span><b>{b.location === 'home' ? "Client's home" : 'Studio'}</b></div>
                 <div className="ticket-row"><span>Email</span><b>{b.clientEmail}</b></div>
                 <div className="ticket-row"><span>Phone</span><b>{b.clientPhone}</b></div>
+                <div className="ticket-row"><span>Photo sharing</span><b>{photoSharingConsentLabel(b.photoSharingConsent)}</b></div>
                 {b.address && <div className="ticket-row"><span>Address</span><b>{b.address}</b></div>}
                 <div className="ticket-row"><span>Add-ons</span><b>{Object.entries(b.addOns).filter(([, q]) => q > 0).map(([id, q]) => `${ADDONS[id]?.name} ×${q}`).join(', ') || '—'}</b></div>
                 {b.isWeekend && <div className="ticket-row"><span>Weekend surcharge</span><b>+$50</b></div>}
@@ -483,7 +532,7 @@ export default function AdminBookingsPage() {
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-deposit')}>Confirm deposit received</button>
                   )}
                   {b.status === 'confirmed' && (
-                    <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Mark session done</button>
+                    <button className="btn btn-primary" disabled={isBusy} onClick={() => finishSessionAndCreateFolder(b)}>Mark session done &amp; create folders</button>
                   )}
                   {b.status === 'confirmed' && (
                     <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>

@@ -43,6 +43,8 @@ export type Booking = {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
+  photoSharingConsent: string;
+  photoSharingConsentAt: Date | null;
   subtotal: number;
   total: number;
   depositAmount: number;

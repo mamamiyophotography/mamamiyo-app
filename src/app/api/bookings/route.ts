@@ -3,6 +3,7 @@ import { db } from '@/lib/db/client';
 import { createBooking, CreateBookingInput } from '@/lib/db/bookingService';
 import { buildPayNowPayload } from '@/lib/paynow';
 import { getSettings } from '@/lib/db/bookingService';
+import { isPhotoSharingConsent } from '@/lib/photoConsent';
 
 export async function POST(req: NextRequest) {
   let input: CreateBookingInput;
@@ -13,6 +14,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    if (!isPhotoSharingConsent(input.photoSharingConsent)) {
+      return NextResponse.json({ error: 'Please select a photo sharing preference.' }, { status: 400 });
+    }
     const booking = await createBooking(db, input);
     const settings = await getSettings(db);
 
@@ -34,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     // Exclude referencePhotoUrls from response — large URLs aren't needed
     // by the client at this point and can push past Vercel's 4.5MB limit
-    const { referencePhotoUrls: _photos, ...bookingSlim } = booking as any;
+    const { referencePhotoUrls: _photos, analyticsAttribution: _attribution, ...bookingSlim } = booking as any;
     return NextResponse.json({ booking: bookingSlim, payNowPayload }, { status: 201 });
   } catch (err) {
     const message = (err as Error).message;

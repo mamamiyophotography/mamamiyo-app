@@ -1,0 +1,88 @@
+
+> mamamiyo-booking@0.1.0 build
+> next build
+
+▲ Next.js 16.3.1 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.js took 18ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1161ms
+  Skipping validation of types
+  Finished TypeScript config validation in 7ms ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/35) ...
+  Generating static pages using 11 workers (8/35) 
+  Generating static pages using 11 workers (17/35) 
+  Generating static pages using 11 workers (26/35) 
+✓ Generating static pages using 11 workers (35/35) in 338ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin
+├ ○ /admin/availability
+├ ○ /admin/bookings
+├ ○ /admin/bundles
+├ ○ /admin/discounts
+├ ○ /admin/import
+├ ○ /admin/login
+├ ○ /admin/settings
+├ ƒ /api/admin/availability
+├ ƒ /api/admin/availability/[id]
+├ ƒ /api/admin/bookings
+├ ƒ /api/admin/bookings/[id]
+├ ƒ /api/admin/bookings/[id]/advance-stage
+├ ƒ /api/admin/bookings/[id]/apply-discount
+├ ƒ /api/admin/bookings/[id]/cancel
+├ ƒ /api/admin/bookings/[id]/confirm-additional-order
+├ ƒ /api/admin/bookings/[id]/confirm-balance
+├ ƒ /api/admin/bookings/[id]/confirm-deposit
+├ ƒ /api/admin/bookings/[id]/delete
+├ ƒ /api/admin/bookings/[id]/extra-line-item
+├ ƒ /api/admin/bookings/[id]/gallery
+├ ƒ /api/admin/bookings/[id]/generate-invoice
+├ ƒ /api/admin/bookings/[id]/mark-completed
+├ ƒ /api/admin/bookings/[id]/reopen-balance
+├ ƒ /api/admin/bookings/[id]/revert-stage
+├ ƒ /api/admin/bookings/[id]/setup-choice
+├ ƒ /api/admin/bookings/[id]/skip-further-retouch
+├ ƒ /api/admin/bookings/[id]/update-addons
+├ ƒ /api/admin/bookings/[id]/update-booking
+├ ƒ /api/admin/bundles
+├ ƒ /api/admin/bundles/[id]/activate
+├ ƒ /api/admin/discounts
+├ ƒ /api/admin/discounts/[id]
+├ ƒ /api/admin/import-booking
+├ ƒ /api/admin/login
+├ ƒ /api/admin/logout
+├ ƒ /api/admin/public-holidays
+├ ƒ /api/admin/public-holidays/[id]
+├ ƒ /api/admin/settings
+├ ƒ /api/analytics/withdraw
+├ ƒ /api/availability
+├ ƒ /api/bookings
+├ ƒ /api/bookings/[id]/cancel
+├ ƒ /api/bookings/lookup
+├ ƒ /api/bundles/[id]/redeem
+├ ƒ /api/cron/balance-invoices
+├ ƒ /api/cron/reminders
+├ ƒ /api/debug-booking
+├ ƒ /api/discounts/[code]
+├ ƒ /api/integrations/gallery
+├ ƒ /api/upload
+├ ○ /apple-icon.png
+├ ○ /book
+├ ƒ /g/[code]
+├ ○ /icon.svg
+├ ○ /lookup
+├ ○ /manifest.webmanifest
+└ ○ /privacy
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

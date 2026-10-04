@@ -1,3 +1,4 @@
+import { bookingAnalytics, confirmWithAnalytics } from '../analytics/server';
 // The complete booking lifecycle, ported from the prototype's stateful
 // functions (createPendingBooking, confirmDeposit, markCompleted,
 // generateInvoice, confirmBalance, cancelBooking, redeemBundleSession,
@@ -35,6 +36,7 @@ import { buildEmailHtml, sendEmail } from '../email';
 import { generateIcs, icsToBase64 } from '../ics';
 import { fmtDatePretty } from '../format';
 import { balancePaymentReference } from '../paynow';
+import { isPhotoSharingConsent } from '../photoConsent';
 
 const PHOTOGRAPHER_EMAIL_ENV = 'PHOTOGRAPHER_EMAIL';
 const PHOTOGRAPHER_PHONE_ENV = 'PHOTOGRAPHER_PHONE';
@@ -86,6 +88,7 @@ export async function getAvailableSlots(db: any, sessionTypeId: string, excludeB
 }
 
 export type CreateBookingInput = {
+  analyticsAttribution?: unknown;
   sessionTypeId: string;
   date: string;
   startTime: string;
@@ -106,6 +109,7 @@ export type CreateBookingInput = {
   clientEmail: string;
   countryCode: string;
   phone: string;
+  photoSharingConsent?: string;
 };
 
 export async function createBooking(db: any, input: CreateBookingInput) {
@@ -113,6 +117,8 @@ export async function createBooking(db: any, input: CreateBookingInput) {
   if (!st) throw new Error(`Unknown session type: ${input.sessionTypeId}`);
   if (st.location === 'home' && !input.address.trim()) throw new Error('Home address is required for this package.');
   if(input.siblingJoining==='yes'&&input.siblingCount!==undefined&&(!Number.isSafeInteger(input.siblingCount)||Number(input.siblingCount)<1))throw new Error('Enter how many siblings will be joining.');
+  const photoSharingConsent = input.photoSharingConsent ?? 'not_recorded';
+  if (photoSharingConsent !== 'not_recorded' && !isPhotoSharingConsent(photoSharingConsent)) throw new Error('Please select a photo sharing preference.');
   const setupSelectionCount = Number(input.setupSelectionCount ?? 0);
   if (!Number.isSafeInteger(setupSelectionCount) || setupSelectionCount < 0 || setupSelectionCount > 3) throw new Error('Number of setup selections must be between 0 and 3.');
   const setupSelections = Array.isArray(input.setupSelections) ? input.setupSelections : [];
@@ -174,6 +180,7 @@ export async function createBooking(db: any, input: CreateBookingInput) {
     const booking = await tx.booking.create({
       data: {
         ref,
+        ...bookingAnalytics(input.analyticsAttribution),
         sessionTypeId: st.id,
         sessionLabel: st.isBundle ? 'First Year Bundle — session 1 of 3' : st.name,
         location: st.location,
@@ -198,6 +205,8 @@ export async function createBooking(db: any, input: CreateBookingInput) {
         clientName: input.clientName,
         clientEmail: input.clientEmail,
         clientPhone,
+        photoSharingConsent,
+        photoSharingConsentAt: photoSharingConsent === 'not_recorded' ? null : new Date(),
         subtotal: pricing.subtotal,
         total: pricing.total,
         depositAmount: pricing.depositAmount,
@@ -220,6 +229,7 @@ export async function createBooking(db: any, input: CreateBookingInput) {
 function toNotifyBooking(b: {
   ref: string; sessionTypeId: string; sessionLabel: string; location: string; date: string; startTime: string;
   clientName: string; bundleSessionNumber: number | null; clientEmail?: string; clientPhone?: string;
+  photoSharingConsent?: string;
   address?: string; notes?: string; setupChoiceNotes?: string; setupSelections?: unknown;
   inspirationReferencePhotoUrls?: unknown; referencePhotoUrls?: unknown; total?: number;
   depositAmount?: number; balanceDue?: number; discountAmount?: number; extraLineItems?: unknown;
@@ -235,10 +245,7 @@ function toNotifyBooking(b: {
 
 export async function confirmDepositAndNotify(db: any, bookingId: string) {
   const settings = await getSettings(db);
-  const booking = await db.booking.update({
-    where: { id: bookingId },
-    data: { status: 'confirmed', depositStatus: 'paid' },
-  });
+  const booking = await confirmWithAnalytics(db, bookingId);
 
   if (booking.bundleParentId) {
     const bundle = await db.bundle.findUnique({ where: { id: booking.bundleParentId } });
@@ -683,7 +690,9 @@ export async function redeemBundleSessionAndNotify(
   notes: string = '',
   babyGender: string = '',
   siblingJoining: string = '',
+  photoSharingConsent: string = 'not_recorded',
 ) {
+  if (photoSharingConsent !== 'not_recorded' && !isPhotoSharingConsent(photoSharingConsent)) throw new Error('Please select a photo sharing preference.');
   if (!Number.isSafeInteger(setupSelectionCount) || setupSelectionCount < 0 || setupSelectionCount > 3) throw new Error('Number of setup selections must be between 0 and 3.');
   if (!Array.isArray(setupSelections) || setupSelections.length > 3 || setupSelections.some(group=>!Number.isSafeInteger(group?.slot)||group.slot<1||group.slot>3||!Array.isArray(group.referencePhotoUrls)||group.referencePhotoUrls.length>3||(group.note!==undefined&&(typeof group.note!=='string'||group.note.length>300))||![undefined,null,'mamamiyo','own'].includes(group.outfitSource))) throw new Error('Each Setup may contain up to 3 reference photos, an outfit source and a short note.');
   if(!Array.isArray(inspirationReferencePhotoUrls)||inspirationReferencePhotoUrls.length>10)throw new Error('Up to 10 Inspirational Reference photos are allowed.');
@@ -727,6 +736,8 @@ export async function redeemBundleSessionAndNotify(
       clientName: bundle.clientName,
       clientEmail: bundle.clientEmail,
       clientPhone: bundle.clientPhone,
+      photoSharingConsent,
+      photoSharingConsentAt: photoSharingConsent === 'not_recorded' ? null : new Date(),
       subtotal: balanceDue,
       total: balanceDue,
       depositAmount: 0,

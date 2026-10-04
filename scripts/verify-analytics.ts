@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {Script} from 'node:vm';
+import {cleanAttribution,safeReferrer,safeCampaign} from '../src/lib/analytics/shared';
+import {bookingAnalytics,confirmWithAnalytics,deliverOutbox,withoutPrivateAnalytics} from '../src/lib/analytics/server';
+import {bootAnalytics,event,attribution,setConsent} from '../src/lib/analytics/client';
+async function run(){
+ assert.equal(safeReferrer('https://www.google.com/search?q=private@example.com'),'https://www.google.com/');assert.equal(safeReferrer('https://private.example.com/alice'),'');assert.equal(safeCampaign('?utm_source=alice@example.com&utm_campaign=private').campaign_source,'unknown');
+ const a={consent:true,capturedAt:Date.now(),source:'google',medium:'organic',landingPage:'/package',clientId:'123.456',sessionId:'789',test:false};
+ assert.equal(cleanAttribution({...a,consent:false}),null);
+ assert.equal(cleanAttribution({...a,capturedAt:Date.now()-31*60000}),null);
+ const dirty=cleanAttribution({...a,source:'alice@example.com',medium:'+6591234567',landingPage:'/lookup?email=private@example.com',clientId:'private',ip:'1.2.3.4',name:'Alice'})!;
+ assert.equal(dirty.source,'unknown');assert.equal(dirty.medium,'unknown');assert.equal(dirty.landingPage,'/');assert.equal(dirty.clientId,undefined);assert(!JSON.stringify(dirty).includes('Alice'));assert(!JSON.stringify(dirty).includes('1.2.3.4'));
+ process.env.ANALYTICS_DB_ENABLED='true';const fields=bookingAnalytics(a) as any;assert.match(fields.analyticsReference,/^[0-9a-f-]{36}$/);
+ assert(!JSON.stringify(withoutPrivateAnalytics({bookings:[{analyticsAttribution:a,analyticsReference:fields.analyticsReference}]})).includes('123.456'));
+ const record:any={id:'one',depositStatus:'pending',sessionTypeId:'newborn',depositAmount:100,...fields};const outbox:any[]=[];
+ const tx:any={booking:{findUniqueOrThrow:async()=>({...record}),update:async({data}:any)=>Object.assign(record,data)},analyticsOutbox:{upsert:async({create}:any)=>{if(!outbox.some(e=>e.eventKey===create.eventKey))outbox.push({id:'outbox',claimedAt:null,...create});}}};
+ const database:any={...tx,$transaction:async(fn:any)=>fn(tx)};
+ await confirmWithAnalytics(database,'one');await confirmWithAnalytics(database,'one');assert.equal(outbox.length,1);assert.equal(outbox[0].payload.events[0].name,'booking_confirmed');assert.equal(outbox[0].payload.events[0].params.value,100);assert.equal(outbox[0].payload.events[0].params.currency,'SGD');
+ record.depositStatus='pending';record.analyticsAttribution={...a,test:true};await confirmWithAnalytics(database,'one');assert.equal(outbox.length,1);
+ database.analyticsOutbox={findMany:async()=>outbox.filter(r=>!r.claimedAt),updateMany:async({data}:any)=>{Object.assign(outbox[0],data);return {count:1}},update:async()=>{}};
+ let sent=0;process.env.ANALYTICS_SEND_ENABLED='true';process.env.GA4_API_SECRET='fake-test-secret';await deliverOutbox(database,async()=>{sent++;throw new Error('network uncertain');});await deliverOutbox(database,async()=>{sent++;return new Response();});assert.equal(sent,1);assert.equal(outbox[0].deliveryStatus,'uncertain');
+ const storage=()=>{const map=new Map<string,string>();return {getItem:(k:string)=>map.get(k)||null,setItem:(k:string,v:string)=>map.set(k,v),removeItem:(k:string)=>map.delete(k)}};
+ Object.assign(globalThis,{location:{pathname:'/book',hostname:'localhost',origin:'http://localhost:3000',search:''},localStorage:storage(),sessionStorage:storage(),window:{},document:{getElementById:()=>null,createElement:()=>({}),head:{appendChild:()=>{throw Error('Test loaded Google')}}}});
+ process.env.NEXT_PUBLIC_ANALYTICS_ENABLED='true';process.env.NEXT_PUBLIC_ANALYTICS_HOST='mamamiyo-app.vercel.app';
+ assert.equal(await attribution(),null);setConsent(true);bootAnalytics();const logged:any[]=[];const log=console.info;console.info=(...args)=>logged.push(args);event('booking_start',{package_type:'newborn'},'once');event('booking_start',{package_type:'newborn'},'once');assert.equal(logged.length,1);console.info=log;
+ assert.equal((await attribution())?.test,true);setConsent(false);assert.equal(await attribution(),null);
+ (globalThis as any).location.hostname='mamamiyo-app.vercel.app';(globalThis as any).location.origin='https://mamamiyo-app.vercel.app';(globalThis as any).location.search='?utm_source=alice@example.com&utm_campaign=private@example.com';
+ (globalThis as any).document.referrer='https://www.google.com/search?q=private@example.com';(globalThis as any).document.head.appendChild=()=>{};setConsent(true);bootAnalytics();
+ assert(!JSON.stringify((globalThis as any).window.dataLayer).includes('private@example.com'));assert(!JSON.stringify((globalThis as any).window.dataLayer).includes('alice@example.com'));
+ (globalThis as any).location.search='?analytics_debug=1';
+ (globalThis as any).sessionStorage.removeItem('mm_attribution_v1');
+ event('booking_start',{package_type:'newborn'},'debug-check');
+ const debugCall=Array.from((globalThis as any).window.dataLayer.at(-1)) as any[];
+ assert.equal(debugCall[2].debug_mode,true);
+ assert.equal((await attribution())?.test,true,'DebugView booking attribution must never create a real confirmation event');
+
+ new Script(readFileSync('docs/analytics/squarespace-injection.html','utf8').split('<script>')[1].split('</script>')[0]);
+ console.log('PASS: consent, PII allowlist, expiry, private client ID, confirmation dedupe, test suppression, uncertain delivery, browser dedupe, Squarespace syntax (no network, no real database, no notifications)');
+}
+run().catch(e=>{console.error(e);process.exitCode=1;});

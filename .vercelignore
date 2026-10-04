@@ -1,0 +1,4 @@
+.private-backups/
+.env*
+.claude/
+docs/

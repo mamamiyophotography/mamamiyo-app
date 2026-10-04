@@ -1,3 +1,4 @@
+import { withoutPrivateAnalytics } from '@/lib/analytics/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/client';
 import { lookupByEmail } from '@/lib/db/bookingService';
@@ -8,5 +9,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'email query param is required' }, { status: 400 });
   }
   const results = await lookupByEmail(db, email);
-  return NextResponse.json(results);
+  return NextResponse.json(withoutPrivateAnalytics(results));
 }

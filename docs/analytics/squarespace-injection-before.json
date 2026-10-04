@@ -1,0 +1,12 @@
+[
+  "<meta name=\"google-site-verification\" content=\"EVAl-3WrflMt3GWwiR3ElwIS9CtpdsMkJwWwVcf6cUY\" />\n<meta name=\"p:domain_verify\" content=\"46f167ba7bd61244a27425e480549b15\"/>\n\n<script type=\"application/ld+json\">\n{\n  \"@context\": \"https://schema.org\",\n  \"@type\": \"LocalBusiness\",\n  \"@id\": \"https://www.mamamiyo-photography.com/#business\",\n  \"name\": \"Mamamiyo Photography\",\n  \"image\": \"https://images.squarespace-cdn.com/content/v1/53f42c1be4b0ecc28e984c54/31072593-84f8-434e-bac2-e6ef98a3dcdb/01-primary-horizontal-transparent.png\",\n  \"description\": \"Professional maternity, newborn, and family photography in Singapore with studio and home visit services.\",\n  \"address\": {\n    \"@type\": \"PostalAddress\",\n    \"streetAddress\": \"32 Lor K, Telok Kurau, #01-01\",\n    \"addressLocality\": \"Singapore\",\n    \"postalCode\": \"425641\",\n    \"addressCountry\": \"SG\"\n  },\n  \"telephone\": \"+65 97600798\",\n  \"url\": \"https://www.mamamiyo-photography.com\",\n  \"priceRange\": \"$$\",\n  \"openingHoursSpecification\": [\n    {\n      \"@type\": \"OpeningHoursSpecification\",\n      \"dayOfWeek\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\"],\n      \"opens\": \"09:00\",\n      \"closes\": \"17:00\"\n    },\n    {\n      \"@type\": \"OpeningHoursSpecification\",\n      \"dayOfWeek\": [\"Saturday\", \"Sunday\"],\n      \"opens\": \"09:00\",\n      \"closes\": \"11:00\"\n    }\n  ],\n  \"sameAs\": [\n    \"https://www.instagram.com/mamamiyo.photography/\",\n    \"https://www.facebook.com/mamamiyo.photography/\"\n  ]\n}\n</script>\n\n<style id=\"mm-portfolio-theme-separators\">\n:is(#collection-54292910e4b005ef540d35d6,#collection-5bb340e78165f5429d0196a9,#collection-5bb33f0bb208fc1ee5fbbadd,#collection-5dc2405b0dfc9300ffaa0c21,#collection-6a93c5844a82787f2e4ef2e6,#collection-6a93cc56a285517b52ab2d42,#collection-6a93d72b8c4cab6b74612fc1,#collection-6a93c9f8aa50601f68d33ffa) :is(.gallery-block,.image-block) + :is(.markdown-block,.sqs-block-html,.sqs-block-code) {\n  border-top: 1px solid #d8c6b3;\n  padding-top: 30px;\n  margin-top: 30px;\n}\n</style>",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  ""
+]

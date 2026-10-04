@@ -1,6 +1,8 @@
+import { withoutPrivateAnalytics } from '@/lib/analytics/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/client';
 import { redeemBundleSessionAndNotify } from '@/lib/db/bookingService';
+import { isPhotoSharingConsent } from '@/lib/photoConsent';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,6 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     notes?: string;
     babyGender?: string;
     siblingJoining?: string;
+    photoSharingConsent?: string;
   };
   try {
     body = await req.json();
@@ -21,11 +24,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
   try {
+    if (!isPhotoSharingConsent(body.photoSharingConsent)) {
+      return NextResponse.json({ error: 'Please select a photo sharing preference.' }, { status: 400 });
+    }
     const booking = await redeemBundleSessionAndNotify(
       db, id, body.slot, body.addOns || {},
-      body.referencePhotoUrls || [], body.setupSelectionCount || 0, body.setupSelections || [], body.inspirationReferencePhotoUrls || [], body.notes || '', body.babyGender || '', body.siblingJoining || ''
+      body.referencePhotoUrls || [], body.setupSelectionCount || 0, body.setupSelections || [], body.inspirationReferencePhotoUrls || [], body.notes || '', body.babyGender || '', body.siblingJoining || '', body.photoSharingConsent
     );
-    return NextResponse.json({ booking }, { status: 201 });
+    return NextResponse.json(withoutPrivateAnalytics({ booking }), { status: 201 });
   } catch (err) {
     const message = (err as Error).message;
     if (message === 'BUNDLE_NOT_ACTIVATED') {

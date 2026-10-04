@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
+import { event, attribution, rememberBooking } from '@/lib/analytics/client';
 import { SESSION_TYPES, ADDONS, SessionType } from '@/lib/constants';
 import { computeBookingPricing } from '@/lib/pricing';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { MonthCalendar, CandidateSlot, startOfMonth, addMonths, fmtDateISO } from '@/components/MonthCalendar';
+import { PHOTO_SHARING_OPTIONS, photoSharingConsentLabel } from '@/lib/photoConsent';
 
 type Step = 'package' | 'calendar' | 'information' | 'setup' | 'addons' | 'review' | 'result';
 const BOOKING_STEPS: {id:Exclude<Step,'result'>;label:string}[] = [
@@ -41,6 +43,7 @@ export default function BookPage() {
   const [babyGender, setBabyGender] = useState('');
   const [siblingJoining, setSiblingJoining] = useState('');
   const [siblingCount,setSiblingCount]=useState('');
+  const [photoSharingConsent,setPhotoSharingConsent]=useState('');
   const [notes, setNotes] = useState('');
   const [setupPhotos, setSetupPhotos] = useState<{ file: File; previewUrl: string }[][]>([[], [], []]);
   const [setupNotes, setSetupNotes] = useState<string[]>(['', '', '']);
@@ -55,13 +58,26 @@ export default function BookPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ booking: { ref: string; status: string; date: string; startTime: string; sessionLabel: string; location: string; depositAmount: number }; payNowPayload: string } | null>(null);
+  const [result, setResult] = useState<{ booking: { ref: string; status: string; date: string; startTime: string; sessionLabel: string; location: string; depositAmount: number; analyticsReference?: string }; payNowPayload: string } | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   const sessionType: SessionType | undefined = SESSION_TYPES.find((s) => s.id === sessionTypeId);
   const includedSetupCount = sessionType?.referenceSetups || 1;
   const additionalSetupKey = sessionType?.id === 'maternity' ? 'extraOutfit' : 'extraSetup';
   const activeSetupCount = Math.min(3, includedSetupCount + (addOns[additionalSetupKey] || 0));
+
+  useEffect(() => {
+    const id=new URLSearchParams(location.search).get('package_type');
+    if(id && SESSION_TYPES.some(p=>p.id===id)) selectPackage(id);
+  }, []);
+
+  // A preselected package may be visible before a visitor grants analytics consent.
+  useEffect(() => {
+    const track=()=>{if(sessionTypeId)event('package_view',{package_type:sessionTypeId},'package:'+sessionTypeId);};
+    track();
+    window.addEventListener('mm:analytics-ready',track);
+    return ()=>window.removeEventListener('mm:analytics-ready',track);
+  },[sessionTypeId]);
 
   // Fetch availability whenever the package changes
   useEffect(() => {
@@ -131,7 +147,7 @@ export default function BookPage() {
 
   function goNext(){
     setStepErrors({});
-    if(step==='package'){if(!sessionType){setStepErrors({package:'Choose a package to continue.'});return;}setStep('calendar');return;}
+    if(step==='package'){if(!sessionType){setStepErrors({package:'Choose a package to continue.'});return;}event('booking_start',{package_type:sessionType.id},'start:'+sessionType.id);setStep('calendar');return;}
     if(step==='calendar'){if(!selectedSlot){setStepErrors({calendar:'Choose a date and time to continue.'});return;}setStep('information');return;}
     if(step==='information'){if(missingFields.length){setStepErrors({information:`Please complete: ${missingFields.join(', ')}.`});return;}setStep('setup');return;}
     if(step==='setup'){setStep('addons');return;}
@@ -146,6 +162,7 @@ export default function BookPage() {
   if (!phone.trim()) missingFields.push('WhatsApp number');
   if (sessionType?.id !== 'maternity' && !babyGender.trim()) missingFields.push("Baby's gender");
   if (!siblingJoining) missingFields.push('Sibling attendance');
+  if (!photoSharingConsent) missingFields.push('Photo sharing preference');
   if(siblingJoining==='yes'&&(!Number.isSafeInteger(Number(siblingCount))||Number(siblingCount)<1))missingFields.push('Number of siblings');
   if (sessionType?.location === 'home' && !address.trim()) missingFields.push('Home address');
   const readyForReview = !!selectedSlot && missingFields.length === 0;
@@ -177,10 +194,12 @@ export default function BookPage() {
       const inspirationReferencePhotoUrls=await Promise.all(inspirationPhotos.map(photo=>uploadPhotoFromBrowser(photo.file)));
       setUploading(false);
 
+      const analyticsAttribution = await attribution();
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          analyticsAttribution,
           sessionTypeId: sessionType.id,
           date: selectedSlot.date,
           startTime: selectedSlot.startTime,
@@ -191,6 +210,7 @@ export default function BookPage() {
           babyGender,
           siblingJoining,
           siblingCount:siblingJoining==='yes'?Number(siblingCount):0,
+          photoSharingConsent,
           setupSelectionCount: activeSetupCount,
           setupSelections,
           inspirationReferencePhotoUrls,
@@ -205,6 +225,8 @@ export default function BookPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Booking failed');
+      rememberBooking(data.booking.analyticsReference);
+      event('booking_submit',{package_type:sessionType.id,booking_reference:data.booking.analyticsReference},data.booking.analyticsReference ? 'submit:'+data.booking.analyticsReference : undefined);
       setResult(data);
       setStep('result');
     } catch (err) {
@@ -477,6 +499,14 @@ export default function BookPage() {
             <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 6 }}>Sibling participation is free. The additional family / grandparents add-on is charged separately.</div>
           </div>
           <div className="field"><label>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything we should know?" /></div>
+          <div className="field">
+            <label>May Mamamiyo Photography share photos from this session online?<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label>
+            <div style={{display:'grid',gap:8,marginTop:6}}>
+              {PHOTO_SHARING_OPTIONS.map(option=><button key={option.value} type="button" className={`chip ${photoSharingConsent===option.value?'selected':''}`} onClick={()=>setPhotoSharingConsent(option.value)} style={{textAlign:'left',justifyContent:'flex-start',whiteSpace:'normal'}}>{option.label}</button>)}
+            </div>
+            <div style={{fontSize:11.5,color:'var(--ink-faint)',marginTop:6}}>Your choice will not affect your booking or package.</div>
+            <div style={{fontSize:11.5,color:'var(--ink-faint)',marginTop:3}}>By selecting an option, you confirm that you are authorised to give this permission.</div>
+          </div>
           </>}
           {step==='information'&&<WizardNav back={goBack} next={goNext} error={stepErrors.information}/>}
           {step==='setup'&&<WizardNav back={goBack} next={goNext}/>}
@@ -510,6 +540,7 @@ export default function BookPage() {
             <div className="ticket-row"><span>Setups <button type="button" onClick={()=>setStep('setup')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{activeSetupCount} · {inspirationPhotos.length} inspiration</b></div>
             <div className="ticket-row"><span>Add-ons <button type="button" onClick={()=>setStep('addons')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{Object.values(addOns).reduce((sum,q)=>sum+q,0)}</b></div>
             <div className="ticket-row"><span>Sibling joining</span><b>{siblingJoining === 'yes' ? `Yes · ${siblingCount}` : 'No'}</b></div>
+            <div className="ticket-row"><span>Photo sharing</span><b>{photoSharingConsentLabel(photoSharingConsent)}</b></div>
 
             {sessionType.isBundle ? (<>
               {/* Bundle: deposit due now — surcharge on session balance, shown in schedule */}

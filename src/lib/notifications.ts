@@ -11,6 +11,7 @@
 import { fmtDatePretty, fmtTime12 } from './format';
 import { studioAddressText } from './studio';
 import { prepLinkFor, closingLineFor, sessionById, BUNDLE_SESSION_BALANCES } from './constants';
+import { photoSharingConsentLabel } from './photoConsent';
 
 export type NotifyBooking = {
   ref: string;
@@ -23,6 +24,7 @@ export type NotifyBooking = {
   bundleSessionNumber?: number | null;
   clientEmail?: string;
   clientPhone?: string;
+  photoSharingConsent?: string;
   address?: string;
   notes?: string;
   setupChoiceNotes?: string;
@@ -72,6 +74,7 @@ function photographerBookingSummary(b: NotifyBooking): string {
     `Package: ${b.sessionLabel}`,
     `Date: ${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`,
     `Location: ${location}`,
+    `Photo sharing: ${photoSharingConsentLabel(b.photoSharingConsent)}`,
     typeof b.total === 'number' ? `Package total: $${b.total}` : '',
     typeof b.depositAmount === 'number' ? `Deposit: $${b.depositAmount}` : '',
     typeof b.balanceDue === 'number' ? `Balance: $${b.balanceDue}` : '',
@@ -87,11 +90,16 @@ function photographerBookingSummary(b: NotifyBooking): string {
   ].filter(Boolean).join('\n');
 }
 
-export function socialMediaUploadReminder(b: Pick<NotifyBooking, 'clientName' | 'sessionLabel' | 'ref'>): string {
+export function socialMediaUploadReminder(b: Pick<NotifyBooking, 'clientName' | 'sessionLabel' | 'ref' | 'photoSharingConsent'>): string {
+  const instruction = b.photoSharingConsent === 'all'
+    ? 'Please upload the finished photos to Google Drive for social media posting.'
+    : b.photoSharingConsent === 'children_only'
+      ? 'Consent: children / baby only. Upload only approved photos that do not show adults for social media posting.'
+      : 'PRIVATE / NO CONSENT: Do not upload or use this session for social media posting.';
   return [
     '📤 Google Drive upload reminder',
     `Further retouch is complete for ${b.clientName} — ${b.sessionLabel}.`,
-    'Please upload the finished photos to Google Drive for social media posting.',
+    instruction,
     `Ref: ${b.ref}`,
   ].join('\n');
 }
@@ -104,9 +112,11 @@ export function bookingConfirmedNotification(b: NotifyBooking, businessName: str
   const whenStr = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
   const prep = prepLinkFor(b);
   const studioLine = b.location === 'studio' ? `📍 Studio: ${studioAddressText()}` : '';
+  const sharingLine = `Photo sharing preference: ${photoSharingConsentLabel(b.photoSharingConsent)}.`;
 
   const waParts = [
     `Hi ${firstName}!\nYour ${b.sessionLabel} on ${whenStr} is confirmed.\nSee you then!`,
+    sharingLine,
     studioLine,
     prep ? `For ${prep.note}: ${prep.url}` : '',
     `Your itemised receipt has been emailed to you.`,
@@ -118,6 +128,7 @@ export function bookingConfirmedNotification(b: NotifyBooking, businessName: str
   const emailParts = [
     `Hi ${firstName}!`,
     `Your ${b.sessionLabel} on ${whenStr} is confirmed. See you then!`,
+    sharingLine,
     prep ? `For ${prep.note}, please visit ${prep.url}\n\nPlease also add this session to your calendar — the invite (.ics) is attached.` : `Please add this session to your calendar — the invite (.ics) is attached.`,
     closingLineFor(b),
   ].filter(Boolean);
@@ -186,9 +197,11 @@ export function bundleSessionConfirmedNotification(
   const whenStr = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
   const sessionNum = sessionIndex + 2;  // sessionIndex 0-based: 0=session2, 1=session3
   const prep = prepLinkFor(b);
+  const sharingLine = `Photo sharing preference: ${photoSharingConsentLabel(b.photoSharingConsent)}.`;
 
   const waParts = [
     `Hi ${firstName}!\nSession ${sessionNum} of 3 of your First Year Bundle is booked for ${whenStr}.\nBalance of $${balanceDue} due after the session.`,
+    sharingLine,
     prep ? `For ${prep.note}: ${prep.url}` : '',
     businessName,
   ].filter(Boolean);
@@ -197,6 +210,7 @@ export function bundleSessionConfirmedNotification(
   const emailParts = [
     `Hi ${firstName}!`,
     `Session ${sessionNum} of 3 of your First Year Bundle is confirmed for ${whenStr}.`,
+    sharingLine,
     studioLine,
     prep ? `For ${prep.note}, please visit ${prep.url}\n\nPlease also add this session to your calendar — the invite (.ics) is attached.` : `Please add this session to your calendar — the invite (.ics) is attached.`,
     closingLineFor(b),

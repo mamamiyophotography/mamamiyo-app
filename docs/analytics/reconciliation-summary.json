@@ -1,0 +1,10 @@
+{
+  "checkedAt": "2026-10-04T01:05:38.337Z",
+  "since": "2026-10-04T00:28:00Z",
+  "bookings": {
+    "submitted": "0",
+    "attributed": "0",
+    "confirmed": "0"
+  },
+  "outbox": []
+}

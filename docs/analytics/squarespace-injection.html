@@ -1,0 +1,72 @@
+<!-- Review before publishing. Remove Squarespace's existing native GA4 integration first;
+     this replacement owns the sole tag and consent. GA4 cross-domain domains are configured in Admin. -->
+<script>
+(function(){
+'use strict';
+if(window.mmAnalyticsInstalled)return; window.mmAnalyticsInstalled=true;
+const ID='G-46ZYQWWCYP', APP='https://book.mamamiyo-photography.com/book';
+const paths=['/','/package','/contact-us','/sensual-maternity','/cutie-newborn','/3m-old','/6m-1-year-old','/composition','/with-pets','/family-siblings','/floral-simple','/fantasy-characters','/lifestyle-occupation'];
+if(!paths.includes(location.pathname))return;
+const codes=['google','bing','instagram','facebook','tiktok','xiaohongshu','lemon','chatgpt','direct','unknown','organic','social','referral','cpc','email','none'];
+const safeCode=v=>codes.includes(v)?v:'unknown';
+function safeReferrer(){try{const u=new URL(document.referrer);const hosts=['google.com','www.google.com','google.com.sg','www.google.com.sg','bing.com','www.bing.com','instagram.com','www.instagram.com','facebook.com','www.facebook.com','l.facebook.com','tiktok.com','www.tiktok.com','chatgpt.com','www.mamamiyo-photography.com','mamamiyo-photography.com','mamamiyo-app.vercel.app'];return u.protocol==='https:'&&hosts.includes(u.hostname)?u.origin+'/':'';}catch{return '';}}
+function safeCampaign(){const q=new URLSearchParams(location.search);return {campaign_name:'not_set',campaign_id:'not_set',campaign_term:'not_set',campaign_content:'not_set',...(q.has('utm_source')?{campaign_source:safeCode(q.get('utm_source')),campaign_medium:safeCode(q.get('utm_medium'))}:{})};}
+let enabled=false, observer;
+const test=new URLSearchParams(location.search).get('analytics_test')==='1'||sessionStorage.getItem('mm_analytics_test')==='true';
+const debug=new URLSearchParams(location.search).get('analytics_debug')==='1';
+if(test)sessionStorage.setItem('mm_analytics_test','true');
+function emit(name,params={},key){
+ if(!enabled)return;
+ if(key&&Date.now()-Number(sessionStorage.getItem('mm_event_'+key)||0)<30*60*1000)return;
+ const safe={...params,...(debug?{debug_mode:true}:{}),page_location:location.origin+location.pathname,page_referrer:safeReferrer(),page_title:'Mamamiyo Photography',send_to:ID};
+ if(test)console.info('[analytics:test]',name,safe);else window.gtag('event',name,safe);
+ if(key)sessionStorage.setItem('mm_event_'+key,String(Date.now()));
+}
+function getAttribution(){
+ const old=JSON.parse(sessionStorage.getItem('mm_attribution_v1')||'null');
+ if(old&&Date.now()-old.capturedAt<30*60*1000)return old;
+ const q=new URLSearchParams(location.search);let source=safeCode(q.get('utm_source')),medium=safeCode(q.get('utm_medium'));
+ if(source==='unknown'){
+  let host='';try{host=new URL(document.referrer).hostname;}catch{}
+  if(!host){source='direct';medium='none';}
+  else if(/(^|\.)google\.[a-z.]+$/.test(host)){source='google';medium='organic';}
+  else if(/(^|\.)bing.com$/.test(host)){source='bing';medium='organic';}
+  else if(/(^|\.)instagram.com$/.test(host)){source='instagram';medium='social';}
+  else if(/(^|\.)facebook.com$/.test(host)){source='facebook';medium='social';}
+ }
+ const a={consent:true,capturedAt:Date.now(),source,medium,landingPage:location.pathname,test};sessionStorage.setItem('mm_attribution_v1',JSON.stringify(a));return a;
+}
+function packageType(card){const title=card.querySelector('h3')?.textContent.trim();return {'Maternity':'maternity','Newborn':'newborn','Full Month':'fullmonth','Baby':'baby','The First Year Bundle':'bundle'}[title];}
+function bindPackages(){
+ observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){const p=packageType(entry.target);if(p)emit('package_view',{package_type:p},'package:'+p);}}),{threshold:0.5});
+ document.querySelectorAll('.card-content,#first-year-bundle').forEach(card=>{if(packageType(card))observer.observe(card);});
+}
+function enable(){
+ enabled=true;
+ if(!test){window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLayer.push(arguments);};
+  gtag('consent','default',{analytics_storage:'granted',ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
+  gtag('js',new Date());gtag('config',ID,{...safeCampaign(),...(debug?{debug_mode:true}:{}),send_page_view:false,page_location:location.origin+location.pathname,page_referrer:safeReferrer(),page_title:'Mamamiyo Photography',cookie_expires:60*86400,allow_google_signals:false,allow_ad_personalization_signals:false});
+  const s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+ID;document.head.appendChild(s);
+  if(debug)gtag('get',ID,'client_id',async value=>{const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));console.info('[analytics:debug identity]',Array.from(new Uint8Array(digest)).map(v=>v.toString(16).padStart(2,'0')).join(''));});
+ }
+ getAttribution();emit('page_view');
+ if(!['/','/package','/contact-us'].includes(location.pathname))emit('portfolio_view',{},'portfolio:'+location.pathname);
+ bindPackages();
+}
+function boot(){
+ const bar=document.createElement('aside');bar.setAttribute('aria-label','Analytics privacy');bar.style.cssText='padding:16px;background:#fff8ed;color:#333;position:relative;z-index:9999';document.body.appendChild(bar);
+ function show(){bar.replaceChildren();const p=document.createElement('p');p.textContent='Optional Google Analytics cookies help us understand visits, package interest and booking steps across our website and booking app. No names, contact details, addresses, photos or notes are sent in analytics events. Booking works without analytics. Google may process data overseas.';bar.appendChild(p);
+  const privacy=document.createElement('a');privacy.href='https://book.mamamiyo-photography.com/privacy';privacy.textContent='Privacy notice';bar.appendChild(privacy);
+  for(const [label,grant] of [['Allow analytics',true],['Decline',false]]){const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{localStorage.setItem('mm_analytics_consent_v1',grant?'granted':'denied');if(grant&&!enabled)enable();if(!grant){sessionStorage.removeItem('mm_attribution_v1');for(const entry of document.cookie.split(';')){const key=entry.trim().split('=')[0];if(/^_ga($|_)/.test(key)){document.cookie=key+'=; Max-Age=0; Path=/';document.cookie=key+'=; Max-Age=0; Path=/; Domain=mamamiyo-photography.com';document.cookie=key+'=; Max-Age=0; Path=/; Domain='+location.hostname;}}enabled=false;location.reload();}preferences();};bar.appendChild(b);}}
+ function preferences(){bar.replaceChildren();const b=document.createElement('button');b.type='button';b.textContent='Analytics preferences';b.onclick=show;bar.appendChild(b);}
+ if(localStorage.getItem('mm_analytics_consent_v1')==='granted'){enable();preferences();}else if(localStorage.getItem('mm_analytics_consent_v1')==='denied')preferences();else show();
+ // Prepare direct links for every package. The linker decorates their normal href after GA4 Admin setup.
+ document.querySelectorAll('.card-content,#first-year-bundle').forEach(card=>{const p=packageType(card);if(!p)return;card.querySelectorAll('a').forEach(a=>{if(/Contact.*Book/i.test(a.textContent)){a.href=APP+'?package_type='+p;a.textContent=p==='bundle'?'Book Bundle':'Book this package';a.dataset.mmPackage=p;}});});
+ const contact=document.querySelector('h1');if(location.pathname==='/contact-us'&&contact){const a=document.createElement('a');a.href=APP;a.textContent='Book a session online';a.className='sqs-block-button-element';contact.parentElement.appendChild(a);}
+ document.addEventListener('click',e=>{const a=e.target.closest?.('a');if(!a)return;const u=new URL(a.href,location.href);if(u.origin!==new URL(APP).origin||u.pathname!=='/book')return;
+  const p=a.dataset.mmPackage||'unknown';if(enabled){const at=getAttribution();u.searchParams.set('mm_source',at.source);u.searchParams.set('mm_medium',at.medium);u.searchParams.set('mm_landing',at.landingPage);if(test)u.searchParams.set('analytics_test','1');if(debug)u.searchParams.set('analytics_debug','1');a.href=u.toString();emit('booking_click',{package_type:p},'click:'+p);}
+ },true);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
+</script>

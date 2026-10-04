@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { ADDONS, sessionById } from '@/lib/constants';
 import { MonthCalendar, CandidateSlot, startOfMonth, addMonths } from '@/components/MonthCalendar';
+import { PHOTO_SHARING_OPTIONS } from '@/lib/photoConsent';
 
 type Booking = {
   id: string; ref: string; sessionLabel: string; date: string; startTime: string; status: string;
@@ -140,6 +141,7 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
   const [addOns, setAddOns] = useState<Record<string, number>>({});
   const [babyGender, setBabyGender] = useState('');
   const [siblingJoining, setSiblingJoining] = useState('');
+  const [photoSharingConsent,setPhotoSharingConsent]=useState('');
   const [notes, setNotes] = useState('');
   const [setupPhotos, setSetupPhotos] = useState<{ file: File; previewUrl: string }[][]>([[],[],[]]);
   const [setupNotes, setSetupNotes] = useState<string[]>(['','','']);
@@ -169,6 +171,7 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
     if (!selectedSlot) return;
     if (!babyGender) { setError('Please select baby\'s gender.'); return; }
     if (!siblingJoining) { setError('Please tell us whether a sibling will be joining.'); return; }
+    if (!photoSharingConsent) { setError('Please select a photo sharing preference.'); return; }
     setSubmitting(true);
     setError(null);
     try {
@@ -180,7 +183,7 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
       const res = await fetch(`/api/bundles/${bundle.id}/redeem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slot: selectedSlot, addOns, referencePhotoUrls, setupSelectionCount:activeSetupCount, setupSelections, inspirationReferencePhotoUrls, notes, babyGender, siblingJoining }),
+        body: JSON.stringify({ slot: selectedSlot, addOns, referencePhotoUrls, setupSelectionCount:activeSetupCount, setupSelections, inspirationReferencePhotoUrls, notes, babyGender, siblingJoining, photoSharingConsent }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Redemption failed'); return; }
@@ -284,6 +287,12 @@ function BundleDetail({ bundle, redeemedSessions, onRedeemed }: { bundle: Bundle
                 <div className="field">
                   <label>Notes (optional)</label>
                   <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything we should know for this session?" style={{ width: '100%', minHeight: 56, border: '1.5px solid var(--line)', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
+                </div>
+                <div className="field">
+                  <label>May Mamamiyo Photography share photos from this session online?</label>
+                  <div style={{display:'grid',gap:8,marginTop:6}}>{PHOTO_SHARING_OPTIONS.map(option=><button key={option.value} type="button" className={`chip ${photoSharingConsent===option.value?'selected':''}`} onClick={()=>setPhotoSharingConsent(option.value)} style={{textAlign:'left',justifyContent:'flex-start',whiteSpace:'normal'}}>{option.label}</button>)}</div>
+                  <div style={{fontSize:11.5,color:'var(--ink-faint)',marginTop:6}}>Your choice will not affect your booking or package.</div>
+                  <div style={{fontSize:11.5,color:'var(--ink-faint)',marginTop:3}}>By selecting an option, you confirm that you are authorised to give this permission.</div>
                 </div>
               <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={!selectedSlot || submitting} onClick={confirmRedeem}>
                 {submitting ? 'Uploading & booking…' : 'Confirm this session'}

@@ -64,6 +64,7 @@ async function run() {
     addOns: {},
     notes: '',
     siblingJoining: 'yes',
+    photoSharingConsent: 'children_only',
     referencePhotoUrls: ['https://example.com/photo1.jpg'],
     address: '',
     clientName: 'Jane Tan',
@@ -74,6 +75,7 @@ async function run() {
   check('booking created with status pending', booking.status === 'pending');
   check('booking phone combined correctly', booking.clientPhone === '+65 91234567');
   check('booking stores sibling attendance', booking.notes.includes('Sibling joining: yes'));
+  check('booking stores photo sharing consent', booking.photoSharingConsent === 'children_only' && booking.photoSharingConsentAt instanceof Date);
 
   const maternityDb = createMockDb({ settings: {}, availability: [{ date: futureDateStr(13), startTime: '09:00', endTime: '12:00', location: 'studio' }] });
   const maternitySlot = (await getAvailableSlots(maternityDb, 'maternity'))[0];

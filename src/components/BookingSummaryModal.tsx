@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { prepLinkFor } from '@/lib/constants';
+import { photoSharingConsentLabel } from '@/lib/photoConsent';
 
 type SummaryBooking = {
   clientName: string;
@@ -21,6 +22,7 @@ type SummaryBooking = {
   ref?: string;
   sessionTypeId: string;
   bundleSessionNumber?: number | null;
+  photoSharingConsent?: string;
 };
 
 type PreparationGuide = {
@@ -114,6 +116,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         ['Location', booking.location === 'home' ? "Client's home" : 'Studio'],
         ['Email', booking.clientEmail],
         ['Phone', booking.clientPhone],
+        ['Photo sharing', photoSharingConsentLabel(booking.photoSharingConsent)],
         ...(booking.address ? [['Address', booking.address]] : []),
         ...(noteParts.gender ? [['Baby gender', noteParts.gender]] : []),
         ...(noteParts.sibling ? [['Sibling joining', noteParts.sibling]] : []),

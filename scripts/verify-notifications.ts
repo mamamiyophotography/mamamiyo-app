@@ -30,6 +30,7 @@ const newborn: NotifyBooking = {
   startTime: '09:00',
   clientName: 'Jane Tan',
   clientPhone: '+6591234567',
+  photoSharingConsent: 'all',
   address: '12 Example Road',
   total: 718,
   depositAmount: 100,
@@ -44,6 +45,7 @@ check('client email mentions "Newborn Photoshoot preparation" (not Milestone)', 
 check('client email does NOT mention "Milestone Stage"', !n.client.emailBody.includes('Milestone Stage'));
 check('client email does NOT mention sessions 2/3 or activation', !/session\s*2|activat/i.test(n.client.emailBody));
 check('client WhatsApp body mentions receipt sent via email', n.client.whatsappBody.toLowerCase().includes('receipt'));
+check('confirmation records the client photo sharing preference', n.client.emailBody.includes('May publish everyone'));
 check('photographer copy is short/functional, includes ref', n.photographer.emailBody.includes('MMY-AB12C'));
 
 // 2. Bundle session 1 confirmation — same rule, no mention of 2/3
@@ -113,6 +115,8 @@ check('photographer 2-hour WhatsApp reminder does NOT repeat the preparation lis
 const socialMediaReminder = socialMediaUploadReminder(newborn);
 check('completed further-retouch reminder asks for a Google Drive upload', socialMediaReminder.includes('Google Drive') && socialMediaReminder.includes('social media posting'));
 check('completed further-retouch reminder identifies the booking', socialMediaReminder.includes(newborn.clientName) && socialMediaReminder.includes(newborn.ref));
+check('private sessions are blocked from social posting reminders', socialMediaUploadReminder({...newborn,photoSharingConsent:'private'}).includes('Do not upload or use'));
+check('children-only consent limits the social posting reminder', socialMediaUploadReminder({...newborn,photoSharingConsent:'children_only'}).includes('do not show adults'));
 
 const invoice = invoiceNotification(newborn, 388, 'BAL-JANE-2210', [
   { description: 'Extra person', amount: 50 },

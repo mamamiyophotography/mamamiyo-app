@@ -63,6 +63,8 @@ model Bundle {
 }
 
 model Booking {
+  analyticsReference String? @unique
+  analyticsAttribution Json?
   id                  String    @id @default(cuid())
   ref                 String    @unique
   sessionTypeId       String
@@ -85,6 +87,8 @@ model Booking {
   clientName          String
   clientEmail         String
   clientPhone         String
+  photoSharingConsent String    @default("not_recorded")
+  photoSharingConsentAt DateTime?
   subtotal            Int
   total               Int
   depositAmount       Int
@@ -171,4 +175,15 @@ model AdditionalOrder {
 
   @@unique([galleryId, version])
   @@index([bookingId, createdAt])
+}
+
+model AnalyticsOutbox {
+  id String @id @default(cuid())
+  eventKey String @unique
+  bookingId String
+  payload Json
+  createdAt DateTime @default(now())
+  claimedAt DateTime?
+  deliveryStatus String @default("pending")
+  @@index([claimedAt])
 }
