@@ -170,6 +170,15 @@ export default function AdminBookingsPage() {
     return value.replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/g, '');
   }
 
+  function jobFolderSessionName(booking: Booking) {
+    if (booking.sessionTypeId === 'newborn') return 'Newborn';
+    if (booking.sessionTypeId === 'fullmonth') return 'Full Month';
+    if (booking.sessionTypeId === 'baby') return 'Baby Family';
+    if (booking.sessionTypeId === 'maternity') return 'Maternity';
+    if (booking.sessionTypeId === 'bundle') return `Baby Bundle ${booking.bundleSessionNumber || 1}`;
+    return booking.sessionLabel.replace(/\s*Photoshoot\s*/i, ' ').trim();
+  }
+
   async function createLocalJobFolder(booking: Booking) {
     const picker = (window as Window & {
       showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
@@ -185,7 +194,8 @@ export default function AdminBookingsPage() {
         : booking.photoSharingConsent === 'children_only'
           ? 'CHILDREN ONLY FOR SOCIAL'
           : 'PRIVATE — DO NOT POST';
-      const folderName = safeFolderPart(`${booking.date} ${booking.clientName} ${booking.sessionLabel} — ${consentSuffix}`);
+      const compactDate = booking.date.replace(/-/g, '');
+      const folderName = safeFolderPart(`${compactDate} ${booking.clientName} ${jobFolderSessionName(booking)} — ${consentSuffix}`);
       const jobFolder = await root.getDirectoryHandle(folderName, { create: true });
       const socialFolder = booking.photoSharingConsent === 'all'
         ? '04 SOCIAL CANDIDATES'
