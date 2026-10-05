@@ -613,8 +613,8 @@ export default function AdminBookingsPage() {
         </div>
         <div className="bookings-count">{loading ? '—' : bookings.length}</div>
       </div>
-      {/* Status filter chips — single scrollable row, equal height, no wrap */}
-      <div className="status-filter" aria-label="Filter bookings by status">
+      {/* Status filter chips wrap into two clean rows so later stages remain visible. */}
+      <div className="status-filter" style={{ flexWrap: 'wrap', overflowX: 'visible' }} aria-label="Filter bookings by status">
         {STATUS_TABS.map((t) => (
           <button key={t.key} onClick={() => setFilter(t.key)} className={`status-filter-button${filter === t.key ? ' active' : ''}`}>
             {t.label}
