@@ -28,7 +28,7 @@ const STATUS_TABS = [
   { key: 'active', label: 'Active' },
   { key: 'pending', label: '1. Pending deposit' },
   { key: 'confirmed', label: '2. Booking confirmed' },
-  { key: 'basic_retouch', label: '3. Basic retouch' },
+  { key: 'basic_retouch', label: '3. Photoshoot done · Basic retouch' },
   { key: 'further_retouch', label: '4. Further retouch' },
   { key: 'soft_copy_delivered', label: '5. Soft Copy Delivered' },
   { key: 'completed', label: '6. Photoshoot complete' },
@@ -60,7 +60,9 @@ export default function AdminBookingsPage() {
     setLoading(true);
     const url = filter === 'active'
       ? `/api/admin/bookings?active=1`
-      : `/api/admin/bookings?status=${filter}`;
+      : filter === 'basic_retouch'
+        ? `/api/admin/bookings?statuses=pending_balance,pending_basic_retouch,basic_retouch`
+        : `/api/admin/bookings?status=${filter}`;
     const res = await fetch(url);
     const data = await res.json();
     setBookings(data.bookings || []);
@@ -501,7 +503,7 @@ export default function AdminBookingsPage() {
                           runAction(b.id, 'confirm-balance');
                         }
                       }}>
-                        Payment Received
+                        Confirm Balance Payment Received
                       </button>
                     </div>
                     {invoiceQr?.bookingId === b.id && <div style={{ marginTop: 10 }}>
