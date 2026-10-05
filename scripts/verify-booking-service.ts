@@ -198,6 +198,18 @@ async function run() {
   const completedWithoutFurtherRetouch = await skipFurtherRetouch(db, booking.id);
   check('basic retouch can skip further retouch and complete', completedWithoutFurtherRetouch.status === 'completed');
 
+  await db.booking.update({ where: { id: booking.id }, data: { status: 'basic_retouch', addOns: { album8x8: 1 } } });
+  const waitingForProductOrder = await skipFurtherRetouch(db, booking.id);
+  check('a booking with a physical product moves to product ordering', waitingForProductOrder.status === 'order_product');
+  const readyForDelivery = await advanceStage(db, booking.id);
+  check('confirming the product order moves the booking to delivery', readyForDelivery.status === 'soft_copy_delivered');
+  const completedAfterDelivery = await advanceStage(db, booking.id);
+  check('confirming product delivery completes the booking', completedAfterDelivery.status === 'completed');
+  const reopenedDelivery = await revertStage(db, booking.id);
+  check('a completed product booking can return to delivery', reopenedDelivery.status === 'soft_copy_delivered');
+  const reopenedProductOrder = await revertStage(db, booking.id);
+  check('delivery can return to product ordering', reopenedProductOrder.status === 'order_product');
+
   // ---- 7. Phone lookup finds the booking ----
   const found = await lookupByPhone(db, '91234567');
   check('phone lookup (no country code entered) finds the booking', found.bookings.some((b) => b.id === booking.id));

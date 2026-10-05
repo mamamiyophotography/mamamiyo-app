@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
       update:{version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt,expiresAt:p.expiresAt ? new Date(p.expiresAt) : null,selectionEnabled:p.selectionEnabled}});
     if (deliveredAt && ['basic_retouch','further_retouch'].includes(booking.status)) {
       const additionalProductCount = await tx.additionalOrder.count({where:{bookingId:booking.id,status:{in:['pending','paid']}}});
-      const nextStatus = hasBookedPhysicalProduct(booking.addOns) || additionalProductCount > 0 ? 'soft_copy_delivered' : 'completed';
+      const nextStatus = hasBookedPhysicalProduct(booking.addOns) || additionalProductCount > 0 ? 'order_product' : 'completed';
       await tx.booking.update({where:{id:booking.id},data:{status:nextStatus}});
     } else if (p.locked && p.submitted && booking.status === 'basic_retouch') {
       await tx.booking.update({where:{id:booking.id},data:{status:'further_retouch'}});
