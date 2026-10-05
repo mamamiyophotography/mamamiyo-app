@@ -214,14 +214,6 @@ export default function AdminBookingsPage() {
     }
   }
 
-  async function finishSessionAndCreateFolder(booking: Booking) {
-    setActionError(null);
-    const created = await createLocalJobFolder(booking);
-    if (!created) return;
-    const result = await runAction(booking.id, 'mark-completed');
-    if (result) setActionSuccess({ id: booking.id, message: 'Session marked done and the complete local folder structure was created.' });
-  }
-
   function roundedInvoiceBox(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
     ctx.beginPath(); ctx.roundRect(x, y, width, height, radius);
   }
@@ -533,7 +525,14 @@ export default function AdminBookingsPage() {
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-deposit')}>Confirm deposit received</button>
                   )}
                   {b.status === 'confirmed' && (
-                    <button className="btn btn-primary" disabled={isBusy} onClick={() => finishSessionAndCreateFolder(b)}>Mark session done &amp; create folders</button>
+                    <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Confirm Photoshoot Done</button>
+                  )}
+                  {b.status === 'confirmed' && (
+                    <button className="btn btn-ghost" disabled={isBusy} onClick={async () => {
+                      setActionError(null);
+                      const created = await createLocalJobFolder(b);
+                      if (created) setActionSuccess({ id: b.id, message: 'The complete local folder structure was created.' });
+                    }}>Create Local Folders</button>
                   )}
                   {b.status === 'confirmed' && (
                     <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>
@@ -543,7 +542,7 @@ export default function AdminBookingsPage() {
                       Basic Retouch Done
                     </button>
                   )}
-                  {!hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
+                  {!hasClientGallery && (b.status === 'confirmed' || b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
                     <a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">
                       {b.sessionTypeId === 'bundle' && (b.bundleSessionNumber || 1) < 3
                         ? 'Create Download Gallery'
