@@ -274,15 +274,6 @@ export default function AdminBookingsPage() {
     finally { setBusyId(null); }
   }
 
-  async function finishBasicRetouch(booking: Booking) {
-    const photoSelect = window.open('about:blank', '_blank');
-    const data = await runAction(booking.id, 'advance-stage');
-    if (!data) { photoSelect?.close(); return; }
-    const url = photoSelectCreateUrl(booking);
-    if (photoSelect) photoSelect.location.href = url;
-    else window.location.href = url;
-  }
-
   function photoSelectCreateUrl(booking: Booking) {
     const selectionEnabled = !(booking.sessionTypeId === 'bundle' && (booking.bundleSessionNumber || 1) < 3);
     const params = new URLSearchParams({
@@ -548,11 +539,16 @@ export default function AdminBookingsPage() {
                     <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>
                   )}
                   {!hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch') && (
-                    <button className="btn btn-primary" disabled={isBusy} onClick={() => finishBasicRetouch(b)}>
-                      {b.sessionTypeId === 'bundle' && (b.bundleSessionNumber || 1) < 3
-                        ? 'Basic Retouch Done · Create Download Gallery'
-                        : 'Basic Retouch Done · Create Gallery'}
+                    <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
+                      Basic Retouch Done
                     </button>
+                  )}
+                  {!hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
+                    <a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">
+                      {b.sessionTypeId === 'bundle' && (b.bundleSessionNumber || 1) < 3
+                        ? 'Create Download Gallery'
+                        : 'Create Gallery'}
+                    </a>
                   )}
                   {b.status === 'basic_retouch' && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
