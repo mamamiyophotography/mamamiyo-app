@@ -5,6 +5,7 @@
 // swapped out. Run with: npx tsx scripts/verify-booking-service.ts
 
 process.env.DRY_RUN_NOTIFICATIONS = 'true'; // no real network calls to Resend
+process.env.WHAPI_TOKEN = ''; // never send real WhatsApp messages during verification
 process.env.PHOTOGRAPHER_EMAIL = 'mamamiyo@example.com';
 process.env.PHOTOGRAPHER_PHONE = '+65 91234567';
 
@@ -22,6 +23,7 @@ import {
   purgeExpiredHolds,
   updateBookingAndNotify,
   checkAndSendFurtherRetouchReminders,
+  checkAndSendReminders,
   sendShootDayBalanceInvoices,
 } from '../src/lib/db/bookingService';
 
@@ -157,10 +159,10 @@ async function run() {
   check('deposit confirmation moves status to confirmed', confirmed.status === 'confirmed');
   check('deposit status is paid', confirmed.depositStatus === 'paid');
 
-  // ---- 4. Complete session -> basic retouch while payment remains independent ----
+  // ---- 4. Complete session -> pending balance payment ----
   const afterComplete = await markCompleted(db, booking.id);
-  check('session moves to pending basic retouch', afterComplete.status === 'pending_basic_retouch');
-  check('balance remains pending during basic retouch', afterComplete.balanceStatus === 'pending');
+  check('session moves to pending balance payment', afterComplete.status === 'pending_balance');
+  check('balance remains pending after the photoshoot', afterComplete.balanceStatus === 'pending');
 
   // ---- 5. Add an extra line item, generate invoice ----
   const { addExtraLineItem } = await import('../src/lib/db/bookingService');
@@ -170,13 +172,13 @@ async function run() {
 
   // ---- 6. Confirm balance -> basic retouch ----
   const settled = await confirmBalanceAndNotify(db, booking.id);
-  check('balance confirmation keeps pending basic retouch', settled.status === 'pending_basic_retouch');
+  check('balance confirmation moves to pending basic retouch', settled.status === 'pending_basic_retouch');
   check('balance status is paid', settled.balanceStatus === 'paid');
 
   const { advanceStage, revertStage, skipFurtherRetouch, reopenBalance } = await import('../src/lib/db/bookingService');
   const reopenedPayment = await reopenBalance(db, booking.id);
   check('paid balance can be corrected back to pending', reopenedPayment.balanceStatus === 'pending');
-  check('reopening balance keeps pending basic retouch', reopenedPayment.status === 'pending_basic_retouch');
+  check('reopening balance returns to pending balance payment', reopenedPayment.status === 'pending_balance');
   await confirmBalanceAndNotify(db, booking.id);
   const awaitingSelection = await advanceStage(db, booking.id);
   check('basic retouch done advances to client selection', awaitingSelection.status === 'basic_retouch');
@@ -365,8 +367,29 @@ async function run() {
   check('further-retouch reminder repeats after another month', await checkAndSendFurtherRetouchReminders(reminderDb, new Date('2026-10-18T10:00:00Z')) === 1);
   await advanceStage(reminderDb, reminderBooking.id);
   check('further-retouch reminders stop at the next stage', await checkAndSendFurtherRetouchReminders(reminderDb, new Date('2026-11-18T10:00:00Z')) === 0);
+  const dailyFurtherNow = new Date('2026-11-18T01:00:00Z');
+  check('daily photographer reminder starts after client selection', await checkAndSendReminders(reminderDb, dailyFurtherNow) === 1);
+  check('daily further-retouch reminder is not duplicated that day', await checkAndSendReminders(reminderDb, dailyFurtherNow) === 0);
+  check('daily further-retouch reminder repeats the next day', await checkAndSendReminders(reminderDb, new Date('2026-11-19T01:00:00Z')) === 1);
+  await reminderDb.booking.update({ where: { id: reminderBooking.id }, data: { status: 'completed' } });
+  check('daily further-retouch reminder stops when work is completed', await checkAndSendReminders(reminderDb, new Date('2026-11-20T01:00:00Z')) === 0);
 
-  // ---- 13. 6pm shoot-day invoice is sent once only ----
+  // ---- 13. Daily Basic Retouch reminders begin on day three ----
+  const basicReminderDb = createMockDb({ settings: {}, availability: [{ date: futureDateStr(20), startTime: '09:00', endTime: '13:00', location: 'studio' }] });
+  const basicSlot = (await getAvailableSlots(basicReminderDb, 'baby'))[0];
+  const basicReminderBooking = await createBooking(basicReminderDb, {
+    sessionTypeId: 'baby', date: basicSlot.date, startTime: basicSlot.startTime, endTime: basicSlot.endTime, isWeekend: basicSlot.isWeekend,
+    addOns: {}, notes: '', referencePhotoUrls: [], address: '', clientName: 'Basic Reminder', clientEmail: 'basic@example.com', countryCode: '+65', phone: '96668888',
+  });
+  await basicReminderDb.booking.update({ where: { id: basicReminderBooking.id }, data: { date: '2026-10-01', status: 'pending_balance', balanceStatus: 'pending', remindersSent: [] } });
+  check('Basic Retouch reminder waits until day three', await checkAndSendReminders(basicReminderDb, new Date('2026-10-03T01:00:00Z')) === 0);
+  check('Basic Retouch reminder starts on day three', await checkAndSendReminders(basicReminderDb, new Date('2026-10-04T01:00:00Z')) === 1);
+  check('Basic Retouch reminder is not duplicated that day', await checkAndSendReminders(basicReminderDb, new Date('2026-10-04T05:00:00Z')) === 0);
+  check('Basic Retouch reminder repeats the next day', await checkAndSendReminders(basicReminderDb, new Date('2026-10-05T01:00:00Z')) === 1);
+  await basicReminderDb.booking.update({ where: { id: basicReminderBooking.id }, data: { status: 'basic_retouch' } });
+  check('Basic Retouch reminder stops when Basic Retouch is done', await checkAndSendReminders(basicReminderDb, new Date('2026-10-06T01:00:00Z')) === 0);
+
+  // ---- 14. 6pm shoot-day invoice is sent once only ----
   const invoiceDb = createMockDb({ settings: {}, availability: [{ date: futureDateStr(19), startTime: '09:00', endTime: '13:00', location: 'studio' }] });
   const invoiceSlot = (await getAvailableSlots(invoiceDb, 'baby'))[0];
   const autoInvoiceBooking = await createBooking(invoiceDb, {

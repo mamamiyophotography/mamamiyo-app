@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       update:{bookingId:booking.id,clientUrl:p.clientUrl}});
     // A linked client Gallery means Basic Retouch has already been prepared.
     // Keep the Booking workflow in the same stage as the Gallery shown to staff.
-    if (booking.status === 'pending_balance' || booking.status === 'pending_basic_retouch') {
+    if (booking.status === 'pending_basic_retouch') {
       const downloadOnlyBundle = booking.sessionTypeId === 'bundle' && (booking.bundleSessionNumber || 1) < 3;
       await prisma.booking.update({where:{id:booking.id},data:{status:downloadOnlyBundle?'completed':'basic_retouch',version:{increment:1}}});
     }
@@ -128,11 +128,11 @@ export async function POST(req: NextRequest) {
     const result = await tx.galleryInbox.upsert({where:{galleryId:p.galleryId},
       create:{galleryId:p.galleryId, bookingId:booking.id, version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt,expiresAt:p.expiresAt ? new Date(p.expiresAt) : null,selectionEnabled:p.selectionEnabled},
       update:{version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt,expiresAt:p.expiresAt ? new Date(p.expiresAt) : null,selectionEnabled:p.selectionEnabled}});
-    if (deliveredAt && ['basic_retouch','pending_balance','further_retouch'].includes(booking.status)) {
+    if (deliveredAt && ['basic_retouch','further_retouch'].includes(booking.status)) {
       const additionalProductCount = await tx.additionalOrder.count({where:{bookingId:booking.id,status:{in:['pending','paid']}}});
       const nextStatus = hasBookedPhysicalProduct(booking.addOns) || additionalProductCount > 0 ? 'soft_copy_delivered' : 'completed';
       await tx.booking.update({where:{id:booking.id},data:{status:nextStatus}});
-    } else if (p.locked && p.submitted && ['basic_retouch','pending_balance'].includes(booking.status)) {
+    } else if (p.locked && p.submitted && booking.status === 'basic_retouch') {
       await tx.booking.update({where:{id:booking.id},data:{status:'further_retouch'}});
     } else if (!p.locked && p.submitted && booking.status === 'further_retouch') {
       await tx.booking.update({where:{id:booking.id},data:{status:'basic_retouch'}});

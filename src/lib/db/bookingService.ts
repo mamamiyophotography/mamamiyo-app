@@ -37,6 +37,7 @@ import { generateIcs, icsToBase64 } from '../ics';
 import { fmtDatePretty } from '../format';
 import { balancePaymentReference } from '../paynow';
 import { isPhotoSharingConsent } from '../photoConsent';
+import { sendWhatsApp } from '../whatsapp';
 
 const PHOTOGRAPHER_EMAIL_ENV = 'PHOTOGRAPHER_EMAIL';
 const PHOTOGRAPHER_PHONE_ENV = 'PHOTOGRAPHER_PHONE';
@@ -534,7 +535,7 @@ export async function markCompleted(db: any, bookingId: string) {
   const due = currentBalanceDue({ balanceDue: booking.balanceDue, extraLineItems: booking.extraLineItems as { description: string; amount: number }[] });
   return db.booking.update({
     where: { id: bookingId },
-    data: { status: 'pending_basic_retouch', balanceStatus: due > 0 ? 'pending' : 'n/a' },
+    data: { status: due > 0 ? 'pending_balance' : 'pending_basic_retouch', balanceStatus: due > 0 ? 'pending' : 'n/a' },
   });
 }
 
@@ -642,6 +643,7 @@ export async function reopenBalance(db: any, bookingId: string) {
       balanceStatus: 'pending',
       balancePaidAt: null,
       furtherRetouchReminderSentAt: null,
+      status: 'pending_balance',
     },
   });
 }
@@ -871,7 +873,7 @@ export async function revertStage(db: any, bookingId: string) {
  * not require a further-retouch round. */
 export async function skipFurtherRetouch(db: any, bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
-  if (booking.status !== 'basic_retouch' && booking.status !== 'pending_balance') {
+  if (booking.status !== 'basic_retouch') {
     throw new Error(`Cannot skip further retouch from status "${booking.status}".`);
   }
   const status = await bookingHasPhysicalProducts(db, booking) ? 'soft_copy_delivered' : 'completed';
@@ -988,9 +990,8 @@ export async function sendShootDayBalanceInvoices(db: any, now = new Date()) {
   return sent;
 }
 
-export async function checkAndSendReminders(db: any) {
+export async function checkAndSendReminders(db: any, now = new Date()) {
   const settings = await getSettings(db);
-  const now = new Date();
   const upcoming = await db.booking.findMany({ where: { status: 'confirmed' } });
   const photographer = photographerContacts();
   let sent = 0;
@@ -1018,6 +1019,62 @@ export async function checkAndSendReminders(db: any) {
         sent++;
       }
     }
+  }
+
+  // Basic Retouch should be started within three calendar days after the
+  // photoshoot. From day three onward, remind the photographer once per SGT
+  // calendar day until the booking advances out of the unfinished stages.
+  const todaySgt = singaporeDateString(now);
+  const unfinishedBasicRetouch = await db.booking.findMany({
+    where: { status: { in: ['pending_balance', 'pending_basic_retouch'] } },
+  });
+  for (const booking of unfinishedBasicRetouch) {
+    const reminderStart = new Date(`${booking.date}T00:00:00+08:00`);
+    reminderStart.setUTCDate(reminderStart.getUTCDate() + 3);
+    if (todaySgt < singaporeDateString(reminderStart)) continue;
+
+    const reminderKey = `basic-retouch-${todaySgt}`;
+    const already = (booking.remindersSent as string[]) || [];
+    if (already.includes(reminderKey)) continue;
+
+    const balanceLine = booking.balanceStatus === 'paid'
+      ? 'Balance payment: received.'
+      : 'Balance payment: still pending.';
+    await sendWhatsApp(
+      photographer.phone,
+      [
+        'Basic Retouch reminder',
+        `${booking.clientName} — ${booking.sessionLabel}`,
+        `Photoshoot: ${fmtDatePretty(booking.date)}`,
+        balanceLine,
+        'Basic Retouch has not been marked as done. Please complete it and update the Booking App.',
+      ].join('\n'),
+    );
+    already.push(reminderKey);
+    await db.booking.update({ where: { id: booking.id }, data: { remindersSent: already } });
+    sent++;
+  }
+
+  // Once the client submits their selection, keep Further Retouch visible to
+  // the photographer every day until the Gallery delivery advances the case.
+  const unfinishedFurtherRetouch = await db.booking.findMany({ where: { status: 'further_retouch' } });
+  for (const booking of unfinishedFurtherRetouch) {
+    const reminderKey = `further-retouch-work-${todaySgt}`;
+    const already = (booking.remindersSent as string[]) || [];
+    if (already.includes(reminderKey)) continue;
+
+    await sendWhatsApp(
+      photographer.phone,
+      [
+        'Further Retouch reminder',
+        `${booking.clientName} — ${booking.sessionLabel}`,
+        `Photoshoot: ${fmtDatePretty(booking.date)}`,
+        'The client has completed the photo selection. Please complete the Further Retouch and update the Booking App.',
+      ].join('\n'),
+    );
+    already.push(reminderKey);
+    await db.booking.update({ where: { id: booking.id }, data: { remindersSent: already } });
+    sent++;
   }
   return sent;
 }

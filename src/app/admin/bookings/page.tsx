@@ -28,10 +28,11 @@ const STATUS_TABS = [
   { key: 'active', label: 'Active' },
   { key: 'pending', label: '1. Pending deposit' },
   { key: 'confirmed', label: '2. Booking confirmed' },
-  { key: 'basic_retouch', label: '3. Photoshoot done · Basic retouch' },
-  { key: 'further_retouch', label: '4. Further retouch' },
-  { key: 'soft_copy_delivered', label: '5. Soft Copy Delivered' },
-  { key: 'completed', label: '6. Photoshoot complete' },
+  { key: 'pending_balance', label: '3. Pending balance payment' },
+  { key: 'basic_retouch', label: '4. Basic retouch' },
+  { key: 'further_retouch', label: '5. Further retouch' },
+  { key: 'soft_copy_delivered', label: '6. Soft Copy Delivered' },
+  { key: 'completed', label: '7. Photoshoot complete' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
@@ -61,7 +62,7 @@ export default function AdminBookingsPage() {
     const url = filter === 'active'
       ? `/api/admin/bookings?active=1`
       : filter === 'basic_retouch'
-        ? `/api/admin/bookings?statuses=pending_balance,pending_basic_retouch,basic_retouch`
+        ? `/api/admin/bookings?statuses=pending_basic_retouch,basic_retouch`
         : `/api/admin/bookings?status=${filter}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -308,7 +309,7 @@ export default function AdminBookingsPage() {
         const isOpen = expandedId === b.id;
         const isBusy = busyId === b.id;
         const hasClientGallery = Boolean(b.gallerySelections?.some(g => g.clientUrl));
-        const displayStatus = hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch') ? 'basic_retouch' : b.status;
+        const displayStatus = hasClientGallery && b.status === 'pending_basic_retouch' ? 'basic_retouch' : b.status;
         const statusStyle = STATUS_LABEL[displayStatus] || { label: displayStatus, color: '#3A2E28', bg: '#EDE6DC' };
         const isPostProcessing = ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'soft_copy_delivered', 'completed'].includes(displayStatus);
 
@@ -539,12 +540,12 @@ export default function AdminBookingsPage() {
                   {b.status === 'confirmed' && (
                     <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>
                   )}
-                  {!hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch') && (
+                  {b.status === 'pending_basic_retouch' && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
                       Basic Retouch Done
                     </button>
                   )}
-                  {!hasClientGallery && (b.status === 'confirmed' || b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
+                  {!hasClientGallery && (b.status === 'confirmed' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
                     <a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">
                       {b.sessionTypeId === 'bundle' && (b.bundleSessionNumber || 1) < 3
                         ? 'Create Download Gallery'
