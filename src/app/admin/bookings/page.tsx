@@ -595,7 +595,7 @@ export default function AdminBookingsPage() {
                           ? <span className="invoice-generating">Creating image <span className="loading-dots" aria-label="Please wait"><i></i><i></i><i></i></span></span>
                           : 'Create image for WhatsApp'}
                       </button>
-                      <button className="btn btn-ghost" disabled={isBusy} onClick={() => {
+                      <button className="btn btn-primary final-bill-confirm" disabled={isBusy} onClick={() => {
                         if (confirm('Confirm that the balance payment has been received? A payment receipt will be emailed to the client.')) {
                           runAction(b.id, 'confirm-balance');
                         }

@@ -244,7 +244,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       await drawPhotoBlock('Inspirational Reference Photos', inspirationPhotos);
       if (additionalLines.length) drawRow('Additional notes', additionalLines, additionalHeight);
       y += 24;
-      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#8c6d3f'; ctx.font = '700 30px Arial'; ctx.fillText('FINANCE', 82, y + 34);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#8c6d3f'; ctx.font = '700 30px Arial'; ctx.fillText('PAYMENT SUMMARY', 82, y + 34);
       y += 54;
       preparedFinanceEntries.forEach((entry) => drawRow(entry.label, entry.lines, entry.height));
       if (booking.ref) { ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#8c6d3f'; ctx.font = '23px Arial'; ctx.fillText(`Booking reference: ${booking.ref}`, 540, canvas.height - 58); }

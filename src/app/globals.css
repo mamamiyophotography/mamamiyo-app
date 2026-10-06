@@ -177,6 +177,18 @@ a { color: inherit; }
 .final-bill-add-charge input { min-width: 0; width: 100% !important; }
 .final-bill-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .final-bill-actions .btn { justify-content: center; text-align: center; }
+.final-bill-panel .btn {
+  border: 1px solid rgba(75, 63, 54, .18);
+  background: #fff;
+  color: #554a42;
+  box-shadow: 0 5px 0 rgba(87, 74, 64, .17), 0 9px 18px rgba(87, 74, 64, .12);
+  transform: translateY(0);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.final-bill-panel .btn:hover { border-color: rgba(75, 63, 54, .32); box-shadow: 0 6px 0 rgba(87, 74, 64, .19), 0 11px 22px rgba(87, 74, 64, .15); transform: translateY(-1px); }
+.final-bill-panel .btn:active { box-shadow: 0 1px 0 rgba(87, 74, 64, .18), 0 3px 7px rgba(87, 74, 64, .11); transform: translateY(4px); }
+.final-bill-panel .btn-primary { background: #342c25; border-color: #342c25; color: #fff; }
+.final-bill-confirm { grid-column: 1 / -1; white-space: nowrap; font-size: 13px; }
 .invoice-generating { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 .loading-dots { display: inline-flex; align-items: center; gap: 3px; min-width: 27px; }
 .loading-dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: invoice-dot 1s ease-in-out infinite; }
