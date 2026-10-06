@@ -966,6 +966,32 @@ function singaporeDateString(now: Date): string {
   }).format(now);
 }
 
+/** Customer self-service edit: add-ons and physical products only. */
+export async function updateClientAddOnsAndNotify(
+  db: any,
+  bookingId: string,
+  email: string,
+  addOns: Record<string, number>,
+) {
+  const existing = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+  if (existing.clientEmail.trim().toLowerCase() !== email.trim().toLowerCase()) {
+    throw new Error('EMAIL_MISMATCH');
+  }
+  if (!['pending', 'confirmed'].includes(existing.status)) {
+    throw new Error('This booking can no longer be changed online. Please contact Mamamiyo Photography.');
+  }
+  return updateBookingAndNotify(db, bookingId, {
+    sessionTypeId: existing.sessionTypeId,
+    date: existing.date,
+    startTime: existing.startTime,
+    endTime: existing.endTime,
+    addOns,
+    address: existing.address,
+    notes: existing.notes,
+    discountCode: existing.discountCode,
+  });
+}
+
 function singaporeDateAfterDays(now: Date, days: number): string {
   const singaporeMidday = new Date(`${singaporeDateString(now)}T12:00:00+08:00`);
   singaporeMidday.setUTCDate(singaporeMidday.getUTCDate() + days);

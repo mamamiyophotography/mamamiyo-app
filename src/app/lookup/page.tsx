@@ -5,9 +5,15 @@ import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { ADDONS, sessionById } from '@/lib/constants';
 import { MonthCalendar, CandidateSlot, startOfMonth, addMonths } from '@/components/MonthCalendar';
 import { PHOTO_SHARING_OPTIONS } from '@/lib/photoConsent';
+import { photoSharingConsentLabel } from '@/lib/photoConsent';
 
 type Booking = {
-  id: string; ref: string; sessionLabel: string; date: string; startTime: string; status: string;
+  id: string; ref: string; sessionTypeId: string; sessionLabel: string; date: string; startTime: string; endTime: string; status: string;
+  clientName: string; clientEmail: string; clientPhone: string; location: string; address: string; notes: string;
+  addOns: Record<string, number>; subtotal: number; total: number; discountCode: string | null; discountAmount: number;
+  isWeekend: boolean; extraLineItems: {description:string;amount:number}[]; photoSharingConsent?: string;
+  setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string;outfitSource?:string|null}[];
+  inspirationReferencePhotoUrls?: string[]; referencePhotoUrls?: string[];
   depositAmount: number; depositStatus: string; balanceDue: number; balanceStatus: string;
   bundleParentId: string | null;
 };
@@ -20,6 +26,10 @@ export default function LookupPage() {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<{ type: 'booking' | 'bundle'; item: Booking | Bundle } | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [editingAddOnsId, setEditingAddOnsId] = useState<string | null>(null);
+  const [draftAddOns, setDraftAddOns] = useState<Record<string, number>>({});
+  const [savingAddOns, setSavingAddOns] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   async function search() {
     if (!email.trim()) return;
@@ -49,6 +59,45 @@ export default function LookupPage() {
     setSelected(null);
   }
 
+  function beginEditAddOns(booking: Booking) {
+    setDraftAddOns({ ...(booking.addOns || {}) });
+    setEditingAddOnsId(booking.id);
+    setSaveMessage(null);
+    setCancelError(null);
+  }
+
+  function changeAddOn(id: string, quantity: number) {
+    setDraftAddOns((current) => {
+      const next = { ...current };
+      if (quantity <= 0) delete next[id];
+      else next[id] = quantity;
+      return next;
+    });
+  }
+
+  async function saveAddOns(booking: Booking) {
+    setSavingAddOns(true);
+    setCancelError(null);
+    setSaveMessage(null);
+    try {
+      const response = await fetch(`/api/bookings/${booking.id}/update-addons`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, addOns: draftAddOns }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not update the booking.');
+      setEditingAddOnsId(null);
+      setSaveMessage('Add-ons and products updated. An updated confirmation email has been sent.');
+      await search();
+      setSelected({ type: 'booking', item: data.booking });
+    } catch (error) {
+      setCancelError((error as Error).message);
+    } finally {
+      setSavingAddOns(false);
+    }
+  }
+
   const results = [...(bookings || []).map((b) => ({ type: 'booking' as const, item: b })), ...(bundles || []).map((b) => ({ type: 'bundle' as const, item: b }))];
 
   return (
@@ -72,6 +121,34 @@ export default function LookupPage() {
                 <div style={{ fontFamily: 'monospace', margin: '8px 0' }}>{b.ref} — {b.status}</div>
                 <div className="ticket-row"><span>Deposit</span><b>${b.depositAmount} — {b.depositStatus}</b></div>
                 <div className="ticket-row"><span>Balance</span><b>{b.balanceStatus === 'n/a' ? '—' : `$${b.balanceDue} — ${b.balanceStatus}`}</b></div>
+                <section style={{marginTop:16,padding:14,border:'1.5px solid var(--line)',borderRadius:12,background:'var(--cream)'}}>
+                  <h3 style={{fontSize:17,marginBottom:10}}>Photoshoot details</h3>
+                  <div className="ticket-row"><span>Client</span><b>{b.clientName}</b></div>
+                  <div className="ticket-row"><span>Email</span><b>{b.clientEmail}</b></div>
+                  <div className="ticket-row"><span>Phone</span><b>{b.clientPhone}</b></div>
+                  <div className="ticket-row"><span>Package</span><b>{b.sessionLabel}</b></div>
+                  <div className="ticket-row"><span>Date &amp; time</span><b>{fmtDatePretty(b.date)}, {fmtTime12(b.startTime)}–{fmtTime12(b.endTime)}</b></div>
+                  <div className="ticket-row"><span>Location</span><b>{b.location === 'home' ? (b.address || 'Client home') : 'Home Studio @ K-Lodge'}</b></div>
+                  <div className="ticket-row"><span>Photo sharing</span><b>{photoSharingConsentLabel(b.photoSharingConsent)}</b></div>
+                  {b.notes && <div style={{marginTop:10}}><b>Notes</b><div style={{whiteSpace:'pre-line',marginTop:5,color:'var(--ink-soft)'}}>{b.notes}</div></div>}
+                  {!!b.setupSelections?.length && <div style={{marginTop:12}}><b>Setup / outfit selections</b>{b.setupSelections.map((setup)=><div key={setup.slot} style={{marginTop:8,padding:'8px 10px',background:'var(--paper)',borderRadius:8}}><div>Setup {setup.slot}{setup.outfitSource ? ` · ${setup.outfitSource === 'own' ? 'Own outfit' : 'Mamamiyo outfit'}` : ''}</div>{setup.note && <div style={{fontSize:12,color:'var(--ink-soft)'}}>{setup.note}</div>}<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:6}}>{setup.referencePhotoUrls?.map(url=><img key={url} src={url} alt={`Setup ${setup.slot} reference`} style={{width:64,height:64,objectFit:'cover',borderRadius:7}}/>)}</div></div>)}</div>}
+                  {!!b.inspirationReferencePhotoUrls?.length && <div style={{marginTop:12}}><b>Inspiration photos</b><div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:6}}>{b.inspirationReferencePhotoUrls.map(url=><img key={url} src={url} alt="Inspiration reference" style={{width:64,height:64,objectFit:'cover',borderRadius:7}}/>)}</div></div>}
+                </section>
+
+                <section style={{marginTop:14,padding:14,border:'1.5px solid var(--line)',borderRadius:12}}>
+                  <h3 style={{fontSize:17,marginBottom:8}}>Add-ons &amp; products</h3>
+                  {Object.entries(b.addOns || {}).filter(([,qty])=>qty>0).length ? Object.entries(b.addOns).filter(([,qty])=>qty>0).map(([id,qty])=><div className="ticket-row" key={id}><span style={{whiteSpace:'pre-line'}}>{ADDONS[id]?.name || id} × {qty}</span><b>${(ADDONS[id]?.price || 0)*qty}</b></div>) : <div style={{color:'var(--ink-soft)',fontSize:13}}>No add-ons selected.</div>}
+                  <div className="ticket-row"><span>Subtotal</span><b>${b.subtotal}</b></div>
+                  {b.discountAmount > 0 && <div className="ticket-row"><span>Discount{b.discountCode ? ` (${b.discountCode})` : ''}</span><b>−${b.discountAmount}</b></div>}
+                  <div className="ticket-row"><span>Total</span><b>${b.total}</b></div>
+
+                  {(b.status === 'pending' || b.status === 'confirmed') && editingAddOnsId !== b.id && <button className="btn btn-primary" style={{marginTop:12}} onClick={()=>beginEditAddOns(b)}>Modify add-ons &amp; products</button>}
+                  {editingAddOnsId === b.id && <div style={{marginTop:12}}>
+                    {(sessionById(b.sessionTypeId)?.addOns || []).map((id)=>{const item=ADDONS[id];const qty=draftAddOns[id]||0;return <div key={id} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:10,alignItems:'center',padding:'9px 0',borderBottom:'1px solid var(--line)'}}><div><b style={{whiteSpace:'pre-line'}}>{item.name}</b><div style={{fontSize:12,color:'var(--ink-soft)'}}>${item.price} each</div></div><div style={{display:'flex',alignItems:'center',gap:8}}><button type="button" className="btn btn-ghost" onClick={()=>changeAddOn(id,qty-1)}>−</button><b>{qty}</b><button type="button" className="btn btn-ghost" onClick={()=>changeAddOn(id,qty+1)}>+</button></div></div>})}
+                    <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}><button className="btn btn-ghost" disabled={savingAddOns} onClick={()=>setEditingAddOnsId(null)}>Cancel</button><button className="btn btn-primary" disabled={savingAddOns} onClick={()=>saveAddOns(b)}>{savingAddOns?'Saving…':'Save changes'}</button></div>
+                  </div>}
+                </section>
+                {saveMessage && <div className="notice" style={{marginTop:12}}>{saveMessage}</div>}
                 {(b.status === 'pending' || b.status === 'confirmed') && (
                   <button className="btn btn-ghost" style={{ marginTop: 12 }} onClick={() => cancelBooking(b.id)}>Cancel / request reschedule</button>
                 )}
