@@ -38,6 +38,7 @@ import { fmtDatePretty } from '../format';
 import { balancePaymentReference } from '../paynow';
 import { isPhotoSharingConsent } from '../photoConsent';
 import { sendWhatsApp } from '../whatsapp';
+import { isBookingLocation, bookingLocationWithAddress } from '../location';
 
 const PHOTOGRAPHER_EMAIL_ENV = 'PHOTOGRAPHER_EMAIL';
 const PHOTOGRAPHER_PHONE_ENV = 'PHOTOGRAPHER_PHONE';
@@ -105,6 +106,7 @@ export type CreateBookingInput = {
   inspirationReferencePhotoUrls?: string[];
   referencePhotoUrls: string[];
   address: string;
+  location?: string;
   discountCode?: string | null;
   clientName: string;
   clientEmail: string;
@@ -116,7 +118,9 @@ export type CreateBookingInput = {
 export async function createBooking(db: any, input: CreateBookingInput) {
   const st = sessionById(input.sessionTypeId);
   if (!st) throw new Error(`Unknown session type: ${input.sessionTypeId}`);
-  if (st.location === 'home' && !input.address.trim()) throw new Error('Home address is required for this package.');
+  const bookingLocation = input.location || st.location;
+  if (!isBookingLocation(bookingLocation)) throw new Error('Please select a valid photoshoot location.');
+  if (bookingLocation !== 'studio' && !input.address.trim()) throw new Error('The photoshoot location address is required.');
   if(input.siblingJoining==='yes'&&input.siblingCount!==undefined&&(!Number.isSafeInteger(input.siblingCount)||Number(input.siblingCount)<1))throw new Error('Enter how many siblings will be joining.');
   const photoSharingConsent = input.photoSharingConsent ?? 'not_recorded';
   if (photoSharingConsent !== 'not_recorded' && !isPhotoSharingConsent(photoSharingConsent)) throw new Error('Please select a photo sharing preference.');
@@ -184,7 +188,7 @@ export async function createBooking(db: any, input: CreateBookingInput) {
         ...bookingAnalytics(input.analyticsAttribution),
         sessionTypeId: st.id,
         sessionLabel: st.isBundle ? 'First Year Bundle — session 1 of 3' : st.name,
-        location: st.location,
+        location: bookingLocation,
         date: input.date,
         startTime: input.startTime,
         endTime: input.endTime,
@@ -200,7 +204,7 @@ export async function createBooking(db: any, input: CreateBookingInput) {
         setupSelections,
         inspirationReferencePhotoUrls,
         referencePhotoUrls: input.referencePhotoUrls,
-        address: st.location === 'home' ? input.address : '',
+        address: bookingLocation === 'studio' ? '' : input.address.trim(),
         discountCode: discount?.code,
         discountAmount: pricing.discountAmount,
         clientName: input.clientName,
@@ -262,7 +266,7 @@ export async function confirmDepositAndNotify(db: any, bookingId: string) {
     uid: booking.ref,
     summary: `${booking.clientName} ${booking.sessionLabel} Mamamiyo Photography`,
     description: `Your ${booking.sessionLabel} is confirmed.\n\nRef: ${booking.ref}\nBalance due after session: $${booking.balanceDue}\n\nQuestions? Reply to this email.`,
-    location: booking.location === 'home' ? booking.address || 'Your home (address on file)' : studioAddress,
+    location: booking.location === 'studio' ? studioAddress : bookingLocationWithAddress(booking.location, booking.address),
     dateISO: booking.date,
     startTime: booking.startTime,
     endTime: booking.endTime,
@@ -306,6 +310,7 @@ export type UpdateBookingInput = {
   endTime: string;
   addOns: Record<string, number>;
   address?: string;
+  location?: string;
   notes?: string;
   discountCode?: string | null;
 };
@@ -323,9 +328,9 @@ export async function updateBookingAndNotify(db: any, bookingId: string, input: 
   if (existing.bundleSessionNumber && existing.bundleSessionNumber > 1 && input.sessionTypeId !== 'bundle') {
     throw new Error('Bundle sessions 2 and 3 cannot be changed to another package.');
   }
-  if (sessionType.location === 'home' && !input.address?.trim()) {
-    throw new Error('A home address is required for the Newborn package.');
-  }
+  const bookingLocation = input.location || existing.location || sessionType.location;
+  if (!isBookingLocation(bookingLocation)) throw new Error('Please select a valid photoshoot location.');
+  if (bookingLocation !== 'studio' && !input.address?.trim()) throw new Error('The photoshoot location address is required.');
 
   const sameSlot = existing.sessionTypeId === input.sessionTypeId
     && existing.date === input.date
@@ -439,14 +444,14 @@ export async function updateBookingAndNotify(db: any, bookingId: string, input: 
       data: {
         sessionTypeId: input.sessionTypeId,
         sessionLabel,
-        location: sessionType.location,
+        location: bookingLocation,
         date: input.date,
         startTime: input.startTime,
         endTime: input.endTime,
         isWeekend,
         addOns: cleanedAddOns,
         notes: input.notes?.trim() || '',
-        address: sessionType.location === 'home' ? input.address!.trim() : '',
+        address: bookingLocation === 'studio' ? '' : input.address!.trim(),
         subtotal,
         total,
         balanceDue,
@@ -485,9 +490,9 @@ export async function updateBookingAndNotify(db: any, bookingId: string, input: 
     uid: updated.ref,
     summary: `${updated.clientName} ${updated.sessionLabel} Mamamiyo Photography`,
     description: `Your updated ${updated.sessionLabel} booking is confirmed.\n\nRef: ${updated.ref}\nBalance due after session: $${updated.balanceDue}`,
-    location: updated.location === 'home'
-      ? updated.address || 'Your home (address on file)'
-      : 'K-Lodge, 32 Lorong K Telok Kurau #01-01, Singapore 425641',
+    location: updated.location === 'studio'
+      ? 'K-Lodge, 32 Lorong K Telok Kurau #01-01, Singapore 425641'
+      : bookingLocationWithAddress(updated.location, updated.address),
     dateISO: updated.date,
     startTime: updated.startTime,
     endTime: updated.endTime,

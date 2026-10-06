@@ -6,6 +6,7 @@ import { ADDONS, sessionById } from '@/lib/constants';
 import { MonthCalendar, CandidateSlot, startOfMonth, addMonths } from '@/components/MonthCalendar';
 import { PHOTO_SHARING_OPTIONS } from '@/lib/photoConsent';
 import { photoSharingConsentLabel } from '@/lib/photoConsent';
+import { bookingLocationWithAddress } from '@/lib/location';
 import { ClientSetupEditor } from '@/components/ClientSetupEditor';
 
 type Booking = {
@@ -130,7 +131,7 @@ export default function LookupPage() {
                   <div className="ticket-row"><span>Phone</span><b>{b.clientPhone}</b></div>
                   <div className="ticket-row"><span>Package</span><b>{b.sessionLabel}</b></div>
                   <div className="ticket-row"><span>Date &amp; time</span><b>{fmtDatePretty(b.date)}, {fmtTime12(b.startTime)}–{fmtTime12(b.endTime)}</b></div>
-                  <div className="ticket-row"><span>Location</span><b>{b.location === 'home' ? (b.address || 'Client home') : 'Home Studio @ K-Lodge'}</b></div>
+                  <div className="ticket-row"><span>Location</span><b>{bookingLocationWithAddress(b.location,b.address)}</b></div>
                   <div className="ticket-row"><span>Photo sharing</span><b>{photoSharingConsentLabel(b.photoSharingConsent)}</b></div>
                   {b.notes && <div style={{marginTop:10}}><b>Notes</b><div style={{whiteSpace:'pre-line',marginTop:5,color:'var(--ink-soft)'}}>{b.notes}</div></div>}
                   {!!b.setupSelections?.length && <div style={{marginTop:12}}><b>Setup / outfit selections</b>{b.setupSelections.map((setup)=><div key={setup.slot} style={{marginTop:8,padding:'8px 10px',background:'var(--paper)',borderRadius:8}}><div>Setup {setup.slot}{setup.outfitSource ? ` · ${setup.outfitSource === 'own' ? 'Own outfit' : 'Mamamiyo outfit'}` : ''}</div>{setup.note && <div style={{fontSize:12,color:'var(--ink-soft)'}}>{setup.note}</div>}<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:6}}>{setup.referencePhotoUrls?.map(url=><img key={url} src={url} alt={`Setup ${setup.slot} reference`} style={{width:64,height:64,objectFit:'cover',borderRadius:7}}/>)}</div></div>)}</div>}

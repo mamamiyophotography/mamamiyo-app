@@ -5,6 +5,7 @@ import { ADDONS, BUNDLE_SESSION_BALANCES, SESSION_TYPES } from '@/lib/constants'
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { addMonths, CandidateSlot, MonthCalendar, startOfMonth } from '@/components/MonthCalendar';
 import { uploadPhotoFromBrowser } from '@/lib/uploadClient';
+import { BOOKING_LOCATIONS, bookingLocationLabel } from '@/lib/location';
 
 export type EditableBooking = {
   id: string;
@@ -17,6 +18,7 @@ export type EditableBooking = {
   isWeekend: boolean;
   addOns: Record<string, number>;
   address: string;
+  location: string;
   notes: string;
   clientName: string;
   referencePhotoUrls?: string[];
@@ -64,6 +66,7 @@ export default function EditBookingModal({
     amount: booking.discountAmount || 0,
   });
   const [address, setAddress] = useState(booking.address || '');
+  const [shootLocation, setShootLocation] = useState(booking.location || SESSION_TYPES.find(item=>item.id===booking.sessionTypeId)?.location || 'studio');
   const [siblingJoining, setSiblingJoining] = useState(
     booking.notes.match(/^Sibling joining:\s*(yes|no)$/im)?.[1]?.toLowerCase() || '',
   );
@@ -180,8 +183,8 @@ export default function EditBookingModal({
       setError('Please select an available date and time.');
       return;
     }
-    if (!postSessionEdit && sessionType.location === 'home' && !address.trim()) {
-      setError('Please enter the client’s home address.');
+    if (!postSessionEdit && shootLocation !== 'studio' && !address.trim()) {
+      setError('Please enter the photoshoot location address.');
       return;
     }
     if (!postSessionEdit && !siblingJoining) {
@@ -223,6 +226,7 @@ export default function EditBookingModal({
           startTime: selectedSlot!.startTime,
           endTime: selectedSlot!.endTime,
           addOns,
+          location: shootLocation,
           discountCode: discountCode.trim() || null,
           address,
           notes: [`Sibling joining: ${siblingJoining}`, notesWithoutSibling].filter(Boolean).join('\n'),
@@ -304,7 +308,7 @@ export default function EditBookingModal({
 
         <div className="field"><label>Inspirational Reference <span style={{color:'var(--ink-faint)',fontWeight:500}}>(up to 10 photos)</span></label><div style={{display:'flex',gap:7,flexWrap:'wrap',margin:'8px 0'}}>{inspirationExisting.map(url=><div key={url} style={{position:'relative',width:58,height:58}}><img src={url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:7}}/><button type="button" onClick={()=>setInspirationExisting(items=>items.filter(item=>item!==url))} style={{position:'absolute',right:1,top:1,border:0,borderRadius:99,background:'#3a2e28dd',color:'#fff'}}>×</button></div>)}{inspirationPending.map((item,index)=><div key={item.previewUrl} style={{position:'relative',width:58,height:58}}><img src={item.previewUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:7}}/><button type="button" onClick={()=>setInspirationPending(items=>items.filter((_,itemIndex)=>itemIndex!==index))} style={{position:'absolute',right:1,top:1,border:0,borderRadius:99,background:'#3a2e28dd',color:'#fff'}}>×</button></div>)}</div><label className="btn btn-ghost" style={{display:'inline-flex'}}>Add inspiration photos<input hidden type="file" accept="image/*" multiple disabled={inspirationExisting.length+inspirationPending.length>=10} onChange={event=>{const room=10-inspirationExisting.length-inspirationPending.length;const added=Array.from(event.target.files||[]).slice(0,room).map(file=>({file,previewUrl:URL.createObjectURL(file)}));setInspirationPending(items=>[...items,...added]);event.target.value='';}}/></label></div>
 
-        {sessionType.location === 'home' && <div className="field"><label>Client’s home address</label><textarea value={address} onChange={(event) => setAddress(event.target.value)} /></div>}
+        {!postSessionEdit && <><div className="field"><label>Photoshoot location</label><select value={shootLocation} onChange={event=>{setShootLocation(event.target.value);if(event.target.value==='studio')setAddress('');}}>{BOOKING_LOCATIONS.map(location=><option key={location.value} value={location.value}>{location.label}</option>)}</select></div>{shootLocation!=='studio'&&<div className="field"><label>{bookingLocationLabel(shootLocation)} address</label><textarea value={address} onChange={(event) => setAddress(event.target.value)} /></div>}</>}
         <div className="field">
           <label>Will a sibling be joining the photoshoot?</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { ADDONS, prepLinkFor } from '@/lib/constants';
 import { photoSharingConsentLabel } from '@/lib/photoConsent';
+import { bookingLocationLabel } from '@/lib/location';
 
 type SummaryBooking = {
   clientName: string;
@@ -133,7 +134,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         ['Session', booking.sessionLabel],
         ['Date', fmtDatePretty(booking.date)],
         ['Time', fmtTime12(booking.startTime)],
-        ['Location', booking.location === 'home' ? "Client's home" : 'Studio'],
+        ['Location', bookingLocationLabel(booking.location)],
         ['Email', booking.clientEmail],
         ['Phone', booking.clientPhone],
         ['Photo sharing', photoSharingConsentLabel(booking.photoSharingConsent)],

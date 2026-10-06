@@ -8,6 +8,7 @@ import { computeBookingPricing } from '@/lib/pricing';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { MonthCalendar, CandidateSlot, startOfMonth, addMonths, fmtDateISO } from '@/components/MonthCalendar';
 import { PHOTO_SHARING_OPTIONS, photoSharingConsentLabel } from '@/lib/photoConsent';
+import { BOOKING_LOCATIONS, bookingLocationLabel } from '@/lib/location';
 
 type Step = 'package' | 'calendar' | 'information' | 'setup' | 'addons' | 'review' | 'result';
 const BOOKING_STEPS: {id:Exclude<Step,'result'>;label:string}[] = [
@@ -40,6 +41,7 @@ export default function BookPage() {
   const [countryCode, setCountryCode] = useState('+65');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [shootLocation, setShootLocation] = useState('studio');
   const [babyGender, setBabyGender] = useState('');
   const [siblingJoining, setSiblingJoining] = useState('');
   const [siblingCount,setSiblingCount]=useState('');
@@ -104,7 +106,10 @@ export default function BookPage() {
   });
 
   function selectPackage(id: string) {
+    const selectedPackage = SESSION_TYPES.find((item) => item.id === id);
     setSessionTypeId(id);
+    setShootLocation(selectedPackage?.location || 'studio');
+    setAddress('');
     setPkgOpen(false);
     setAddOns({});
     setSetupPhotos([[], [], []]);
@@ -164,7 +169,7 @@ export default function BookPage() {
   if (!siblingJoining) missingFields.push('Sibling attendance');
   if (!photoSharingConsent) missingFields.push('Photo sharing preference');
   if(siblingJoining==='yes'&&(!Number.isSafeInteger(Number(siblingCount))||Number(siblingCount)<1))missingFields.push('Number of siblings');
-  if (sessionType?.location === 'home' && !address.trim()) missingFields.push('Home address');
+  if (shootLocation !== 'studio' && !address.trim()) missingFields.push('Location address');
   const readyForReview = !!selectedSlot && missingFields.length === 0;
 
   const pricing =
@@ -206,6 +211,7 @@ export default function BookPage() {
           endTime: selectedSlot.endTime,
           isWeekend: selectedSlot.isWeekend,
           addOns,
+          location: shootLocation,
           notes,
           babyGender,
           siblingJoining,
@@ -451,12 +457,8 @@ export default function BookPage() {
               <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="9123 4567" style={{ flex: 1 }} />
             </div>
           </div>
-          {sessionType.location === 'home' && (
-            <div className="field">
-              <label>Home address<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label>
-              <textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Unit number, street, postal code" style={{ minHeight: 56 }} />
-            </div>
-          )}
+          <div className="field"><label>Photoshoot location<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label><select value={shootLocation} onChange={(e)=>{setShootLocation(e.target.value);if(e.target.value==='studio')setAddress('');}}>{BOOKING_LOCATIONS.map(location=><option key={location.value} value={location.value}>{location.label}</option>)}</select></div>
+          {shootLocation !== 'studio' && <div className="field"><label>{bookingLocationLabel(shootLocation)} address<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label><textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Building, unit number, street and postal code" style={{ minHeight: 56 }} /></div>}
           </>}
           {step==='setup'&&<>
           <div className="field">
@@ -537,6 +539,7 @@ export default function BookPage() {
             <div className="ticket-row"><span>Package <button type="button" onClick={()=>setStep('package')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{sessionType.name}</b></div>
             <div className="ticket-row"><span>Date &amp; time <button type="button" onClick={()=>setStep('calendar')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{fmtDatePretty(selectedSlot.date)}, {fmtTime12(selectedSlot.startTime)}</b></div>
             <div className="ticket-row"><span>Your information <button type="button" onClick={()=>setStep('information')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{firstName} {lastName}</b></div>
+            <div className="ticket-row"><span>Location</span><b>{bookingLocationLabel(shootLocation)}{address ? ` · ${address}` : ''}</b></div>
             <div className="ticket-row"><span>Setups <button type="button" onClick={()=>setStep('setup')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{activeSetupCount} · {inspirationPhotos.length} inspiration</b></div>
             <div className="ticket-row"><span>Add-ons <button type="button" onClick={()=>setStep('addons')} style={{border:0,background:'none',color:'var(--gold-deep)',textDecoration:'underline'}}>Edit</button></span><b>{Object.values(addOns).reduce((sum,q)=>sum+q,0)}</b></div>
             <div className="ticket-row"><span>Sibling joining</span><b>{siblingJoining === 'yes' ? `Yes · ${siblingCount}` : 'No'}</b></div>

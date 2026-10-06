@@ -12,12 +12,13 @@ import { fmtDatePretty, fmtTime12 } from './format';
 import { studioAddressText } from './studio';
 import { prepLinkFor, closingLineFor, sessionById, BUNDLE_SESSION_BALANCES } from './constants';
 import { photoSharingConsentLabel } from './photoConsent';
+import { bookingLocationWithAddress } from './location';
 
 export type NotifyBooking = {
   ref: string;
   sessionTypeId: string;
   sessionLabel: string;
-  location: string; // 'studio' | 'home'
+  location: string;
   date: string;
   startTime: string;
   clientName: string;
@@ -46,9 +47,7 @@ function firstNameOf(fullName: string): string {
 }
 
 function photographerBookingSummary(b: NotifyBooking): string {
-  const location = b.location === 'home'
-    ? `Client home${b.address ? ` — ${b.address}` : ''}`
-    : studioAddressText();
+  const location = b.location === 'studio' ? studioAddressText() : bookingLocationWithAddress(b.location, b.address);
   const selections = Array.isArray(b.setupSelections) ? b.setupSelections : [];
   const outfitLines = selections.length
     ? selections.flatMap((selection, index) => {
@@ -143,7 +142,7 @@ export function bookingConfirmedNotification(b: NotifyBooking, businessName: str
     },
     photographer: {
       emailSubject: `Booking confirmed — ${b.sessionLabel}`,
-      emailBody: `Deposit received. Booking confirmed.\n\nClient: ${b.clientName}\nSession: ${b.sessionLabel}\nWhen: ${whenStr}\nLocation: ${b.location === 'home' ? `Home — ${b.address || 'see booking'}` : 'Studio'}\nRef: ${b.ref}`,
+      emailBody: `Deposit received. Booking confirmed.\n\nClient: ${b.clientName}\nSession: ${b.sessionLabel}\nWhen: ${whenStr}\nLocation: ${bookingLocationWithAddress(b.location,b.address)}\nRef: ${b.ref}`,
       whatsappBody: `Confirmed: ${b.sessionLabel} with ${b.clientName}\n${whenStr}\nRef: ${b.ref}`,
     },
   };
@@ -320,7 +319,7 @@ export function reminderNotification(b: NotifyBooking, threshold: ReminderThresh
             `📅 Appointment reminder — in about 2 hours`,
             `${b.clientName} — ${b.sessionLabel}`,
             `${whenStr}`,
-            `Location: ${b.location === 'home' ? 'Client home' : 'Studio'}`,
+            `Location: ${bookingLocationWithAddress(b.location,b.address)}`,
             `Ref: ${b.ref}`,
           ].join('\n')
         : [missingSetupPhotosAlert, photographerBookingSummary(b), photographerPrepLine].filter(Boolean).join('\n\n'),
@@ -401,9 +400,7 @@ export function newBookingRequestNotification(
   businessName: string
 ): NotificationPair {
   const whenStr = `${fmtDatePretty(b.date)} at ${fmtTime12(b.startTime)}`;
-  const locationLine = b.location === 'home'
-    ? `Location: Client's home — ${b.address || 'see booking'}`
-    : `Location: Studio`;
+  const locationLine = `Location: ${bookingLocationWithAddress(b.location,b.address)}`;
   const notesLine = b.notes ? `Notes: ${b.notes}` : '';
 
   const body = [

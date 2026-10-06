@@ -8,6 +8,7 @@ import EditBookingModal from '@/components/EditBookingModal';
 import ManageGalleryModal from '@/components/ManageGalleryModal';
 import { photoSharingConsentLabel } from '@/lib/photoConsent';
 import { codexPhotoSelectionUrl } from '@/lib/codexPhotoSelection';
+import { bookingLocationLabel } from '@/lib/location';
 
 type Booking = {
   downloadFeedback?: {galleryId:string;downloadType:'basic'|'further'|'all';downloadedAt:string}[];
@@ -447,7 +448,7 @@ export default function AdminBookingsPage() {
                 {actionError?.id === b.id && <div className="notice warn" style={{ marginTop: 0, marginBottom: 12 }}>{actionError.message}</div>}
 
                 <div className="ticket-row"><span>Reference</span><b style={{ fontFamily: 'monospace' }}>{b.ref}</b></div>
-                <div className="ticket-row"><span>Location</span><b>{b.location === 'home' ? "Client's home" : 'Studio'}</b></div>
+                <div className="ticket-row"><span>Location</span><b>{bookingLocationLabel(b.location)}</b></div>
                 <div className="ticket-row"><span>Email</span><b>{b.clientEmail}</b></div>
                 <div className="ticket-row"><span>Phone</span><b>{b.clientPhone}</b></div>
                 <div className="ticket-row"><span>Photo sharing</span><b>{photoSharingConsentLabel(b.photoSharingConsent)}</b></div>
