@@ -6,8 +6,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   try {
     const input = await req.json() as UpdateBookingInput;
-    const booking = await updateBookingAndNotify(db, id, input);
-    return NextResponse.json({ booking, emailSent: true });
+    const booking = await updateBookingAndNotify(db, id, input, { notifyClient: false });
+    return NextResponse.json({ booking, emailSent: false });
   } catch (err) {
     const message = (err as Error).message;
     const status = message === 'SLOT_NOT_AVAILABLE' ? 409 : 400;

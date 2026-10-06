@@ -134,11 +134,12 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         ['Session', booking.sessionLabel],
         ['Date', fmtDatePretty(booking.date)],
         ['Time', fmtTime12(booking.startTime)],
-        ['Location', bookingLocationLabel(booking.location)],
+        ['Location & address', booking.address
+          ? `${bookingLocationLabel(booking.location)} — ${booking.address}`
+          : bookingLocationLabel(booking.location)],
         ['Email', booking.clientEmail],
         ['Phone', booking.clientPhone],
         ['Photo sharing', photoSharingConsentLabel(booking.photoSharingConsent)],
-        ...(booking.address ? [['Address', booking.address]] : []),
         ...(noteParts.gender ? [['Baby gender', noteParts.gender]] : []),
         ...(noteParts.sibling ? [['Sibling joining', noteParts.sibling]] : []),
         ...(noteParts.siblingCount ? [['Number of siblings', noteParts.siblingCount]] : []),

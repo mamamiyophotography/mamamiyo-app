@@ -315,9 +315,13 @@ export type UpdateBookingInput = {
   discountCode?: string | null;
 };
 
-/** Admin-only edit flow for pre-shoot bookings. Revalidates availability,
- * recalculates pricing, resets reminders, and sends an updated confirmation. */
-export async function updateBookingAndNotify(db: any, bookingId: string, input: UpdateBookingInput) {
+/** Edit flow for pre-shoot bookings. Revalidates availability and recalculates pricing. */
+export async function updateBookingAndNotify(
+  db: any,
+  bookingId: string,
+  input: UpdateBookingInput,
+  options: { notifyClient?: boolean } = { notifyClient: true },
+) {
   const existing = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
   if (!['pending', 'confirmed'].includes(existing.status)) {
     throw new Error('Only pending or confirmed bookings can be edited.');
@@ -479,6 +483,7 @@ export async function updateBookingAndNotify(db: any, bookingId: string, input: 
   if (previous.address !== updated.address) changedFields.push('address');
   if (previous.notes !== updated.notes) changedFields.push('notes');
 
+  if (options.notifyClient !== false) {
   const pair = bookingUpdatedNotification(
     toNotifyBooking(updated),
     { date: previous.date, startTime: previous.startTime },
@@ -531,6 +536,7 @@ export async function updateBookingAndNotify(db: any, bookingId: string, input: 
     );
   } catch (err) {
     throw new Error(`Booking was updated, but the confirmation email failed: ${(err as Error).message}`);
+  }
   }
   return updated;
 }

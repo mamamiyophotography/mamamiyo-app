@@ -303,9 +303,8 @@ export default function EditBookingModal({
               </div>
             </div>
           )}
+          {sessionType.id==='newborn' && <div style={{marginTop:18,paddingTop:16,borderTop:'1px solid var(--line)'}}><div className="field"><label>Photoshoot location</label><select value={shootLocation} onChange={event=>{setShootLocation(event.target.value);setAddress('');}}>{NEWBORN_BOOKING_LOCATIONS.map(location=><option key={location.value} value={location.value}>{location.label}</option>)}</select></div><div className="field" style={{marginBottom:0}}><label>{bookingLocationLabel(shootLocation)} address</label><textarea value={address} onChange={(event) => setAddress(event.target.value)} placeholder={shootLocation==='confinement'?'Confinement center name, building, unit and postal code':'Building, unit number, street and postal code'} /></div></div>}
         </div>}
-
-        {!postSessionEdit && sessionType.id==='newborn' && <div className="card" style={{margin:'16px 0'}}><div className="field"><label>Photoshoot location</label><select value={shootLocation} onChange={event=>{setShootLocation(event.target.value);setAddress('');}}>{NEWBORN_BOOKING_LOCATIONS.map(location=><option key={location.value} value={location.value}>{location.label}</option>)}</select></div><div className="field"><label>{bookingLocationLabel(shootLocation)} address</label><textarea value={address} onChange={(event) => setAddress(event.target.value)} placeholder={shootLocation==='confinement'?'Confinement center name, building, unit and postal code':'Building, unit number, street and postal code'} /></div></div>}
 
         {postSessionEdit && <div className="notice" style={{ marginBottom: 16 }}>After the photoshoot, Edit Booking updates the final bill. Package, date, client details and Setup choices remain unchanged.</div>}
 
@@ -389,7 +388,7 @@ export default function EditBookingModal({
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-ghost" type="button" disabled={saving} onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" type="button" disabled={saving || !selectedSlot} onClick={save}>
-            {saving ? 'Saving…' : postSessionEdit ? 'Save bill changes' : 'Save changes & email client'}
+            {saving ? 'Saving…' : postSessionEdit ? 'Save bill changes' : 'Save changes'}
           </button>
         </div>
       </div>
