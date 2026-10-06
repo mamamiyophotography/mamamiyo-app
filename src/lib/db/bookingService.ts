@@ -966,6 +966,12 @@ function singaporeDateString(now: Date): string {
   }).format(now);
 }
 
+function singaporeDateAfterDays(now: Date, days: number): string {
+  const singaporeMidday = new Date(`${singaporeDateString(now)}T12:00:00+08:00`);
+  singaporeMidday.setUTCDate(singaporeMidday.getUTCDate() + days);
+  return singaporeDateString(singaporeMidday);
+}
+
 /** Sends the balance invoice at 6pm SGT on the photoshoot date. The cron
  * route controls the time; this function protects against duplicates. */
 export async function sendShootDayBalanceInvoices(db: any, now = new Date()) {
@@ -1002,9 +1008,16 @@ export async function checkAndSendReminders(db: any, now = new Date()) {
     const sessionStart = new Date(`${booking.date}T${booking.startTime}:00+08:00`);
     const hoursUntil = (sessionStart.getTime() - now.getTime()) / 3600000;
     if (hoursUntil <= 0) continue;
+    const threeDaysFromToday = singaporeDateAfterDays(now, 3);
+    const tomorrow = singaporeDateAfterDays(now, 1);
     const already = (booking.remindersSent as string[]) || [];
     for (const threshold of REMINDER_THRESHOLDS) {
-      if (hoursUntil <= threshold.hours && !already.includes(threshold.key)) {
+      const isDue = threshold.key === '3day'
+        ? booking.date === threeDaysFromToday
+        : threshold.key === '1day'
+          ? booking.date === tomorrow
+          : hoursUntil <= threshold.hours;
+      if (isDue && !already.includes(threshold.key)) {
         const pair = reminderNotification(toNotifyBooking(booking), threshold, settings.businessName);
         if(threshold.key==='3day'){
           const setupSelections=Array.isArray(booking.setupSelections)?booking.setupSelections:[];
