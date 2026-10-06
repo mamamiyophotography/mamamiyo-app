@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
-import { prepLinkFor } from '@/lib/constants';
+import { ADDONS, prepLinkFor } from '@/lib/constants';
 import { photoSharingConsentLabel } from '@/lib/photoConsent';
 
 type SummaryBooking = {
@@ -23,6 +23,16 @@ type SummaryBooking = {
   sessionTypeId: string;
   bundleSessionNumber?: number | null;
   photoSharingConsent?: string;
+  addOns?: Record<string, number>;
+  extraLineItems?: { description:string; amount:number }[];
+  subtotal?: number;
+  total?: number;
+  depositAmount?: number;
+  balanceDue?: number;
+  balanceStatus?: string;
+  discountCode?: string | null;
+  discountAmount?: number;
+  setupSelections?: { slot:number; referencePhotoUrls:string[]; note?:string; outfitSource?:'mamamiyo'|'own'|null }[];
 };
 
 type PreparationGuide = {
@@ -123,6 +133,20 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         ...(noteParts.siblingCount ? [['Number of siblings', noteParts.siblingCount]] : []),
         ...(noteParts.other ? [['Notes', noteParts.other]] : []),
         [selectionLabel, String(booking.setupSelectionCount || 0)],
+        ...(booking.setupSelections || []).flatMap((setup) => [
+          [`Setup ${setup.slot} outfit`, setup.outfitSource === 'own' ? 'Own outfit' : setup.outfitSource === 'mamamiyo' ? 'Mamamiyo outfit' : 'Not selected'],
+          ...(setup.note ? [[`Setup ${setup.slot} notes`, setup.note]] : []),
+        ]),
+        ...Object.entries(booking.addOns || {}).filter(([, quantity]) => quantity > 0).map(([id, quantity]) => [
+          ADDONS[id]?.name || id,
+          `${quantity} × $${ADDONS[id]?.price || 0} = $${quantity * (ADDONS[id]?.price || 0)}`,
+        ]),
+        ...(booking.extraLineItems || []).map((item) => [item.description, `$${item.amount}`]),
+        ...(typeof booking.subtotal === 'number' ? [['Subtotal', `$${booking.subtotal}`]] : []),
+        ...((booking.discountAmount || 0) > 0 ? [[`Discount${booking.discountCode ? ` (${booking.discountCode})` : ''}`, `−$${booking.discountAmount}`]] : []),
+        ...(typeof booking.total === 'number' ? [['Package total', `$${booking.total}`]] : []),
+        ...(typeof booking.depositAmount === 'number' ? [['Deposit paid', `$${booking.depositAmount}`]] : []),
+        ...(typeof booking.balanceDue === 'number' ? [['Balance', `$${booking.balanceDue} · ${booking.balanceStatus || 'pending'}`]] : []),
       ];
       const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
         const words = text.split(/\s+/); const lines: string[] = []; let line = '';

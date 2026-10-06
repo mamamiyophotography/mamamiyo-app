@@ -109,7 +109,7 @@ export default function AdminBookingsPage() {
   }
 
   async function openSummary(id: string) {
-    const res = await fetch(`/api/admin/bookings/${id}`);
+    const res = await fetch(`/api/admin/bookings/${id}?t=${Date.now()}`, { cache: 'no-store' });
     const data = await res.json();
     if (data?.booking) setSummaryBooking(data.booking);
   }
