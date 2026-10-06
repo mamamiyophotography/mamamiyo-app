@@ -118,7 +118,7 @@ export type CreateBookingInput = {
 export async function createBooking(db: any, input: CreateBookingInput) {
   const st = sessionById(input.sessionTypeId);
   if (!st) throw new Error(`Unknown session type: ${input.sessionTypeId}`);
-  const bookingLocation = input.location || st.location;
+  const bookingLocation = st.id === 'newborn' ? (input.location || 'home') : st.location;
   if (!isBookingLocation(bookingLocation)) throw new Error('Please select a valid photoshoot location.');
   if (bookingLocation !== 'studio' && !input.address.trim()) throw new Error('The photoshoot location address is required.');
   if(input.siblingJoining==='yes'&&input.siblingCount!==undefined&&(!Number.isSafeInteger(input.siblingCount)||Number(input.siblingCount)<1))throw new Error('Enter how many siblings will be joining.');
@@ -328,7 +328,7 @@ export async function updateBookingAndNotify(db: any, bookingId: string, input: 
   if (existing.bundleSessionNumber && existing.bundleSessionNumber > 1 && input.sessionTypeId !== 'bundle') {
     throw new Error('Bundle sessions 2 and 3 cannot be changed to another package.');
   }
-  const bookingLocation = input.location || existing.location || sessionType.location;
+  const bookingLocation = sessionType.id === 'newborn' ? (input.location || existing.location || 'home') : sessionType.location;
   if (!isBookingLocation(bookingLocation)) throw new Error('Please select a valid photoshoot location.');
   if (bookingLocation !== 'studio' && !input.address?.trim()) throw new Error('The photoshoot location address is required.');
 

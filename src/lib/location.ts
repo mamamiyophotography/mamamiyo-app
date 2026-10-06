@@ -1,9 +1,11 @@
 export const BOOKING_LOCATIONS = [
   { value: 'studio', label: 'Home Studio @ K-Lodge' },
-  { value: 'home', label: "Client's home" },
-  { value: 'confinement', label: 'Confinement centre' },
-  { value: 'other', label: 'Other location' },
+  { value: 'home', label: 'Client Home' },
+  { value: 'confinement', label: 'Confinement Center' },
+  { value: 'other', label: 'Other' },
 ] as const;
+
+export const NEWBORN_BOOKING_LOCATIONS = BOOKING_LOCATIONS.filter((location) => location.value !== 'studio');
 
 export type BookingLocation = (typeof BOOKING_LOCATIONS)[number]['value'];
 

@@ -8,7 +8,7 @@ import { computeBookingPricing } from '@/lib/pricing';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { MonthCalendar, CandidateSlot, startOfMonth, addMonths, fmtDateISO } from '@/components/MonthCalendar';
 import { PHOTO_SHARING_OPTIONS, photoSharingConsentLabel } from '@/lib/photoConsent';
-import { BOOKING_LOCATIONS, bookingLocationLabel } from '@/lib/location';
+import { NEWBORN_BOOKING_LOCATIONS, bookingLocationLabel } from '@/lib/location';
 
 type Step = 'package' | 'calendar' | 'information' | 'setup' | 'addons' | 'review' | 'result';
 const BOOKING_STEPS: {id:Exclude<Step,'result'>;label:string}[] = [
@@ -153,7 +153,7 @@ export default function BookPage() {
   function goNext(){
     setStepErrors({});
     if(step==='package'){if(!sessionType){setStepErrors({package:'Choose a package to continue.'});return;}event('booking_start',{package_type:sessionType.id},'start:'+sessionType.id);setStep('calendar');return;}
-    if(step==='calendar'){if(!selectedSlot){setStepErrors({calendar:'Choose a date and time to continue.'});return;}setStep('information');return;}
+    if(step==='calendar'){if(!selectedSlot){setStepErrors({calendar:'Choose a date and time to continue.'});return;}if(sessionType?.id==='newborn'&&(!shootLocation||!address.trim())){setStepErrors({calendar:'Choose the photoshoot location and enter its address.'});return;}setStep('information');return;}
     if(step==='information'){if(missingFields.length){setStepErrors({information:`Please complete: ${missingFields.join(', ')}.`});return;}setStep('setup');return;}
     if(step==='setup'){setStep('addons');return;}
     if(step==='addons')setStep('review');
@@ -169,7 +169,6 @@ export default function BookPage() {
   if (!siblingJoining) missingFields.push('Sibling attendance');
   if (!photoSharingConsent) missingFields.push('Photo sharing preference');
   if(siblingJoining==='yes'&&(!Number.isSafeInteger(Number(siblingCount))||Number(siblingCount)<1))missingFields.push('Number of siblings');
-  if (shootLocation !== 'studio' && !address.trim()) missingFields.push('Location address');
   const readyForReview = !!selectedSlot && missingFields.length === 0;
 
   const pricing =
@@ -408,7 +407,11 @@ export default function BookPage() {
               )}
             </>
           )}
-          <WizardNav back={goBack} next={goNext} nextDisabled={!selectedSlot} error={stepErrors.calendar}/>
+          {sessionType.id==='newborn'&&<div className="card" style={{marginTop:18}}>
+            <div className="field"><label>Photoshoot location<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label><select value={shootLocation} onChange={(e)=>{setShootLocation(e.target.value);setAddress('');}}>{NEWBORN_BOOKING_LOCATIONS.map(location=><option key={location.value} value={location.value}>{location.label}</option>)}</select></div>
+            <div className="field"><label>{bookingLocationLabel(shootLocation)} address<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label><textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder={shootLocation==='confinement'?'Confinement center name, building, unit and postal code':'Building, unit number, street and postal code'} style={{ minHeight: 70 }} /></div>
+          </div>}
+          <WizardNav back={goBack} next={goNext} nextDisabled={!selectedSlot||(sessionType.id==='newborn'&&(!shootLocation||!address.trim()))} error={stepErrors.calendar}/>
         </div>
       )}
 
@@ -457,8 +460,6 @@ export default function BookPage() {
               <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="9123 4567" style={{ flex: 1 }} />
             </div>
           </div>
-          <div className="field"><label>Photoshoot location<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label><select value={shootLocation} onChange={(e)=>{setShootLocation(e.target.value);if(e.target.value==='studio')setAddress('');}}>{BOOKING_LOCATIONS.map(location=><option key={location.value} value={location.value}>{location.label}</option>)}</select></div>
-          {shootLocation !== 'studio' && <div className="field"><label>{bookingLocationLabel(shootLocation)} address<span style={{ color: 'var(--rust)', fontWeight: 700 }}> (Compulsory)</span></label><textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Building, unit number, street and postal code" style={{ minHeight: 56 }} /></div>}
           </>}
           {step==='setup'&&<>
           <div className="field">
