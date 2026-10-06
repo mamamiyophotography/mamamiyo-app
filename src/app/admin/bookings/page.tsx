@@ -292,7 +292,7 @@ export default function AdminBookingsPage() {
       if (!created) return;
       setActionSuccess({
         id: booking.id,
-        message: 'The Dropbox client folder and all subfolders were created. Opening PhotoSelect Pro…',
+        message: 'The Dropbox client folder and all subfolders were created. Opening Photo Clean Up Agent…',
       });
       window.open(photoSelectCreateUrl(booking), '_blank', 'noopener,noreferrer');
     } finally {
@@ -339,7 +339,7 @@ export default function AdminBookingsPage() {
                 <div style={{ fontFamily: "'Quicksand', sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: '#3A2E28' }}>{b.clientName}</div>
                 <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>
                 <div style={{ fontWeight: 600, fontSize: 12.5, color: '#3A2E28', marginTop: 4, lineHeight: 1.35 }}>{fmtDatePretty(b.date)} · {fmtTime12(b.startTime)}</div>
-                {!hasClientGallery && (b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <button type="button" disabled={isBusy} onClick={() => createGalleryWithDropboxFolder(b)} title="Create the Dropbox client folder, then create a Gallery in PhotoSelect Pro" style={{display:'inline-block',marginTop:8,padding:'8px 12px',border:0,background:'#657e76',color:'#fff',borderRadius:7,fontSize:13,fontWeight:600,cursor:isBusy?'default':'pointer'}}>Create Dropbox Folder &amp; Gallery</button>}
+                {!hasClientGallery && (b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <button type="button" disabled={isBusy} onClick={() => createGalleryWithDropboxFolder(b)} title="Create the Dropbox client folder, then open Photo Clean Up Agent to prepare the Gallery" style={{display:'inline-block',marginTop:8,padding:'8px 12px',border:0,background:'#657e76',color:'#fff',borderRadius:7,fontSize:13,fontWeight:600,cursor:isBusy?'default':'pointer'}}>Create Folder &amp; Open Photo Clean Up Agent</button>}
                 {b.gallerySelections?.map(g => <div key={g.galleryId} style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8,marginTop:8,padding:'10px',background:'#e3eee9',borderRadius:6,fontSize:13}}>
                   {(g.deliveredAt || g.locked || g.submitted) && <span style={{width:'100%'}}>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : 'Client selection received'}</span>}
                   {g.clientUrl ? <div style={{display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,width:'100%',maxWidth:320}}>
@@ -349,7 +349,7 @@ export default function AdminBookingsPage() {
                     {!g.deliveredAt&&<button type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'basic')} style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Share Basic Retouch WhatsApp Image</button>}
                     {g.deliveredAt&&<button type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'further')} style={{border:'1px solid #557970',background:'#557970',padding:'7px 10px',borderRadius:6,color:'#fff',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Share Further Retouch WhatsApp Image</button>}
                     <a href={`/g/${g.galleryId.slice(0,12)}`} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #7d918b',background:'#f8fbfa',padding:'7px 10px',borderRadius:6,color:'#415e58',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Open Client Gallery</a>
-                  </div> : <span style={{color:'#8b5b43'}}>Link this Gallery again in PhotoSelect Pro to enable the mobile client link.</span>}
+                  </div> : <span style={{color:'#8b5b43'}}>Link this Gallery again in Photo Clean Up Agent to enable the mobile client link.</span>}
                 </div>)}
                 {b.additionalOrders?.map(order=><div key={order.id} style={{marginTop:8,padding:'10px 12px',background:order.status==='paid'?'#e4eadf':'#fff0d8',borderRadius:7,fontSize:13}}><div style={{display:'flex',justifyContent:'space-between',gap:8,fontWeight:700}}><span>Additional Order · {order.status==='paid'?'Paid':'Payment pending'}</span><span>${order.total}</span></div><div style={{marginTop:5,color:'#6f6258'}}>{order.items.map(item=>`${item.name} ×${item.quantity}`).join(' · ')}</div><div style={{marginTop:4}}>Ref: {order.invoiceRef} · +{order.bonusRetouches} complimentary retouch{order.bonusRetouches===1?'':'es'}</div>{order.status!=='paid'&&<button className="btn btn-sm" style={{marginTop:8}} disabled={busyId===b.id} onClick={()=>runAction(b.id,'confirm-additional-order',{orderId:order.id})}>Payment received</button>}</div>)}
               </div>
@@ -565,9 +565,7 @@ export default function AdminBookingsPage() {
                   )}
                   {!hasClientGallery && (b.status === 'confirmed' || b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
                     <button className="btn btn-ghost" disabled={isBusy} onClick={() => createGalleryWithDropboxFolder(b)}>
-                      {b.sessionTypeId === 'bundle' && (b.bundleSessionNumber || 1) < 3
-                        ? 'Create Dropbox Folder & Download Gallery'
-                        : 'Create Dropbox Folder & Gallery'}
+                      Create Folder &amp; Open Photo Clean Up Agent
                     </button>
                   )}
                   {b.status === 'basic_retouch' && (
