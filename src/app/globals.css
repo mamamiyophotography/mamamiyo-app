@@ -101,6 +101,18 @@ a { color: inherit; }
 .ticket-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .ticket-total .amt { font-family: Georgia, serif; font-size: 24px; color: var(--gold-deep); }
 .final-bill-panel { margin-top: 14px; padding: 14px; border-radius: 10px; background: var(--gold-pale); }
+.workflow-panel { margin-top: 14px; padding: 14px; border: 1px solid rgba(80,70,60,.1); border-radius: 12px; }
+.workflow-panel.compact { margin-top: 10px; padding: 12px; }
+.workflow-billing, .final-bill-panel { background: #F7E8C8; }
+.workflow-photo { background: #DDEAF2; }
+.workflow-status { background: #DDEBDD; }
+.workflow-panel-title { margin-bottom: 9px; font-size: 12px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: #5d554e; }
+.workflow-current { font-size: 13px; font-weight: 700; color: #4c4540; }
+.workflow-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.workflow-hint { font-size: 12px; color: var(--ink-soft); }
+.workflow-more { margin-top: 12px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; background: #F3EEEA; }
+.workflow-more.compact { margin-top: 2px; padding: 8px 10px; }
+.workflow-more summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--ink-soft); }
 .final-bill-panel .ticket-row { grid-template-columns: minmax(0, 1fr) auto; }
 .final-bill-panel .ticket-row b { text-align: right; white-space: nowrap; overflow-wrap: normal; }
 .final-bill-panel .ticket-row span { white-space: pre-line; }

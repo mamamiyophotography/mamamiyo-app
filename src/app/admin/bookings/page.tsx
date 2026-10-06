@@ -356,19 +356,18 @@ export default function AdminBookingsPage() {
                 <div style={{ fontFamily: "'Quicksand', sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: '#3A2E28' }}>{b.clientName}</div>
                 <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>
                 <div style={{ fontWeight: 600, fontSize: 12.5, color: '#3A2E28', marginTop: 4, lineHeight: 1.35 }}>{fmtDatePretty(b.date)} · {fmtTime12(b.startTime)}</div>
-                {!hasClientGallery && (b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <div style={{display:'flex',flexWrap:'wrap',gap:7,marginTop:8}}><button type="button" disabled={isBusy} onClick={() => createEditingFolders(b)} title="Create the client editing folders" style={{padding:'8px 12px',border:0,background:'#657e76',color:'#fff',borderRadius:7,fontSize:13,fontWeight:600,cursor:isBusy?'default':'pointer'}}>Create Editing Folders</button><a href={photoSelectionCodexUrl(b)} onClick={() => showCodexPhotoSelectionLaunch(b)} title="打开 Codex，带入客户资料和宽松选片规则；按发送开始" style={{padding:'8px 12px',border:'1px solid #9d8298',background:'#fff',color:'#6c5368',borderRadius:7,fontSize:13,fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7,textDecoration:'none'}}>交给 Codex 选片</a><a href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer" title="Use after photo selection and your manual review are complete" style={{padding:'8px 12px',border:'1px solid #657e76',background:'#fff',color:'#4d6961',borderRadius:7,textDecoration:'none',fontSize:13,fontWeight:600}}>Open Photo Select Pro · Upload Gallery</a></div>}
-                {b.gallerySelections?.map(g => <div key={g.galleryId} style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8,marginTop:8,padding:'10px',background:'#e3eee9',borderRadius:6,fontSize:13}}>
+                {isOpen && b.gallerySelections?.map(g => <div key={g.galleryId} className="workflow-panel workflow-photo compact">
                   {(g.deliveredAt || g.locked || g.submitted) && <span style={{width:'100%'}}>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : 'Client selection received'}</span>}
                   {g.clientUrl ? <div style={{display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,width:'100%',maxWidth:320}}>
-                    {(g.submitted||g.locked||g.deliveredAt) ? <a href={photoSelectGalleryActionUrl(b,g.galleryId,'update-basic')} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Update Basic Retouch</a> : <button type="button" onClick={()=>setManageGallery({bookingId:b.id,galleryId:g.galleryId})} style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Manage Gallery</button>}
-                    {g.submitted&&<a href={photoSelectGalleryActionUrl(b,g.galleryId,'unlock-selection')} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #b87962',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#704333',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Allow Client to Change Selection</a>}
+                    {!(g.submitted||g.locked||g.deliveredAt) && <button type="button" onClick={()=>setManageGallery({bookingId:b.id,galleryId:g.galleryId})} style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Manage Gallery</button>}
                     {(g.submitted||g.locked)&&<a href={photoSelectGalleryActionUrl(b,g.galleryId,'upload-further')} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #8d6fa8',background:'#8d6fa8',padding:'7px 10px',borderRadius:6,color:'#fff',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Upload Further Retouch</a>}
                     {!g.deliveredAt&&<button type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'basic')} style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Share Basic Retouch WhatsApp Image</button>}
                     {g.deliveredAt&&<button type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'further')} style={{border:'1px solid #557970',background:'#557970',padding:'7px 10px',borderRadius:6,color:'#fff',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Share Further Retouch WhatsApp Image</button>}
                     <a href={`/g/${g.galleryId.slice(0,12)}`} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #7d918b',background:'#f8fbfa',padding:'7px 10px',borderRadius:6,color:'#415e58',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Open Client Gallery</a>
+                    {(g.submitted||g.locked||g.deliveredAt)&&<details className="workflow-more compact"><summary>More Gallery options</summary><div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,g.galleryId,'update-basic')} target="_blank" rel="noopener noreferrer">Update Basic Retouch</a>{g.submitted&&<a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,g.galleryId,'unlock-selection')} target="_blank" rel="noopener noreferrer">Allow Client to Change Selection</a>}</div></details>}
                   </div> : <span style={{color:'#8b5b43'}}>Link this Gallery again in Photo Clean Up Agent to enable the mobile client link.</span>}
                 </div>)}
-                {b.additionalOrders?.map(order=><div key={order.id} style={{marginTop:8,padding:'10px 12px',background:order.status==='paid'?'#e4eadf':'#fff0d8',borderRadius:7,fontSize:13}}><div style={{display:'flex',justifyContent:'space-between',gap:8,fontWeight:700}}><span>Additional Order · {order.status==='paid'?'Paid':'Payment pending'}</span><span>${order.total}</span></div><div style={{marginTop:5,color:'#6f6258'}}>{order.items.map(item=>`${item.name} ×${item.quantity}`).join(' · ')}</div><div style={{marginTop:4}}>Ref: {order.invoiceRef} · +{order.bonusRetouches} complimentary retouch{order.bonusRetouches===1?'':'es'}</div>{order.status!=='paid'&&<button className="btn btn-sm" style={{marginTop:8}} disabled={busyId===b.id} onClick={()=>runAction(b.id,'confirm-additional-order',{orderId:order.id})}>Payment received</button>}</div>)}
+                {isOpen && b.additionalOrders?.map(order=><div key={order.id} style={{marginTop:8,padding:'10px 12px',background:order.status==='paid'?'#e4eadf':'#fff0d8',borderRadius:7,fontSize:13}}><div style={{display:'flex',justifyContent:'space-between',gap:8,fontWeight:700}}><span>Additional Order · {order.status==='paid'?'Paid':'Payment pending'}</span><span>${order.total}</span></div><div style={{marginTop:5,color:'#6f6258'}}>{order.items.map(item=>`${item.name} ×${item.quantity}`).join(' · ')}</div><div style={{marginTop:4}}>Ref: {order.invoiceRef} · +{order.bonusRetouches} complimentary retouch{order.bonusRetouches===1?'':'es'}</div>{order.status!=='paid'&&<button className="btn btn-sm" style={{marginTop:8}} disabled={busyId===b.id} onClick={()=>runAction(b.id,'confirm-additional-order',{orderId:order.id})}>Payment received</button>}</div>)}
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, minWidth: 92 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 999, background: statusStyle.bg, color: statusStyle.color, whiteSpace: 'nowrap' }}>
@@ -419,6 +418,11 @@ export default function AdminBookingsPage() {
                   <div style={{ marginTop: 8, fontSize: 12 }}>Reminders sent: {b.remindersSent?.length ? b.remindersSent.join(', ') : 'none yet'}</div>
                 )}
 
+                {(!isPostProcessing || b.balanceStatus !== 'pending') && <section className="workflow-panel workflow-billing">
+                  <div className="workflow-panel-title">Billing</div>
+                  <div className="workflow-current">{b.balanceStatus === 'paid' ? 'Balance paid ✓' : b.status === 'pending' ? `Deposit pending · $${b.depositAmount}` : b.balanceStatus === 'n/a' ? 'No balance due' : `Balance: $${b.balanceDue}`}</div>
+                </section>}
+
                 {/* Final bill panel */}
                 {isPostProcessing && b.balanceStatus === 'pending' && (() => {
                   const addOnsRecord = (b.addOns || {}) as Record<string, number>;
@@ -433,7 +437,7 @@ export default function AdminBookingsPage() {
                   const totalDue = Math.max(0, b.balanceDue + extraTotal);
                   return (
                   <div className="final-bill-panel">
-                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Final bill</div>
+                    <div className="workflow-panel-title">Billing · Final bill</div>
                     {b.invoiceStale && <div className="notice" style={{ marginBottom: 10 }}>Add-ons changed after invoice {b.invoiceRef}. Please generate and send a new invoice.</div>}
 
                     {/* Full breakdown */}
@@ -554,101 +558,45 @@ export default function AdminBookingsPage() {
                   );
                 })()}
 
-                {/* Action buttons */}
-                <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-                  {b.status !== 'cancelled' && b.balanceStatus !== 'paid' && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Edit booking</button>
-                  )}
-                  {b.status === 'pending' && (
-                    <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-deposit')}>Confirm deposit received</button>
-                  )}
-                  {b.status === 'confirmed' && (
-                    <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Confirm Photoshoot Done</button>
-                  )}
-                  {b.status === 'confirmed' && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={async () => {
-                      setActionError(null);
-                      const created = await createLocalJobFolder(b);
-                      if (created) setActionSuccess({ id: b.id, message: 'The editing folder structure was created. Export Lightroom Basic Edit photos into 01 BASIC EDIT.' });
-                    }}>Create Editing Folders</button>
-                  )}
-                  {b.status === 'confirmed' && (
-                    <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>
-                  )}
-                  {b.status === 'pending_basic_retouch' && (
-                    <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
-                      Basic Retouch Done
-                    </button>
-                  )}
-                  {!hasClientGallery && (b.status === 'confirmed' || b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => createEditingFolders(b)}>
-                      Create Editing Folders
-                    </button>
-                  )}
-                  {!hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
-                    <a className="btn btn-ghost" href={photoSelectionCodexUrl(b)} onClick={() => showCodexPhotoSelectionLaunch(b)}>
 
-                      交给 Codex 选片
-                    </a>
-                  )}
-                  {!hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
-                    <a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">
-                      Open Photo Select Pro · Upload Gallery
-                    </a>
-                  )}
-                  {b.status === 'basic_retouch' && (
-                    <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
-                      Move to further retouch
-                    </button>
-                  )}
-                  {b.status === 'order_product' && (
-                    <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
-                      Product Ordered · Move to Delivery
-                    </button>
-                  )}
-                  {b.status === 'soft_copy_delivered' && (
-                    <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
-                      Product Delivered · Complete Photoshoot
-                    </button>
-                  )}
-                  {b.status === 'basic_retouch' && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => {
-                      if (confirm('Skip further retouch and mark this photoshoot complete?')) {
-                        runAction(b.id, 'skip-further-retouch');
-                      }
-                    }}>
-                      Skip further retouch &amp; complete
-                    </button>
-                  )}
-                  {(b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'further_retouch' || b.status === 'order_product' || b.status === 'soft_copy_delivered' || b.status === 'completed') && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'revert-stage')}>
-                      {b.status === 'completed'
-                        ? 'Go back to previous delivery stage'
-                        : b.status === 'soft_copy_delivered'
-                          ? 'Go back to order product'
-                        : b.status === 'order_product'
-                          ? 'Go back to further retouch'
-                        : b.status === 'further_retouch'
-                          ? 'Go back to client selection'
-                          : b.status === 'basic_retouch'
-                            ? 'Go back to pending basic retouch'
-                            : 'Go back to booking confirmed'}
-                    </button>
-                  )}
-                  {isPostProcessing && b.balanceStatus === 'paid' && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => {
-                      if (confirm('Mark this balance as unpaid? The editing stage will stay the same and no customer message will be sent.')) {
-                        runAction(b.id, 'reopen-balance');
-                      }
-                    }}>
-                      Mark balance as unpaid
-                    </button>
-                  )}
-                  {b.status !== 'cancelled' && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => { if (confirm('Cancel this booking?')) runAction(b.id, 'cancel'); }}>Cancel</button>
-                  )}
-                  <button className="btn btn-ghost" style={{ color: 'var(--rust)' }} disabled={isBusy} onClick={() => { if (confirm('Permanently DELETE this booking? Cannot be undone.')) runAction(b.id, 'delete'); }}>Delete</button>
-                </div>
+                {/* Photo processing */}
+                <section className="workflow-panel workflow-photo">
+                  <div className="workflow-panel-title">Photo Processing</div>
+                  <div className="workflow-actions">
+                    {b.status === 'confirmed' && <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>}
+                    {!hasClientGallery && ['confirmed','pending_balance','pending_basic_retouch','basic_retouch','completed'].includes(b.status) && <button className="btn btn-ghost" disabled={isBusy} onClick={() => createEditingFolders(b)}>Create Editing Folders</button>}
+                    {!hasClientGallery && ['pending_balance','pending_basic_retouch','basic_retouch','completed'].includes(b.status) && <a className="btn btn-ghost" href={photoSelectionCodexUrl(b)} onClick={() => showCodexPhotoSelectionLaunch(b)}>交给 Codex 选片</a>}
+                    {!hasClientGallery && ['pending_balance','pending_basic_retouch','basic_retouch','completed'].includes(b.status) && <a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">Open Photo Select Pro · Upload Gallery</a>}
+                    {hasClientGallery && <span className="workflow-hint">Gallery connected. Gallery tools are shown above.</span>}
+                  </div>
+                </section>
+
+                {/* Status controls */}
+                <section className="workflow-panel workflow-status">
+                  <div className="workflow-panel-title">Status</div>
+                  <div className="workflow-current">Current: {statusStyle.label}</div>
+                  <div className="workflow-actions">
+                    {b.status === 'pending' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-deposit')}>Confirm deposit received</button>}
+                    {b.status === 'confirmed' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Confirm Photoshoot Done</button>}
+                    {b.status === 'pending_basic_retouch' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Basic Retouch Done</button>}
+                    {b.status === 'basic_retouch' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Move to further retouch</button>}
+                    {b.status === 'order_product' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Ordered · Move to Delivery</button>}
+                    {b.status === 'soft_copy_delivered' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Delivered · Complete Photoshoot</button>}
+                    {(b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'further_retouch' || b.status === 'order_product' || b.status === 'soft_copy_delivered' || b.status === 'completed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'revert-stage')}>{b.status === 'completed' ? 'Go back to previous delivery stage' : b.status === 'soft_copy_delivered' ? 'Go back to order product' : b.status === 'order_product' ? 'Go back to further retouch' : b.status === 'further_retouch' ? 'Go back to client selection' : b.status === 'basic_retouch' ? 'Go back to pending basic retouch' : 'Go back to booking confirmed'}</button>}
+                  </div>
+                </section>
+
+                <details className="workflow-more">
+                  <summary>More options</summary>
+                  <div className="workflow-actions">
+                    {b.status !== 'cancelled' && b.balanceStatus !== 'paid' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Edit booking</button>}
+                    {b.status === 'basic_retouch' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => { if (confirm('Skip further retouch and continue to the appropriate final stage?')) runAction(b.id, 'skip-further-retouch'); }}>Skip further retouch</button>}
+                    {isPostProcessing && b.balanceStatus === 'paid' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => { if (confirm('Mark this balance as unpaid? The editing stage will stay the same and no customer message will be sent.')) runAction(b.id, 'reopen-balance'); }}>Mark balance as unpaid</button>}
+                    {b.status !== 'cancelled' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => { if (confirm('Cancel this booking?')) runAction(b.id, 'cancel'); }}>Cancel booking</button>}
+                    <button className="btn btn-ghost" style={{ color: 'var(--rust)' }} disabled={isBusy} onClick={() => { if (confirm('Permanently DELETE this booking? Cannot be undone.')) runAction(b.id, 'delete'); }}>Delete booking</button>
+                  </div>
+                </details>
+
                 {actionSuccess?.id === b.id && <div className="notice" style={{ marginTop: 10 }}>{actionSuccess.message}</div>}
               </div>
             )}
