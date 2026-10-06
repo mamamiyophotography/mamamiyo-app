@@ -206,7 +206,7 @@ export default function AdminBookingsPage() {
         : booking.photoSharingConsent === 'children_only'
           ? '04 SOCIAL CANDIDATES — CHILDREN ONLY'
           : '04 DO NOT USE FOR SOCIAL MEDIA';
-      for (const name of ['01 RAW', '02 BASIC EDIT', '03 FURTHER RETOUCH', socialFolder, '05 CLIENT DELIVERY']) {
+      for (const name of ['01 BASIC EDIT', '02 CLEANED FOR GALLERY', '03 FURTHER RETOUCH', socialFolder, '05 CLIENT DELIVERY']) {
         await jobFolder.getDirectoryHandle(name, { create: true });
       }
       return true;
@@ -283,7 +283,7 @@ export default function AdminBookingsPage() {
     return `http://127.0.0.1:8766/restart?${params.toString()}`;
   }
 
-  async function createGalleryWithDropboxFolder(booking: Booking) {
+  async function createEditingFolders(booking: Booking) {
     setBusyId(booking.id);
     setActionError(null);
     setActionSuccess(null);
@@ -292,9 +292,8 @@ export default function AdminBookingsPage() {
       if (!created) return;
       setActionSuccess({
         id: booking.id,
-        message: 'The Dropbox client folder and all subfolders were created. Opening Photo Clean Up Agent…',
+        message: 'The editing folders were created. Export Lightroom Basic Edit photos into 01 BASIC EDIT.',
       });
-      window.open(photoSelectCreateUrl(booking), '_blank', 'noopener,noreferrer');
     } finally {
       setBusyId(null);
     }
@@ -339,7 +338,7 @@ export default function AdminBookingsPage() {
                 <div style={{ fontFamily: "'Quicksand', sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: '#3A2E28' }}>{b.clientName}</div>
                 <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>
                 <div style={{ fontWeight: 600, fontSize: 12.5, color: '#3A2E28', marginTop: 4, lineHeight: 1.35 }}>{fmtDatePretty(b.date)} · {fmtTime12(b.startTime)}</div>
-                {!hasClientGallery && (b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <button type="button" disabled={isBusy} onClick={() => createGalleryWithDropboxFolder(b)} title="Create the Dropbox client folder, then open Photo Clean Up Agent to prepare the Gallery" style={{display:'inline-block',marginTop:8,padding:'8px 12px',border:0,background:'#657e76',color:'#fff',borderRadius:7,fontSize:13,fontWeight:600,cursor:isBusy?'default':'pointer'}}>Create Folder &amp; Open Photo Clean Up Agent</button>}
+                {!hasClientGallery && (b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <div style={{display:'flex',flexWrap:'wrap',gap:7,marginTop:8}}><button type="button" disabled={isBusy} onClick={() => createEditingFolders(b)} title="Create the client editing folders" style={{padding:'8px 12px',border:0,background:'#657e76',color:'#fff',borderRadius:7,fontSize:13,fontWeight:600,cursor:isBusy?'default':'pointer'}}>Create Editing Folders</button><a href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer" title="Use after Photo Cleanup is complete" style={{padding:'8px 12px',border:'1px solid #657e76',background:'#fff',color:'#4d6961',borderRadius:7,textDecoration:'none',fontSize:13,fontWeight:600}}>Open Photo Select Pro · Upload Gallery</a></div>}
                 {b.gallerySelections?.map(g => <div key={g.galleryId} style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8,marginTop:8,padding:'10px',background:'#e3eee9',borderRadius:6,fontSize:13}}>
                   {(g.deliveredAt || g.locked || g.submitted) && <span style={{width:'100%'}}>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : 'Client selection received'}</span>}
                   {g.clientUrl ? <div style={{display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,width:'100%',maxWidth:320}}>
@@ -552,8 +551,8 @@ export default function AdminBookingsPage() {
                     <button className="btn btn-ghost" disabled={isBusy} onClick={async () => {
                       setActionError(null);
                       const created = await createLocalJobFolder(b);
-                      if (created) setActionSuccess({ id: b.id, message: 'The complete local folder structure was created.' });
-                    }}>Create Local Folders</button>
+                      if (created) setActionSuccess({ id: b.id, message: 'The editing folder structure was created. Export Lightroom Basic Edit photos into 01 BASIC EDIT.' });
+                    }}>Create Editing Folders</button>
                   )}
                   {b.status === 'confirmed' && (
                     <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>
@@ -564,9 +563,14 @@ export default function AdminBookingsPage() {
                     </button>
                   )}
                   {!hasClientGallery && (b.status === 'confirmed' || b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
-                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => createGalleryWithDropboxFolder(b)}>
-                      Create Folder &amp; Open Photo Clean Up Agent
+                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => createEditingFolders(b)}>
+                      Create Editing Folders
                     </button>
+                  )}
+                  {!hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
+                    <a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">
+                      Open Photo Select Pro · Upload Gallery
+                    </a>
                   )}
                   {b.status === 'basic_retouch' && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
