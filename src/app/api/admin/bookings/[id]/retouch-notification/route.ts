@@ -19,10 +19,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const body = isBasic
       ? `Hi ${firstName}!\n\nYour Basic Retouch Gallery is ready. Please open your private Gallery to view the photos and submit your selection for Further Retouch.\n\n${gallery.clientUrl}\n\nMamamiyo Photography`
       : `Hi ${firstName}!\n\nYour Further Retouch photos are ready. Please open your private Gallery to view and download your completed photos.\n\n${gallery.clientUrl}\n\nMamamiyo Photography`;
+    const whatsappBody = isBasic
+      ? `Hi ${firstName}! Your photos with Basic Retouch are ready 😊\n\nView, select and download them here:\n${gallery.clientUrl}\n\nMamamiyo Photography`
+      : `Hi ${firstName}! Your photos with Further Retouch are ready 😊\n\nView and download them here:\n${gallery.clientUrl}\n\nMamamiyo Photography`;
     await sendEmail(booking.clientEmail, subject, body, undefined, buildEmailHtml({title:subject,paragraphs:body.split('\n\n'),businessName:'Mamamiyo Photography'}));
     if (!process.env.WHAPI_TOKEN) throw new Error('Email sent, but WHAPI_TOKEN is missing, so WhatsApp was not sent.');
     const mascotUrl = `${req.nextUrl.origin}/mascots/${isBasic ? 'basic-retouch-ready.png' : 'further-retouch-ready.png'}`;
-    await sendWhatsAppImage(booking.clientPhone, mascotUrl, body);
+    await sendWhatsAppImage(booking.clientPhone, mascotUrl, whatsappBody);
 
     let nextStatus = booking.status;
     if (isBasic) nextStatus = 'basic_retouch';
