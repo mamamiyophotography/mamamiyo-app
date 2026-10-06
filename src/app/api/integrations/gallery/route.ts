@@ -4,7 +4,6 @@ import { timingSafeEqual } from 'node:crypto';
 import { Resend } from 'resend';
 import { buildPayNowPayload } from '@/lib/paynow';
 import QRCode from 'qrcode';
-import { hasBookedPhysicalProduct } from '@/lib/constants';
 import { brandedFromAddress } from '@/lib/email';
 import { socialMediaUploadReminder } from '@/lib/notifications';
 import { sendWhatsApp } from '@/lib/whatsapp';
@@ -36,6 +35,37 @@ export async function POST(req: NextRequest) {
   if (raw.length > 150000) return NextResponse.json({error:'Too large'}, {status:413});
   let p: any;
   try { p = JSON.parse(raw); } catch { return NextResponse.json({error:'Invalid JSON'}, {status:400}); }
+  if (p.kind === 'download') {
+    const downloadTypes = ['basic', 'further', 'all'] as const;
+    if (!/^[a-f0-9]{32}$/.test(p.galleryId || '') || typeof p.bookingRef !== 'string' || p.bookingRef.length > 100 ||
+        !downloadTypes.includes(p.downloadType) || typeof p.downloadedAt !== 'string' || !Number.isFinite(Date.parse(p.downloadedAt))) {
+      return NextResponse.json({error:'Invalid download event'}, {status:400});
+    }
+    const booking = await prisma.booking.findUnique({where:{ref:p.bookingRef}});
+    if (!booking || booking.status === 'cancelled') return NextResponse.json({error:'Booking not available'}, {status:409});
+    const gallery = await prisma.galleryInbox.findUnique({where:{galleryId:p.galleryId}});
+    if (!gallery || gallery.bookingId !== booking.id) return NextResponse.json({error:'Gallery is not linked to this booking'}, {status:409});
+    const previous = await prisma.bookingAuditLog.findMany({
+      where:{bookingId:booking.id,action:'gallery_download'},
+      select:{after:true},
+    });
+    const firstForType = !previous.some(log => {
+      const value = log.after as {galleryId?:string;downloadType?:string};
+      return value.galleryId === p.galleryId && value.downloadType === p.downloadType;
+    });
+    const downloadedAt = new Date(p.downloadedAt);
+    await prisma.bookingAuditLog.create({data:{
+      bookingId:booking.id,
+      action:'gallery_download',
+      before:{},
+      after:{galleryId:p.galleryId,downloadType:p.downloadType,downloadedAt:downloadedAt.toISOString()},
+    }});
+    if (firstForType && process.env.PHOTOGRAPHER_PHONE) {
+      const label = p.downloadType === 'basic' ? 'Basic Retouch photos' : p.downloadType === 'further' ? 'Further Retouch photos' : 'all Gallery photos';
+      await sendWhatsApp(process.env.PHOTOGRAPHER_PHONE, `${booking.clientName} downloaded ${label}.\n${booking.sessionLabel} · ${booking.ref}`);
+    }
+    return NextResponse.json({ok:true,firstForType});
+  }
   if (p.kind === 'client_link') {
     if (!/^[a-f0-9]{32}$/.test(p.galleryId || '') || typeof p.bookingRef !== 'string' || p.bookingRef.length > 100 || typeof p.clientUrl !== 'string' || p.clientUrl.length > 2000) {
       return NextResponse.json({error:'Invalid client Gallery link'}, {status:400});
@@ -53,12 +83,8 @@ export async function POST(req: NextRequest) {
     await prisma.galleryInbox.upsert({where:{galleryId:p.galleryId},
       create:{galleryId:p.galleryId,bookingId:booking.id,clientUrl:p.clientUrl,version:0,items:[],submitted:false,locked:false},
       update:{bookingId:booking.id,clientUrl:p.clientUrl}});
-    // A linked client Gallery means Basic Retouch has already been prepared.
-    // Keep the Booking workflow in the same stage as the Gallery shown to staff.
-    if (booking.status === 'pending_basic_retouch') {
-      const downloadOnlyBundle = booking.sessionTypeId === 'bundle' && (booking.bundleSessionNumber || 1) < 3;
-      await prisma.booking.update({where:{id:booking.id},data:{status:downloadOnlyBundle?'completed':'basic_retouch',version:{increment:1}}});
-    }
+    // Linking the Gallery completes upload, but the booking only moves to
+    // Awaiting Client Selection after the photographer sends the client notice.
     return NextResponse.json({ok:true});
   }
   if (p.kind === 'additional_order_reset') {
@@ -128,11 +154,7 @@ export async function POST(req: NextRequest) {
     const result = await tx.galleryInbox.upsert({where:{galleryId:p.galleryId},
       create:{galleryId:p.galleryId, bookingId:booking.id, version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt,expiresAt:p.expiresAt ? new Date(p.expiresAt) : null,selectionEnabled:p.selectionEnabled},
       update:{version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt,expiresAt:p.expiresAt ? new Date(p.expiresAt) : null,selectionEnabled:p.selectionEnabled}});
-    if (deliveredAt && ['basic_retouch','further_retouch'].includes(booking.status)) {
-      const additionalProductCount = await tx.additionalOrder.count({where:{bookingId:booking.id,status:{in:['pending','paid']}}});
-      const nextStatus = hasBookedPhysicalProduct(booking.addOns) || additionalProductCount > 0 ? 'order_product' : 'completed';
-      await tx.booking.update({where:{id:booking.id},data:{status:nextStatus}});
-    } else if (p.locked && p.submitted && booking.status === 'basic_retouch') {
+    if (p.locked && p.submitted && booking.status === 'basic_retouch') {
       await tx.booking.update({where:{id:booking.id},data:{status:'further_retouch'}});
     } else if (!p.locked && p.submitted && booking.status === 'further_retouch') {
       await tx.booking.update({where:{id:booking.id},data:{status:'basic_retouch'}});

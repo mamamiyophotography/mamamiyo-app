@@ -14,5 +14,5 @@ export function photoSharingConsentLabel(value: string | null | undefined): stri
   if (value === 'all') return 'May publish everyone';
   if (value === 'children_only') return 'May publish children / baby only';
   if (value === 'private') return 'Private — do not publish anyone';
-  return 'Not recorded — do not publish';
+  return 'Not selected';
 }

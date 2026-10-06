@@ -31,3 +31,17 @@ export async function sendWhatsApp(toPhoneE164: string, body: string): Promise<v
     throw new Error(`Whapi.Cloud rejected the WhatsApp alert (${response.status}): ${detail}`);
   }
 }
+
+export async function sendWhatsAppImage(toPhoneE164: string, imageUrl: string, caption: string): Promise<void> {
+  const token = process.env.WHAPI_TOKEN?.trim();
+  if (!token || !caption.trim()) return;
+  const response = await fetch('https://gate.whapi.cloud/messages/image', {
+    method: 'POST',
+    headers: { accept: 'application/json', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ to: whapiRecipient(toPhoneE164), media: imageUrl, caption, view_once: false }),
+  });
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 500);
+    throw new Error(`Whapi.Cloud rejected the WhatsApp image (${response.status}): ${detail}`);
+  }
+}

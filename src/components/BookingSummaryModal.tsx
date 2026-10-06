@@ -21,6 +21,7 @@ type SummaryBooking = {
   setupChoiceNotes?: string;
   ref?: string;
   sessionTypeId: string;
+  isWeekend?: boolean;
   bundleSessionNumber?: number | null;
   photoSharingConsent?: string;
   addOns?: Record<string, number>;
@@ -137,16 +138,6 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
           [`Setup ${setup.slot} outfit`, setup.outfitSource === 'own' ? 'Own outfit' : setup.outfitSource === 'mamamiyo' ? 'Mamamiyo outfit' : 'Not selected'],
           ...(setup.note ? [[`Setup ${setup.slot} notes`, setup.note]] : []),
         ]),
-        ...Object.entries(booking.addOns || {}).filter(([, quantity]) => quantity > 0).map(([id, quantity]) => [
-          ADDONS[id]?.name || id,
-          `${quantity} × $${ADDONS[id]?.price || 0} = $${quantity * (ADDONS[id]?.price || 0)}`,
-        ]),
-        ...(booking.extraLineItems || []).map((item) => [item.description, `$${item.amount}`]),
-        ...(typeof booking.subtotal === 'number' ? [['Subtotal', `$${booking.subtotal}`]] : []),
-        ...((booking.discountAmount || 0) > 0 ? [[`Discount${booking.discountCode ? ` (${booking.discountCode})` : ''}`, `−$${booking.discountAmount}`]] : []),
-        ...(typeof booking.total === 'number' ? [['Package total', `$${booking.total}`]] : []),
-        ...(typeof booking.depositAmount === 'number' ? [['Deposit paid', `$${booking.depositAmount}`]] : []),
-        ...(typeof booking.balanceDue === 'number' ? [['Balance', `$${booking.balanceDue} · ${booking.balanceStatus || 'pending'}`]] : []),
       ];
       const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
         const words = text.split(/\s+/); const lines: string[] = []; let line = '';
@@ -160,13 +151,41 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         const lines = wrap(ctx!, value, 520);
         return { label, lines, height: Math.max(52, lines.length * 34 + 16) };
       });
+      const addOnRows = Object.entries(booking.addOns || {}).filter(([, quantity]) => quantity > 0).map(([id, quantity]) => [
+        ADDONS[id]?.name || id,
+        `${quantity} × $${ADDONS[id]?.price || 0} = $${quantity * (ADDONS[id]?.price || 0)}`,
+      ] as string[]);
+      const extraRows = (booking.extraLineItems || []).map((item) => [item.description, `$${item.amount}`]);
+      const addOnsTotal = Object.entries(booking.addOns || {}).reduce((sum, [id, quantity]) => sum + Math.max(0, quantity) * (ADDONS[id]?.price || 0), 0);
+      const extrasTotal = (booking.extraLineItems || []).reduce((sum, item) => sum + item.amount, 0);
+      const weekendSurcharge = booking.isWeekend ? 50 : 0;
+      const originalPrice = typeof booking.subtotal === 'number'
+        ? booking.subtotal - addOnsTotal - weekendSurcharge
+        : Math.max(0, (booking.total || 0) + (booking.discountAmount || 0) - addOnsTotal - weekendSurcharge);
+      const totalPrice = (booking.total || 0) + extrasTotal;
+      const remainingBalance = booking.balanceStatus === 'paid' ? 0 : (booking.balanceDue || 0) + extrasTotal;
+      const financeEntries = [
+        ['Original package price', `$${originalPrice}`],
+        ...addOnRows,
+        ...(weekendSurcharge ? [['Weekend / public holiday surcharge', `$${weekendSurcharge}`]] : []),
+        ...extraRows,
+        ...((booking.discountAmount || 0) > 0 ? [[`Discount${booking.discountCode ? ` (${booking.discountCode})` : ''}`, `−$${booking.discountAmount}`]] : []),
+        ...(typeof booking.total === 'number' ? [['Total price', `$${totalPrice}`]] : []),
+        ...(typeof booking.depositAmount === 'number' ? [['Deposit paid', `$${booking.depositAmount}`]] : []),
+        ...(typeof booking.balanceDue === 'number' ? [['Remaining balance', `$${remainingBalance} · ${booking.balanceStatus || 'pending'}`]] : []),
+      ];
+      const preparedFinanceEntries = financeEntries.map(([label, value]) => {
+        const lines = wrap(ctx!, value, 520);
+        return { label, lines, height: Math.max(52, lines.length * 34 + 16) };
+      });
       const additionalLines = booking.setupChoiceNotes ? wrap(ctx, booking.setupChoiceNotes, 520) : [];
       const additionalHeight = additionalLines.length ? Math.max(52, additionalLines.length * 34 + 16) : 0;
       const setupPhotos = booking.referencePhotoUrls.slice(0, 3);
       const inspirationPhotos = (booking.inspirationReferencePhotoUrls || []).slice(0, 3);
       const photoBlockHeight = (photos: string[]) => 52 + (photos.length ? 218 : 0);
       const contentHeight = 210 + 28 + preparedEntries.reduce((sum, entry) => sum + entry.height, 0)
-        + photoBlockHeight(setupPhotos) + photoBlockHeight(inspirationPhotos) + additionalHeight + 82;
+        + photoBlockHeight(setupPhotos) + photoBlockHeight(inspirationPhotos) + additionalHeight
+        + 78 + preparedFinanceEntries.reduce((sum, entry) => sum + entry.height, 0) + 82;
       canvas.height = Math.max(1350, contentHeight + 56);
       ctx = canvas.getContext('2d'); if (!ctx) return;
 
@@ -215,6 +234,10 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       await drawPhotoBlock('Setup Selection Photos', setupPhotos);
       await drawPhotoBlock('Inspirational Reference Photos', inspirationPhotos);
       if (additionalLines.length) drawRow('Additional notes', additionalLines, additionalHeight);
+      y += 24;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#8c6d3f'; ctx.font = '700 30px Arial'; ctx.fillText('FINANCE', 82, y + 34);
+      y += 54;
+      preparedFinanceEntries.forEach((entry) => drawRow(entry.label, entry.lines, entry.height));
       if (booking.ref) { ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#8c6d3f'; ctx.font = '23px Arial'; ctx.fillText(`Booking reference: ${booking.ref}`, 540, canvas.height - 58); }
       if (!cancelled) setImageDataUrl(canvas.toDataURL('image/png'));
     }

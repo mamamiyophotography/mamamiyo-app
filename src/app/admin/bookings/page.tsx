@@ -10,6 +10,9 @@ import { photoSharingConsentLabel } from '@/lib/photoConsent';
 import { codexPhotoSelectionUrl } from '@/lib/codexPhotoSelection';
 
 type Booking = {
+  downloadFeedback?: {galleryId:string;downloadType:'basic'|'further'|'all';downloadedAt:string}[];
+  basicRetouchProgress?: Record<string, boolean>;
+  furtherRetouchProgress?: Record<string, boolean>;
   additionalOrders?: {id:string;galleryId:string;version:number;items:{name:string;quantity:number;amount:number;bonusRetouches:number}[];total:number;bonusRetouches:number;status:string;invoiceRef:string;createdAt:string;paidAt:string|null}[];
   gallerySelections?: {galleryId:string;clientUrl:string|null;version:number;submitted:boolean;locked:boolean;deliveredAt:string|null;emailSentAt:string|null}[];
   id: string; ref: string; sessionTypeId: string; sessionLabel: string; location: string;
@@ -195,7 +198,7 @@ export default function AdminBookingsPage() {
         ? 'CHILDREN ONLY FOR SOCIAL'
         : booking.photoSharingConsent === 'private'
           ? 'PRIVATE — DO NOT POST'
-          : '';
+          : 'SHARING PERMISSION NOT SELECTED';
     const compactDate = booking.date.replace(/-/g, '');
     const baseName = `${compactDate} ${booking.clientName} ${jobFolderSessionName(booking)}`;
     return safeFolderPart(consentSuffix ? `${baseName} — ${consentSuffix}` : baseName);
@@ -219,7 +222,7 @@ export default function AdminBookingsPage() {
           ? '04 SOCIAL CANDIDATES — CHILDREN ONLY'
           : booking.photoSharingConsent === 'private'
             ? '04 DO NOT USE FOR SOCIAL MEDIA'
-            : '04 SOCIAL CANDIDATES — LEGACY BOOKING';
+            : '04 SHARING PERMISSION NOT SELECTED';
       for (const name of ['01 BASIC EDIT', '02 CLEANED FOR GALLERY', '03 FURTHER RETOUCH', socialFolder, '05 CLIENT DELIVERY']) {
         await jobFolder.getDirectoryHandle(name, { create: true });
       }
@@ -308,6 +311,7 @@ export default function AdminBookingsPage() {
     try {
       const created = await createLocalJobFolder(booking);
       if (!created) return;
+      await runAction(booking.id, 'basic-retouch-step', { step: 'folders', completed: true });
       setActionSuccess({
         id: booking.id,
         message: 'The editing folders were created. Export Lightroom Basic Edit photos into 01 BASIC EDIT.',
@@ -315,6 +319,16 @@ export default function AdminBookingsPage() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  async function setRetouchStep(booking: Booking, workflow: 'basic'|'further', step: string, completed: boolean) {
+    const result = await runAction(booking.id, 'basic-retouch-step', { workflow, step, completed });
+    if (result) setActionSuccess({ id: booking.id, message: completed ? `${workflow === 'basic' ? 'Basic' : 'Further'} Retouch progress updated.` : 'This step was reopened.' });
+  }
+
+  async function notifyRetouchReady(booking: Booking, kind: 'basic'|'further') {
+    const result = await runAction(booking.id, 'retouch-notification', { kind });
+    if (result) setActionSuccess({ id: booking.id, message: `${kind === 'basic' ? 'Basic' : 'Further'} Retouch email and WhatsApp image sent to the client.` });
   }
 
   function photoSelectGalleryActionUrl(booking: Booking, galleryId: string, action: 'update-basic'|'unlock-selection'|'upload-further') {
@@ -344,9 +358,18 @@ export default function AdminBookingsPage() {
         const isOpen = expandedId === b.id;
         const isBusy = busyId === b.id;
         const hasClientGallery = Boolean(b.gallerySelections?.some(g => g.clientUrl));
-        const displayStatus = hasClientGallery && b.status === 'pending_basic_retouch' ? 'basic_retouch' : b.status;
+        const displayStatus = b.status;
         const statusStyle = STATUS_LABEL[displayStatus] || { label: displayStatus, color: '#3A2E28', bg: '#EDE6DC' };
         const isPostProcessing = ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'].includes(displayStatus);
+        const retouchProgress = b.basicRetouchProgress || {};
+        const retouchDone = [Boolean(retouchProgress.folders), Boolean(retouchProgress.lightroom), Boolean(retouchProgress.codex), Boolean(retouchProgress.photoshop), hasClientGallery, Boolean(retouchProgress.notification)];
+        const retouchCompletedCount = retouchDone.filter(Boolean).length;
+        const retouchCurrentStep = retouchDone.findIndex(done => !done);
+        const galleryState = b.gallerySelections?.find(g => g.clientUrl);
+        const furtherProgress = b.furtherRetouchProgress || {};
+        const furtherDone = [Boolean(galleryState?.submitted && galleryState?.locked), Boolean(furtherProgress.pixelcake), Boolean(furtherProgress.photoshop), Boolean(galleryState?.deliveredAt), Boolean(furtherProgress.notification)];
+        const furtherCompletedCount = furtherDone.filter(Boolean).length;
+        const furtherCurrentStep = furtherDone.findIndex(done => !done);
 
         return (
           <div key={b.id} className={`booking-card${isOpen ? ' open' : ''}${filter === 'active' ? ((b.status === 'pending' || b.status === 'confirmed') ? ' pre-shoot-card' : ' post-shoot-card') : ''}`}>
@@ -359,12 +382,10 @@ export default function AdminBookingsPage() {
                 {isOpen && b.gallerySelections?.map(g => <div key={g.galleryId} className="workflow-panel workflow-photo compact">
                   {(g.deliveredAt || g.locked || g.submitted) && <span style={{width:'100%'}}>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : 'Client selection received'}</span>}
                   {g.clientUrl ? <div style={{display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,width:'100%',maxWidth:320}}>
+                    {b.downloadFeedback?.filter(item=>item.galleryId===g.galleryId).map((item,index)=><div key={`${item.downloadType}-${item.downloadedAt}-${index}`} style={{padding:'7px 9px',borderRadius:7,background:'#e5f0e9',color:'#3f6557',fontSize:12,fontWeight:700}}>Downloaded: {item.downloadType === 'basic' ? 'Basic Retouch' : item.downloadType === 'further' ? 'Further Retouch' : 'All photos'} · {new Intl.DateTimeFormat('en-SG',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Singapore'}).format(new Date(item.downloadedAt))}</div>)}
                     {!(g.submitted||g.locked||g.deliveredAt) && <button type="button" onClick={()=>setManageGallery({bookingId:b.id,galleryId:g.galleryId})} style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Manage Gallery</button>}
-                    {(g.submitted||g.locked)&&<a href={photoSelectGalleryActionUrl(b,g.galleryId,'upload-further')} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #8d6fa8',background:'#8d6fa8',padding:'7px 10px',borderRadius:6,color:'#fff',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Upload Further Retouch</a>}
-                    {!g.deliveredAt&&<button type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'basic')} style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Share Basic Retouch WhatsApp Image</button>}
-                    {g.deliveredAt&&<button type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'further')} style={{border:'1px solid #557970',background:'#557970',padding:'7px 10px',borderRadius:6,color:'#fff',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Share Further Retouch WhatsApp Image</button>}
                     <a href={`/g/${g.galleryId.slice(0,12)}`} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #7d918b',background:'#f8fbfa',padding:'7px 10px',borderRadius:6,color:'#415e58',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Open Client Gallery</a>
-                    {(g.submitted||g.locked||g.deliveredAt)&&<details className="workflow-more compact"><summary>More Gallery options</summary><div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,g.galleryId,'update-basic')} target="_blank" rel="noopener noreferrer">Update Basic Retouch</a>{g.submitted&&<a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,g.galleryId,'unlock-selection')} target="_blank" rel="noopener noreferrer">Allow Client to Change Selection</a>}</div></details>}
+                    {(g.submitted||g.locked||g.deliveredAt)&&<details className="workflow-more compact"><summary>More Gallery options</summary><div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,g.galleryId,'update-basic')} target="_blank" rel="noopener noreferrer">Update Basic Retouch</a>{g.submitted&&<a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,g.galleryId,'unlock-selection')} target="_blank" rel="noopener noreferrer">Allow Client to Change Selection</a>}{(g.submitted||g.locked)&&<a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,g.galleryId,'upload-further')} target="_blank" rel="noopener noreferrer">Upload Further Retouch</a>}{!g.deliveredAt&&<button className="btn btn-ghost" type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'basic')}>Create Basic Retouch WhatsApp Image</button>}{g.deliveredAt&&<button className="btn btn-ghost" type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'further')}>Create Further Retouch WhatsApp Image</button>}</div></details>}
                   </div> : <span style={{color:'#8b5b43'}}>Link this Gallery again in Photo Clean Up Agent to enable the mobile client link.</span>}
                 </div>)}
                 {isOpen && b.additionalOrders?.map(order=><div key={order.id} style={{marginTop:8,padding:'10px 12px',background:order.status==='paid'?'#e4eadf':'#fff0d8',borderRadius:7,fontSize:13}}><div style={{display:'flex',justifyContent:'space-between',gap:8,fontWeight:700}}><span>Additional Order · {order.status==='paid'?'Paid':'Payment pending'}</span><span>${order.total}</span></div><div style={{marginTop:5,color:'#6f6258'}}>{order.items.map(item=>`${item.name} ×${item.quantity}`).join(' · ')}</div><div style={{marginTop:4}}>Ref: {order.invoiceRef} · +{order.bonusRetouches} complimentary retouch{order.bonusRetouches===1?'':'es'}</div>{order.status!=='paid'&&<button className="btn btn-sm" style={{marginTop:8}} disabled={busyId===b.id} onClick={()=>runAction(b.id,'confirm-additional-order',{orderId:order.id})}>Payment received</button>}</div>)}
@@ -562,13 +583,28 @@ export default function AdminBookingsPage() {
                 {/* Photo processing */}
                 <section className="workflow-panel workflow-photo">
                   <div className="workflow-panel-title">Photo Processing</div>
-                  <div className="workflow-actions">
-                    {b.status === 'confirmed' && <button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>}
-                    {!hasClientGallery && ['confirmed','pending_balance','pending_basic_retouch','basic_retouch','completed'].includes(b.status) && <button className="btn btn-ghost" disabled={isBusy} onClick={() => createEditingFolders(b)}>Create Editing Folders</button>}
-                    {!hasClientGallery && ['pending_balance','pending_basic_retouch','basic_retouch','completed'].includes(b.status) && <a className="btn btn-ghost" href={photoSelectionCodexUrl(b)} onClick={() => showCodexPhotoSelectionLaunch(b)}>交给 Codex 选片</a>}
-                    {!hasClientGallery && ['pending_balance','pending_basic_retouch','basic_retouch','completed'].includes(b.status) && <a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">Open Photo Select Pro · Upload Gallery</a>}
-                    {hasClientGallery && <span className="workflow-hint">Gallery connected. Gallery tools are shown above.</span>}
-                  </div>
+                  {b.status === 'confirmed' && <div className="workflow-actions"><button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button></div>}
+                  {['pending_balance','pending_basic_retouch','basic_retouch'].includes(b.status) && <>
+                    <div className="retouch-progress-summary">Basic Retouch · {retouchCompletedCount} of 6 completed</div>
+                    <div className="retouch-checklist">
+                      <div className={`retouch-step${retouchDone[0]?' complete':''}${retouchCurrentStep===0?' current':''}`}><span className="retouch-step-number">{retouchDone[0]?'✓':'1'}</span><div><b>Create editing folders</b><p>Currently stored in Dropbox. Google One may be used later.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={() => createEditingFolders(b)}>{retouchDone[0]?'Create folders again':'Create Editing Folders'}</button>{retouchDone[0]&&<button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'basic','folders',false)}>Reopen step</button>}</div></div></div>
+                      <div className={`retouch-step${retouchDone[1]?' complete':''}${retouchCurrentStep===1?' current':''}`}><span className="retouch-step-number">{retouchDone[1]?'✓':'2'}</span><div><b>Lightroom editing</b><p>Import photos, edit them, then export to the editing folder from Step 1.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'basic','lightroom',!retouchDone[1])}>{retouchDone[1]?'Mark as not done':'Mark Lightroom Editing Done'}</button></div></div></div>
+                      <div className={`retouch-step${retouchDone[2]?' complete':''}${retouchCurrentStep===2?' current':''}`}><span className="retouch-step-number">{retouchDone[2]?'✓':'3'}</span><div><b>Screen photos with Codex</b><p>Check duplicates, blinking, focus and group-photo alternatives, then review the results.</p><div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectionCodexUrl(b)} onClick={() => showCodexPhotoSelectionLaunch(b)}>Open Codex Photo Screening</a><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'basic','codex',!retouchDone[2])}>{retouchDone[2]?'Mark as not done':'Mark Screening Done'}</button></div></div></div>
+                      <div className={`retouch-step${retouchDone[3]?' complete':''}${retouchCurrentStep===3?' current':''}`}><span className="retouch-step-number">{retouchDone[3]?'✓':'4'}</span><div><b>Photoshop editing</b><p>Complete the required manual corrections in Photoshop.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'basic','photoshop',!retouchDone[3])}>{retouchDone[3]?'Mark as not done':'Mark Photoshop Editing Done'}</button></div></div></div>
+                      <div className={`retouch-step${retouchDone[4]?' complete':''}${retouchCurrentStep===4?' current':''}`}><span className="retouch-step-number">{retouchDone[4]?'✓':'5'}</span><div><b>Create &amp; upload photos to Gallery</b><p>{hasClientGallery?'Gallery connected successfully.':'Create the client Gallery after the edited photos are ready.'}</p>{!hasClientGallery&&<div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">Open Photo Select Pro · Upload Gallery</a></div>}</div></div>
+                      <div className={`retouch-step${retouchDone[5]?' complete':''}${retouchCurrentStep===5?' current':''}`}><span className="retouch-step-number">{retouchDone[5]?'✓':'6'}</span><div><b>Notify client</b><p>Send the Gallery link by email and WhatsApp with the Mamamiyo character image. The booking moves to Awaiting Client Selection only after this succeeds.</p>{hasClientGallery&&!retouchDone[5]&&<div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>notifyRetouchReady(b,'basic')}>Send Email + WhatsApp</button></div>}</div></div>
+                    </div>
+                  </>}
+                  {['further_retouch','order_product','soft_copy_delivered','completed'].includes(b.status) && <>
+                    <div className="retouch-progress-summary">Further Retouch · {furtherCompletedCount} of 5 completed</div>
+                    <div className="retouch-checklist">
+                      <div className={`retouch-step${furtherDone[0]?' complete':''}${furtherCurrentStep===0?' current':''}`}><span className="retouch-step-number">{furtherDone[0]?'✓':'1'}</span><div><b>Get client selection from Gallery</b><p>{furtherDone[0]?'Client selection received and confirmed.':'Wait for the client to submit and confirm the selected photos.'}</p></div></div>
+                      <div className={`retouch-step${furtherDone[1]?' complete':''}${furtherCurrentStep===1?' current':''}`}><span className="retouch-step-number">{furtherDone[1]?'✓':'2'}</span><div><b>PixelCake initial retouch</b><p>Open PixelCake and complete the first retouch pass.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'further','pixelcake',!furtherDone[1])}>{furtherDone[1]?'Mark as not done':'Mark PixelCake Retouch Done'}</button></div></div></div>
+                      <div className={`retouch-step${furtherDone[2]?' complete':''}${furtherCurrentStep===2?' current':''}`}><span className="retouch-step-number">{furtherDone[2]?'✓':'3'}</span><div><b>Photoshop detail retouch</b><p>Open Photoshop and complete the remaining detailed corrections.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'further','photoshop',!furtherDone[2])}>{furtherDone[2]?'Mark as not done':'Mark Photoshop Retouch Done'}</button></div></div></div>
+                      <div className={`retouch-step${furtherDone[3]?' complete':''}${furtherCurrentStep===3?' current':''}`}><span className="retouch-step-number">{furtherDone[3]?'✓':'4'}</span><div><b>Upload Further Retouch to Gallery</b><p>{furtherDone[3]?'Further Retouch upload completed.':'Upload the completed photos through Photo Select Pro.'}</p>{galleryState&&!furtherDone[3]&&<div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'upload-further')} target="_blank" rel="noopener noreferrer">Upload Further Retouch</a></div>}</div></div>
+                      <div className={`retouch-step${furtherDone[4]?' complete':''}${furtherCurrentStep===4?' current':''}`}><span className="retouch-step-number">{furtherDone[4]?'✓':'5'}</span><div><b>Notify client</b><p>Send the completed Gallery by email and WhatsApp with the Mamamiyo character image.</p>{furtherDone[3]&&!furtherDone[4]&&<div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>notifyRetouchReady(b,'further')}>Send Email + WhatsApp</button></div>}</div></div>
+                    </div>
+                  </>}
                 </section>
 
                 {/* Status controls */}
@@ -579,7 +615,6 @@ export default function AdminBookingsPage() {
                     {b.status === 'pending' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-deposit')}>Confirm deposit received</button>}
                     {b.status === 'confirmed' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Confirm Photoshoot Done</button>}
                     {b.status === 'pending_basic_retouch' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Basic Retouch Done</button>}
-                    {b.status === 'basic_retouch' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Move to further retouch</button>}
                     {b.status === 'order_product' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Ordered · Move to Delivery</button>}
                     {b.status === 'soft_copy_delivered' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Delivered · Complete Photoshoot</button>}
                     {(b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'further_retouch' || b.status === 'order_product' || b.status === 'soft_copy_delivered' || b.status === 'completed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'revert-stage')}>{b.status === 'completed' ? 'Go back to previous delivery stage' : b.status === 'soft_copy_delivered' ? 'Go back to order product' : b.status === 'order_product' ? 'Go back to further retouch' : b.status === 'further_retouch' ? 'Go back to client selection' : b.status === 'basic_retouch' ? 'Go back to pending basic retouch' : 'Go back to booking confirmed'}</button>}
@@ -591,6 +626,7 @@ export default function AdminBookingsPage() {
                   <div className="workflow-actions">
                     {b.status !== 'cancelled' && b.balanceStatus !== 'paid' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Edit booking</button>}
                     {b.status === 'basic_retouch' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => { if (confirm('Skip further retouch and continue to the appropriate final stage?')) runAction(b.id, 'skip-further-retouch'); }}>Skip further retouch</button>}
+                    {b.status === 'basic_retouch' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Manually move to Further Retouch</button>}
                     {isPostProcessing && b.balanceStatus === 'paid' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => { if (confirm('Mark this balance as unpaid? The editing stage will stay the same and no customer message will be sent.')) runAction(b.id, 'reopen-balance'); }}>Mark balance as unpaid</button>}
                     {b.status !== 'cancelled' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => { if (confirm('Cancel this booking?')) runAction(b.id, 'cancel'); }}>Cancel booking</button>}
                     <button className="btn btn-ghost" style={{ color: 'var(--rust)' }} disabled={isBusy} onClick={() => { if (confirm('Permanently DELETE this booking? Cannot be undone.')) runAction(b.id, 'delete'); }}>Delete booking</button>

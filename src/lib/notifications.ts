@@ -95,7 +95,9 @@ export function socialMediaUploadReminder(b: Pick<NotifyBooking, 'clientName' | 
     ? 'Please upload the finished photos to Google Drive for social media posting.'
     : b.photoSharingConsent === 'children_only'
       ? 'Consent: children / baby only. Upload only approved photos that do not show adults for social media posting.'
-      : 'PRIVATE / NO CONSENT: Do not upload or use this session for social media posting.';
+      : b.photoSharingConsent === 'private'
+        ? 'PRIVATE: Do not upload or use this session for social media posting.'
+        : 'Photo sharing preference was not selected. Please confirm permission before choosing any photos for social media.';
   return [
     '📤 Google Drive upload reminder',
     `Further retouch is complete for ${b.clientName} — ${b.sessionLabel}.`,
