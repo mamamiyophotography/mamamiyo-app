@@ -283,6 +283,23 @@ export default function AdminBookingsPage() {
     return `http://127.0.0.1:8766/restart?${params.toString()}`;
   }
 
+  async function createGalleryWithDropboxFolder(booking: Booking) {
+    setBusyId(booking.id);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const created = await createLocalJobFolder(booking);
+      if (!created) return;
+      setActionSuccess({
+        id: booking.id,
+        message: 'The Dropbox client folder and all subfolders were created. Opening PhotoSelect Pro…',
+      });
+      window.open(photoSelectCreateUrl(booking), '_blank', 'noopener,noreferrer');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function photoSelectGalleryActionUrl(booking: Booking, galleryId: string, action: 'update-basic'|'unlock-selection'|'upload-further') {
     const params = new URLSearchParams({ action, gallery: galleryId, booking: booking.ref });
     return `http://127.0.0.1:8766/restart?${params.toString()}`;
@@ -322,7 +339,7 @@ export default function AdminBookingsPage() {
                 <div style={{ fontFamily: "'Quicksand', sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: '#3A2E28' }}>{b.clientName}</div>
                 <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>
                 <div style={{ fontWeight: 600, fontSize: 12.5, color: '#3A2E28', marginTop: 4, lineHeight: 1.35 }}>{fmtDatePretty(b.date)} · {fmtTime12(b.startTime)}</div>
-                {!hasClientGallery && (b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <a href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer" title="Create a Gallery in PhotoSelect Pro on your studio computer" style={{display:'inline-block',marginTop:8,padding:'8px 12px',background:'#657e76',color:'#fff',borderRadius:7,textDecoration:'none',fontSize:13,fontWeight:600}}>Open PhotoSelect Pro · Create Gallery</a>}
+                {!hasClientGallery && (b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <button type="button" disabled={isBusy} onClick={() => createGalleryWithDropboxFolder(b)} title="Create the Dropbox client folder, then create a Gallery in PhotoSelect Pro" style={{display:'inline-block',marginTop:8,padding:'8px 12px',border:0,background:'#657e76',color:'#fff',borderRadius:7,fontSize:13,fontWeight:600,cursor:isBusy?'default':'pointer'}}>Create Dropbox Folder &amp; Gallery</button>}
                 {b.gallerySelections?.map(g => <div key={g.galleryId} style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8,marginTop:8,padding:'10px',background:'#e3eee9',borderRadius:6,fontSize:13}}>
                   {(g.deliveredAt || g.locked || g.submitted) && <span style={{width:'100%'}}>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : 'Client selection received'}</span>}
                   {g.clientUrl ? <div style={{display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,width:'100%',maxWidth:320}}>
@@ -546,12 +563,12 @@ export default function AdminBookingsPage() {
                       Basic Retouch Done
                     </button>
                   )}
-                  {!hasClientGallery && (b.status === 'confirmed' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
-                    <a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">
+                  {!hasClientGallery && (b.status === 'confirmed' || b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
+                    <button className="btn btn-ghost" disabled={isBusy} onClick={() => createGalleryWithDropboxFolder(b)}>
                       {b.sessionTypeId === 'bundle' && (b.bundleSessionNumber || 1) < 3
-                        ? 'Create Download Gallery'
-                        : 'Create Gallery'}
-                    </a>
+                        ? 'Create Dropbox Folder & Download Gallery'
+                        : 'Create Dropbox Folder & Gallery'}
+                    </button>
                   )}
                   {b.status === 'basic_retouch' && (
                     <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>
