@@ -204,16 +204,51 @@ export default function AdminBookingsPage() {
     return safeFolderPart(consentSuffix ? `${baseName} — ${consentSuffix}` : baseName);
   }
 
-  async function createLocalJobFolder(booking: Booking) {
+  type PersistedDirectoryHandle = FileSystemDirectoryHandle & {
+    queryPermission?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<PermissionState>;
+    requestPermission?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<PermissionState>;
+  };
+
+  function savedDropboxRoot(action: 'get' | 'set', handle?: PersistedDirectoryHandle): Promise<PersistedDirectoryHandle | null> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('mamamiyo-booking-folders', 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('handles');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const transaction = db.transaction('handles', action === 'get' ? 'readonly' : 'readwrite');
+        const store = transaction.objectStore('handles');
+        const operation = action === 'get' ? store.get('dropbox-customer-photos') : store.put(handle, 'dropbox-customer-photos');
+        operation.onsuccess = () => resolve(action === 'get' ? (operation.result || null) : (handle || null));
+        operation.onerror = () => reject(operation.error);
+        transaction.oncomplete = () => db.close();
+      };
+    });
+  }
+
+  async function getDropboxRoot(): Promise<PersistedDirectoryHandle | null> {
+    let root = await savedDropboxRoot('get').catch(() => null);
+    if (root) {
+      const permission = await root.queryPermission?.({ mode: 'readwrite' });
+      if (permission === 'granted' || await root.requestPermission?.({ mode: 'readwrite' }) === 'granted') return root;
+    }
     const picker = (window as Window & {
-      showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
+      showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite'; id?: string; startIn?: 'documents' }) => Promise<PersistedDirectoryHandle>;
     }).showDirectoryPicker;
-    if (!picker) {
+    if (!picker) return null;
+    root = await picker({ mode: 'readwrite', id: 'mamamiyo-customer-photos', startIn: 'documents' });
+    await savedDropboxRoot('set', root);
+    return root;
+  }
+
+  async function createLocalJobFolder(booking: Booking) {
+    if (!(window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker) {
       setActionError({ id: booking.id, message: 'Local folder creation requires Chrome or Edge on a desktop computer.' });
       return false;
     }
     try {
-      const root = await picker({ mode: 'readwrite' });
+      const root = await getDropboxRoot();
+      if (!root) throw new Error('Dropbox Customer Photos folder access is unavailable.');
       const folderName = jobFolderName(booking);
       const jobFolder = await root.getDirectoryHandle(folderName, { create: true });
       const socialFolder = booking.photoSharingConsent === 'all'
@@ -301,7 +336,8 @@ export default function AdminBookingsPage() {
   }
 
   function photoSelectionCodexUrl(booking: Booking) {
-    return codexPhotoSelectionUrl({ ...booking, folderHint: jobFolderName(booking) });
+    const folderName = jobFolderName(booking);
+    return codexPhotoSelectionUrl({ ...booking, folderHint: folderName, dropboxFolderPath: `/Customer's Photos/${folderName}/01 BASIC EDIT` });
   }
 
   async function createEditingFolders(booking: Booking) {
@@ -314,7 +350,7 @@ export default function AdminBookingsPage() {
       await runAction(booking.id, 'basic-retouch-step', { step: 'folders', completed: true });
       setActionSuccess({
         id: booking.id,
-        message: 'The editing folders were created. Export Lightroom Basic Edit photos into 01 BASIC EDIT.',
+        message: `The Dropbox editing folders were created in Customer's Photos/${jobFolderName(booking)}. Export Lightroom photos into 01 BASIC EDIT.`,
       });
     } finally {
       setBusyId(null);
