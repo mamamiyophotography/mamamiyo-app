@@ -123,7 +123,7 @@ export const ADDONS: Record<string, { name: string; price: number }> = {
   // Service add-ons
   extraSetup: { name: 'Additional Setup', price: 100 },
   extraOutfit: { name: 'Additional Outfit', price: 100 },
-  headcount: { name: 'Additional Family / Grandparents', price: 30 },
+  headcount: { name: 'Additional Family / Grandparents / Pet', price: 30 },
   // Photo Album (layflat, rigid paper)
   album8x8: { name: 'Layflat Photo Album\n8in × 8in / 20cm × 20cm\n20 pages, up to 30 images\nIncludes 20 Bonus Further Retouch', price: 108 },
   album10x10: { name: 'Layflat Photo Album\n10in × 10in / 25cm × 25cm\n20 pages, up to 30 images\nIncludes 20 Bonus Further Retouch', price: 138 },

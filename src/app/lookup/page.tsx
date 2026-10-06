@@ -6,6 +6,7 @@ import { ADDONS, sessionById } from '@/lib/constants';
 import { MonthCalendar, CandidateSlot, startOfMonth, addMonths } from '@/components/MonthCalendar';
 import { PHOTO_SHARING_OPTIONS } from '@/lib/photoConsent';
 import { photoSharingConsentLabel } from '@/lib/photoConsent';
+import { ClientSetupEditor } from '@/components/ClientSetupEditor';
 
 type Booking = {
   id: string; ref: string; sessionTypeId: string; sessionLabel: string; date: string; startTime: string; endTime: string; status: string;
@@ -13,6 +14,7 @@ type Booking = {
   addOns: Record<string, number>; subtotal: number; total: number; discountCode: string | null; discountAmount: number;
   isWeekend: boolean; extraLineItems: {description:string;amount:number}[]; photoSharingConsent?: string;
   setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string;outfitSource?:string|null}[];
+  setupSelectionCount?: number;
   inspirationReferencePhotoUrls?: string[]; referencePhotoUrls?: string[];
   depositAmount: number; depositStatus: string; balanceDue: number; balanceStatus: string;
   bundleParentId: string | null;
@@ -133,6 +135,7 @@ export default function LookupPage() {
                   {b.notes && <div style={{marginTop:10}}><b>Notes</b><div style={{whiteSpace:'pre-line',marginTop:5,color:'var(--ink-soft)'}}>{b.notes}</div></div>}
                   {!!b.setupSelections?.length && <div style={{marginTop:12}}><b>Setup / outfit selections</b>{b.setupSelections.map((setup)=><div key={setup.slot} style={{marginTop:8,padding:'8px 10px',background:'var(--paper)',borderRadius:8}}><div>Setup {setup.slot}{setup.outfitSource ? ` · ${setup.outfitSource === 'own' ? 'Own outfit' : 'Mamamiyo outfit'}` : ''}</div>{setup.note && <div style={{fontSize:12,color:'var(--ink-soft)'}}>{setup.note}</div>}<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:6}}>{setup.referencePhotoUrls?.map(url=><img key={url} src={url} alt={`Setup ${setup.slot} reference`} style={{width:64,height:64,objectFit:'cover',borderRadius:7}}/>)}</div></div>)}</div>}
                   {!!b.inspirationReferencePhotoUrls?.length && <div style={{marginTop:12}}><b>Inspiration photos</b><div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:6}}>{b.inspirationReferencePhotoUrls.map(url=><img key={url} src={url} alt="Inspiration reference" style={{width:64,height:64,objectFit:'cover',borderRadius:7}}/>)}</div></div>}
+                  {(b.status === 'pending' || b.status === 'confirmed') && <ClientSetupEditor booking={b} email={email} setupCount={Math.min(3,Math.max(1,b.setupSelectionCount || (sessionById(b.sessionTypeId)?.referenceSetups || 1) + (b.addOns?.extraSetup || 0) + (b.addOns?.extraOutfit || 0)))} onSaved={(booking)=>{setSaveMessage('Setup choices and photos updated. An updated confirmation email has been sent.');setSelected({type:'booking',item:booking});search();}}/>}
                 </section>
 
                 <section style={{marginTop:14,padding:14,border:'1.5px solid var(--line)',borderRadius:12}}>

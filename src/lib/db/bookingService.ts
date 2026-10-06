@@ -992,6 +992,41 @@ export async function updateClientAddOnsAndNotify(
   });
 }
 
+/** Customer self-service edit: setup/outfit choices and reference photos. */
+export async function updateClientSetupChoicesAndNotify(
+  db: any,
+  bookingId: string,
+  email: string,
+  setupSelections: { slot: number; referencePhotoUrls: string[]; note?: string; outfitSource?: 'mamamiyo'|'own'|null }[],
+  inspirationReferencePhotoUrls: string[],
+) {
+  const existing = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+  if (existing.clientEmail.trim().toLowerCase() !== email.trim().toLowerCase()) throw new Error('EMAIL_MISMATCH');
+  if (!['pending', 'confirmed'].includes(existing.status)) throw new Error('This booking can no longer be changed online. Please contact Mamamiyo Photography.');
+  if (!Array.isArray(setupSelections) || setupSelections.length < 1 || setupSelections.length > 3 || setupSelections.some((group, index) =>
+    group?.slot !== index + 1 || !Array.isArray(group.referencePhotoUrls) || group.referencePhotoUrls.length > 3 ||
+    group.referencePhotoUrls.some(url => typeof url !== 'string' || url.length > 2000) ||
+    (group.note !== undefined && (typeof group.note !== 'string' || group.note.length > 300)) ||
+    ![undefined, null, 'mamamiyo', 'own'].includes(group.outfitSource)
+  )) throw new Error('Each Setup may contain up to 3 photos, an outfit choice and a short note.');
+  if (!Array.isArray(inspirationReferencePhotoUrls) || inspirationReferencePhotoUrls.length > 10 || inspirationReferencePhotoUrls.some(url => typeof url !== 'string' || url.length > 2000)) throw new Error('Inspirational Reference may contain up to 10 photos.');
+
+  const referencePhotoUrls = setupSelections.flatMap(group => group.referencePhotoUrls);
+  await db.$transaction(async (tx: any) => {
+    await tx.booking.update({ where: { id: bookingId }, data: { setupSelections, setupSelectionCount: setupSelections.length, referencePhotoUrls, inspirationReferencePhotoUrls, version: { increment: 1 } } });
+    await tx.bookingAuditLog.create({ data: {
+      bookingId,
+      action: 'client_update_setup_choice',
+      before: { setupSelections: existing.setupSelections, referencePhotoUrls: existing.referencePhotoUrls, inspirationReferencePhotoUrls: existing.inspirationReferencePhotoUrls },
+      after: { setupSelections, referencePhotoUrls, inspirationReferencePhotoUrls },
+    } });
+  });
+  return updateBookingAndNotify(db, bookingId, {
+    sessionTypeId: existing.sessionTypeId, date: existing.date, startTime: existing.startTime, endTime: existing.endTime,
+    addOns: existing.addOns || {}, address: existing.address, notes: existing.notes, discountCode: existing.discountCode,
+  });
+}
+
 function singaporeDateAfterDays(now: Date, days: number): string {
   const singaporeMidday = new Date(`${singaporeDateString(now)}T12:00:00+08:00`);
   singaporeMidday.setUTCDate(singaporeMidday.getUTCDate() + days);
