@@ -333,17 +333,18 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
     try {
       const safeRef = (booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-');
       const files = await Promise.all([
+        imageFile('/mascots/booking-confirmed.png', `Mamamiyo-Thank-You-${safeRef}.png`),
         imageFile(imageDataUrl, `Mamamiyo-Booking-${safeRef}.png`),
         imageFile(preparationImageDataUrl, `Mamamiyo-What-to-Prepare-${safeRef}.png`),
       ]);
       if (navigator.share && (!navigator.canShare || navigator.canShare({ files }))) {
-        await navigator.share({ title: 'Mamamiyo Booking Summary and What to Prepare', files });
+        await navigator.share({ title: 'Mamamiyo Booking Confirmation, Summary and What to Prepare', files });
         setSaveMessage('Choose WhatsApp or another app from the share menu.');
         return;
       }
-      setSaveMessage('This device cannot share two images together. Please use the two separate Share buttons below.');
+      setSaveMessage('This device cannot share all three images together. Please use the separate Share buttons below.');
     } catch (error) {
-      setSaveMessage((error as Error).name === 'AbortError' ? 'Share cancelled.' : 'Could not open the share menu. Please use the two separate Share buttons below.');
+      setSaveMessage((error as Error).name === 'AbortError' ? 'Share cancelled.' : 'Could not open the share menu. Please use the separate Share buttons below.');
     }
   }
 
@@ -357,16 +358,19 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         style={{ maxWidth: 420, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Booking Summary + What to Prepare</div>
+        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Booking Confirmation + Summary + What to Prepare</div>
         {imageDataUrl && <>
-          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 8 }}>Share both images with the client through WhatsApp. If your device cannot share them together, use the separate buttons below.</div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 8 }}>Share all three images with the client through WhatsApp after the deposit is confirmed. If your device cannot share them together, use the separate buttons below.</div>
+          <img className="invoice-image-preview" src="/mascots/booking-confirmed.png" alt="Thank you for your confirmation" />
+          <div style={{ fontWeight: 700, fontSize: 14, margin: '16px 0 8px' }}>Booking Summary</div>
           <img className="invoice-image-preview" src={imageDataUrl} alt={`Booking summary for ${booking.clientName}`} />
           <div style={{ fontWeight: 700, fontSize: 14, margin: '16px 0 8px' }}>What to Prepare</div>
           {preparationImageDataUrl
             ? <img className="invoice-image-preview" src={preparationImageDataUrl} alt={`What to prepare for ${booking.sessionLabel}`} />
             : <div className="notice" role="status" style={{ marginTop: 0 }}>Preparing the session checklist…</div>}
-          <button type="button" className="btn btn-primary" disabled={!preparationImageDataUrl} style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={saveOrShare}>Share Booking Summary + What to Prepare</button>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+          <button type="button" className="btn btn-primary" disabled={!preparationImageDataUrl} style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={saveOrShare}>Share All 3 Images in WhatsApp</button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginTop: 8 }}>
+            <button type="button" className="btn btn-ghost" style={{ justifyContent: 'center', whiteSpace: 'normal' }} onClick={() => shareOne('/mascots/booking-confirmed.png', `Mamamiyo-Thank-You-${(booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-')}.png`, 'Thank You for Your Confirmation')}>Share Thank You Image</button>
             <button type="button" className="btn btn-ghost" style={{ justifyContent: 'center', whiteSpace: 'normal' }} onClick={() => shareOne(imageDataUrl, `Mamamiyo-Booking-${(booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-')}.png`, 'Mamamiyo Booking Summary')}>Share Booking Summary</button>
             <button type="button" className="btn btn-ghost" disabled={!preparationImageDataUrl} style={{ justifyContent: 'center', whiteSpace: 'normal' }} onClick={() => shareOne(preparationImageDataUrl, `Mamamiyo-What-to-Prepare-${(booking.ref || booking.clientName).replace(/[^A-Za-z0-9_-]+/g, '-')}.png`, 'Mamamiyo What to Prepare')}>Share What to Prepare</button>
           </div>

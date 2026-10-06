@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       : `Hi ${firstName}!\n\nYour Further Retouch photos are ready. Please open your private Gallery to view and download your completed photos.\n\n${gallery.clientUrl}\n\nMamamiyo Photography`;
     await sendEmail(booking.clientEmail, subject, body, undefined, buildEmailHtml({title:subject,paragraphs:body.split('\n\n'),businessName:'Mamamiyo Photography'}));
     if (!process.env.WHAPI_TOKEN) throw new Error('Email sent, but WHAPI_TOKEN is missing, so WhatsApp was not sent.');
-    const mascotUrl = `${req.nextUrl.origin}/mascots/wave.png`;
+    const mascotUrl = `${req.nextUrl.origin}/mascots/${isBasic ? 'basic-retouch-ready.png' : 'further-retouch-ready.png'}`;
     await sendWhatsAppImage(booking.clientPhone, mascotUrl, body);
 
     let nextStatus = booking.status;
