@@ -74,9 +74,8 @@ export default function AdminBookingsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  function openPhotoCleanupAgent(booking: Booking) {
+  function showPhotoCleanupLaunch(booking: Booking) {
     setOpeningCleanupId(booking.id);
-    window.location.href = photoCleanupAgentUrl(booking);
     window.setTimeout(() => setOpeningCleanupId(current => current === booking.id ? null : current), 5000);
   }
 
@@ -359,7 +358,7 @@ export default function AdminBookingsPage() {
                 <div style={{ fontFamily: "'Quicksand', sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: '#3A2E28' }}>{b.clientName}</div>
                 <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>
                 <div style={{ fontWeight: 600, fontSize: 12.5, color: '#3A2E28', marginTop: 4, lineHeight: 1.35 }}>{fmtDatePretty(b.date)} · {fmtTime12(b.startTime)}</div>
-                {!hasClientGallery && (b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <div style={{display:'flex',flexWrap:'wrap',gap:7,marginTop:8}}><button type="button" disabled={isBusy} onClick={() => createEditingFolders(b)} title="Create the client editing folders" style={{padding:'8px 12px',border:0,background:'#657e76',color:'#fff',borderRadius:7,fontSize:13,fontWeight:600,cursor:isBusy?'default':'pointer'}}>Create Editing Folders</button><button type="button" onClick={() => openPhotoCleanupAgent(b)} title="Open this client's 01 BASIC EDIT folder in Photo Cleanup Agent" style={{padding:'8px 12px',border:'1px solid #9d8298',background:'#fff',color:'#6c5368',borderRadius:7,fontSize:13,fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7}}>{openingCleanupId === b.id && <span className="cleanup-launch-spinner" aria-hidden="true"/>}{openingCleanupId === b.id ? 'Opening Photo Cleanup Agent...' : 'Open Photo Cleanup Agent'}</button><a href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer" title="Use after Photo Cleanup is complete" style={{padding:'8px 12px',border:'1px solid #657e76',background:'#fff',color:'#4d6961',borderRadius:7,textDecoration:'none',fontSize:13,fontWeight:600}}>Open Photo Select Pro · Upload Gallery</a></div>}
+                {!hasClientGallery && (b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'pending_balance') && <div style={{display:'flex',flexWrap:'wrap',gap:7,marginTop:8}}><button type="button" disabled={isBusy} onClick={() => createEditingFolders(b)} title="Create the client editing folders" style={{padding:'8px 12px',border:0,background:'#657e76',color:'#fff',borderRadius:7,fontSize:13,fontWeight:600,cursor:isBusy?'default':'pointer'}}>Create Editing Folders</button><a href={photoCleanupAgentUrl(b)} onClick={() => showPhotoCleanupLaunch(b)} title="Open this client's 01 BASIC EDIT folder in Photo Cleanup Agent" style={{padding:'8px 12px',border:'1px solid #9d8298',background:'#fff',color:'#6c5368',borderRadius:7,fontSize:13,fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7,textDecoration:'none'}}>{openingCleanupId === b.id && <span className="cleanup-launch-spinner" aria-hidden="true"/>}{openingCleanupId === b.id ? 'Opening Photo Cleanup Agent...' : 'Open Photo Cleanup Agent'}</a><a href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer" title="Use after Photo Cleanup is complete" style={{padding:'8px 12px',border:'1px solid #657e76',background:'#fff',color:'#4d6961',borderRadius:7,textDecoration:'none',fontSize:13,fontWeight:600}}>Open Photo Select Pro · Upload Gallery</a></div>}
                 {b.gallerySelections?.map(g => <div key={g.galleryId} style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8,marginTop:8,padding:'10px',background:'#e3eee9',borderRadius:6,fontSize:13}}>
                   {(g.deliveredAt || g.locked || g.submitted) && <span style={{width:'100%'}}>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : 'Client selection received'}</span>}
                   {g.clientUrl ? <div style={{display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,width:'100%',maxWidth:320}}>
@@ -589,10 +588,10 @@ export default function AdminBookingsPage() {
                     </button>
                   )}
                   {!hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
-                    <button type="button" className="btn btn-ghost" onClick={() => openPhotoCleanupAgent(b)}>
+                    <a className="btn btn-ghost" href={photoCleanupAgentUrl(b)} onClick={() => showPhotoCleanupLaunch(b)}>
                       {openingCleanupId === b.id && <span className="cleanup-launch-spinner" aria-hidden="true"/>}
                       {openingCleanupId === b.id ? 'Opening Photo Cleanup Agent...' : 'Open Photo Cleanup Agent'}
-                    </button>
+                    </a>
                   )}
                   {!hasClientGallery && (b.status === 'pending_balance' || b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'completed') && (
                     <a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">
