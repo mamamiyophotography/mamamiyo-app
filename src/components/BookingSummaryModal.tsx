@@ -92,6 +92,15 @@ export function preparationGuideFor(booking: Pick<SummaryBooking, 'sessionTypeId
   };
 }
 
+function preparationImageFor(booking: Pick<SummaryBooking, 'sessionTypeId' | 'bundleSessionNumber'>): string | null {
+  if (booking.sessionTypeId === 'maternity') return '/mascots/maternity-preparation.png';
+  if (booking.sessionTypeId === 'newborn' || booking.sessionTypeId === 'fullmonth' || (booking.sessionTypeId === 'bundle' && (booking.bundleSessionNumber || 1) === 1)) {
+    return '/mascots/newborn-fullmonth-preparation.png';
+  }
+  if (booking.sessionTypeId === 'baby' || booking.sessionTypeId === 'bundle') return '/mascots/baby-preparation.png';
+  return null;
+}
+
 function splitBookingNotes(notes: string) {
   let remaining = notes || '';
   const genderMatch = remaining.match(/Baby gender:\s*([^\n·]+)/i);
@@ -248,6 +257,11 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
   useEffect(() => {
     let cancelled = false;
     async function buildPreparationImage() {
+      const preparedImage = preparationImageFor(booking);
+      if (preparedImage) {
+        if (!cancelled) setPreparationImageDataUrl(preparedImage);
+        return;
+      }
       const guide = preparationGuideFor(booking, noteParts.sibling === 'Yes');
       const canvas = document.createElement('canvas');
       canvas.width = 1080;
