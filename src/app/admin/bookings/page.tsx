@@ -188,9 +188,12 @@ export default function AdminBookingsPage() {
       ? 'SOCIAL APPROVED'
       : booking.photoSharingConsent === 'children_only'
         ? 'CHILDREN ONLY FOR SOCIAL'
-        : 'PRIVATE — DO NOT POST';
+        : booking.photoSharingConsent === 'private'
+          ? 'PRIVATE — DO NOT POST'
+          : '';
     const compactDate = booking.date.replace(/-/g, '');
-    return safeFolderPart(`${compactDate} ${booking.clientName} ${jobFolderSessionName(booking)} — ${consentSuffix}`);
+    const baseName = `${compactDate} ${booking.clientName} ${jobFolderSessionName(booking)}`;
+    return safeFolderPart(consentSuffix ? `${baseName} — ${consentSuffix}` : baseName);
   }
 
   async function createLocalJobFolder(booking: Booking) {
@@ -209,7 +212,9 @@ export default function AdminBookingsPage() {
         ? '04 SOCIAL CANDIDATES'
         : booking.photoSharingConsent === 'children_only'
           ? '04 SOCIAL CANDIDATES — CHILDREN ONLY'
-          : '04 DO NOT USE FOR SOCIAL MEDIA';
+          : booking.photoSharingConsent === 'private'
+            ? '04 DO NOT USE FOR SOCIAL MEDIA'
+            : '04 SOCIAL CANDIDATES — LEGACY BOOKING';
       for (const name of ['01 BASIC EDIT', '02 CLEANED FOR GALLERY', '03 FURTHER RETOUCH', socialFolder, '05 CLIENT DELIVERY']) {
         await jobFolder.getDirectoryHandle(name, { create: true });
       }
