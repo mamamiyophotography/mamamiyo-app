@@ -113,6 +113,51 @@ a { color: inherit; }
 .workflow-more { margin-top: 12px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; background: #F3EEEA; }
 .workflow-more.compact { margin-top: 2px; padding: 8px 10px; }
 .workflow-more summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--ink-soft); }
+.workflow-panel .btn,
+.workflow-panel a,
+.workflow-panel button,
+.workflow-more .btn,
+.workflow-more a,
+.workflow-more button {
+  border: 1px solid rgba(75, 63, 54, .16) !important;
+  background: #fff !important;
+  color: #4b433d !important;
+  box-shadow: 0 5px 0 rgba(87, 74, 64, .16), 0 9px 18px rgba(87, 74, 64, .12);
+  transform: translateY(0);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;
+}
+.workflow-panel .btn:hover,
+.workflow-panel a:hover,
+.workflow-panel button:hover,
+.workflow-more .btn:hover,
+.workflow-more a:hover,
+.workflow-more button:hover {
+  border-color: rgba(75, 63, 54, .28);
+  background: #fff;
+  box-shadow: 0 6px 0 rgba(87, 74, 64, .18), 0 11px 22px rgba(87, 74, 64, .15);
+  transform: translateY(-1px);
+}
+.workflow-panel .btn:active,
+.workflow-panel a:active,
+.workflow-panel button:active,
+.workflow-more .btn:active,
+.workflow-more a:active,
+.workflow-more button:active {
+  box-shadow: 0 1px 0 rgba(87, 74, 64, .18), 0 3px 7px rgba(87, 74, 64, .11);
+  transform: translateY(4px);
+}
+.workflow-panel .btn-primary {
+  border-color: rgba(55, 63, 52, .24);
+  background: #fff;
+  color: #343a31;
+  font-weight: 800;
+}
+.workflow-panel .btn:disabled,
+.workflow-more .btn:disabled {
+  background: rgba(255,255,255,.68);
+  box-shadow: 0 2px 0 rgba(87, 74, 64, .08);
+  transform: none;
+}
 .final-bill-panel .ticket-row { grid-template-columns: minmax(0, 1fr) auto; }
 .final-bill-panel .ticket-row b { text-align: right; white-space: nowrap; overflow-wrap: normal; }
 .final-bill-panel .ticket-row span { white-space: pre-line; }
