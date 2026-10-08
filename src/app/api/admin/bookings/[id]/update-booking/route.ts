@@ -6,7 +6,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   try {
     const input = await req.json() as UpdateBookingInput;
-    const booking = await updateBookingAndNotify(db, id, input, { notifyClient: false });
+    const booking = await updateBookingAndNotify(db, id, input, { notifyClient: false, allowUnavailableSlot: true });
     return NextResponse.json({ booking, emailSent: false });
   } catch (err) {
     const message = (err as Error).message;

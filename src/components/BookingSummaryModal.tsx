@@ -145,10 +145,6 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         ...(noteParts.siblingCount ? [['Number of siblings', noteParts.siblingCount]] : []),
         ...(noteParts.other ? [['Notes', noteParts.other]] : []),
         [selectionLabel, String(booking.setupSelectionCount || 0)],
-        ...(booking.setupSelections || []).flatMap((setup) => [
-          [`Setup ${setup.slot} outfit`, setup.outfitSource === 'own' ? 'Own outfit' : setup.outfitSource === 'mamamiyo' ? 'Mamamiyo outfit' : 'Not selected'],
-          ...(setup.note ? [[`Setup ${setup.slot} notes`, setup.note]] : []),
-        ]),
       ];
       const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
         const words = text.split(/\s+/); const lines: string[] = []; let line = '';
@@ -191,11 +187,22 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       });
       const additionalLines = booking.setupChoiceNotes ? wrap(ctx, booking.setupChoiceNotes, 520) : [];
       const additionalHeight = additionalLines.length ? Math.max(52, additionalLines.length * 34 + 16) : 0;
-      const setupPhotos = booking.referencePhotoUrls.slice(0, 3);
+      const rawSetupGroups = booking.setupSelections?.length
+        ? booking.setupSelections
+        : booking.referencePhotoUrls.length
+          ? [{ slot: 1, referencePhotoUrls: booking.referencePhotoUrls, outfitSource: null, note: '' }]
+          : [];
+      const setupGroups = [...rawSetupGroups]
+        .sort((a, b) => a.slot - b.slot)
+        .slice(0, Math.max(booking.setupSelectionCount || 0, 3));
       const inspirationPhotos = (booking.inspirationReferencePhotoUrls || []).slice(0, 3);
       const photoBlockHeight = (photos: string[]) => 52 + (photos.length ? 218 : 0);
+      const setupBlockHeight = setupGroups.reduce((sum, setup) => {
+        const noteLines = setup.note ? wrap(ctx!, setup.note, 520).length : 0;
+        return sum + 58 + (setup.referencePhotoUrls?.length ? 218 : 36) + 52 + (noteLines ? Math.max(52, noteLines * 34 + 16) : 0) + 20;
+      }, 0);
       const contentHeight = 210 + 28 + preparedEntries.reduce((sum, entry) => sum + entry.height, 0)
-        + photoBlockHeight(setupPhotos) + photoBlockHeight(inspirationPhotos) + additionalHeight
+        + setupBlockHeight + photoBlockHeight(inspirationPhotos) + additionalHeight
         + 78 + preparedFinanceEntries.reduce((sum, entry) => sum + entry.height, 0) + 82;
       canvas.height = Math.max(1350, contentHeight + 56);
       ctx = canvas.getContext('2d'); if (!ctx) return;
@@ -242,7 +249,36 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         });
         y += 218;
       };
-      await drawPhotoBlock('Setup Selection Photos', setupPhotos);
+      for (const setup of setupGroups) {
+        y += 20;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#8c6d3f'; ctx.font = '700 30px Arial'; ctx.fillText(`SETUP ${setup.slot}`, 82, y + 32);
+        y += 58;
+        const photos = (setup.referencePhotoUrls || []).slice(0, 3);
+        if (photos.length) {
+          const loaded = await Promise.all(photos.map(loadImage)); const imageWidth = 270, imageHeight = 190, gap = 35;
+          loaded.forEach((loadedImage, index) => {
+            const x = 82 + index * (imageWidth + gap); const imageTop = y + 14;
+            ctx!.fillStyle = '#ffffff'; ctx!.fillRect(x, imageTop, imageWidth, imageHeight);
+            ctx!.strokeStyle = '#ded4c9'; ctx!.lineWidth = 2; ctx!.strokeRect(x, imageTop, imageWidth, imageHeight);
+            if (loadedImage) {
+              const scale = Math.min(imageWidth / loadedImage.image.naturalWidth, imageHeight / loadedImage.image.naturalHeight);
+              const width = loadedImage.image.naturalWidth * scale, height = loadedImage.image.naturalHeight * scale;
+              ctx!.drawImage(loadedImage.image, x + (imageWidth - width) / 2, imageTop + (imageHeight - height) / 2, width, height);
+              URL.revokeObjectURL(loadedImage.objectUrl);
+            }
+          });
+          y += 218;
+        } else {
+          ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#8f877b'; ctx.font = '24px Arial'; ctx.fillText('No setup photos uploaded', 82, y + 18);
+          y += 36;
+        }
+        const outfitLabel = setup.outfitSource === 'own' ? "Client's own outfit" : setup.outfitSource === 'mamamiyo' ? 'Mamamiyo outfit' : 'Outfit not selected';
+        drawRow('Outfit', [outfitLabel], 52);
+        if (setup.note) {
+          const setupNoteLines = wrap(ctx!, setup.note, 520);
+          drawRow('Setup notes', setupNoteLines, Math.max(52, setupNoteLines.length * 34 + 16));
+        }
+      }
       await drawPhotoBlock('Inspirational Reference Photos', inspirationPhotos);
       if (additionalLines.length) drawRow('Additional notes', additionalLines, additionalHeight);
       y += 24;

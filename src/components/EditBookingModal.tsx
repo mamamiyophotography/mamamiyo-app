@@ -59,6 +59,8 @@ export default function EditBookingModal({
   });
   const [selectedDate, setSelectedDate] = useState<string | null>(booking.date);
   const [calMonth, setCalMonth] = useState(startOfMonth(new Date(`${booking.date}T00:00:00`)));
+  const [customDate, setCustomDate] = useState(booking.date);
+  const [customStartTime, setCustomStartTime] = useState(booking.startTime);
   const [addOns, setAddOns] = useState<Record<string, number>>(booking.addOns || {});
   const [discountCode, setDiscountCode] = useState(booking.discountCode || '');
   const [discountCheck, setDiscountCheck] = useState<{ status: 'empty' | 'checking' | 'valid' | 'invalid'; amount: number }>({
@@ -184,6 +186,21 @@ export default function EditBookingModal({
     });
   }
 
+  function useCustomDateTime() {
+    if (!customDate || !customStartTime) {
+      setError('Choose a date and start time.');
+      return;
+    }
+    const [hours, minutes] = customStartTime.split(':').map(Number);
+    const endMinutes = hours * 60 + minutes + sessionType.durationMin;
+    const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
+    const day = new Date(`${customDate}T00:00:00`).getDay();
+    setSelectedDate(customDate);
+    setSelectedSlot({ date: customDate, startTime: customStartTime, endTime, isWeekend: day === 0 || day === 6 });
+    setCalMonth(startOfMonth(new Date(`${customDate}T00:00:00`)));
+    setError(null);
+  }
+
   async function save() {
     if (!postSessionEdit && !selectedSlot) {
       setError('Please select an available date and time.');
@@ -303,6 +320,13 @@ export default function EditBookingModal({
               </div>
             </div>
           )}
+          <div style={{marginTop:16,padding:14,border:'1.5px solid var(--line)',borderRadius:10,background:'var(--cream)'}}>
+            <div style={{fontWeight:700,marginBottom:8}}>Set a custom date and time</div>
+            <div style={{fontSize:12,color:'var(--ink-soft)',marginBottom:10}}>Use this when you have agreed on a time that is not listed in the availability calendar.</div>
+            <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:8}}><input type="date" value={customDate} onChange={(event)=>setCustomDate(event.target.value)} /><input type="time" value={customStartTime} onChange={(event)=>setCustomStartTime(event.target.value)} /></div>
+            <button type="button" className="btn btn-ghost" style={{marginTop:10}} onClick={useCustomDateTime}>Use this date &amp; time</button>
+            {selectedSlot&&<div style={{marginTop:8,fontSize:12.5,color:'var(--sage)',fontWeight:700}}>Selected: {fmtDatePretty(selectedSlot.date)}, {fmtTime12(selectedSlot.startTime)}–{fmtTime12(selectedSlot.endTime)}</div>}
+          </div>
           {sessionType.id==='newborn' && <div style={{marginTop:18,paddingTop:16,borderTop:'1px solid var(--line)'}}><div className="field"><label>Photoshoot location</label><select value={shootLocation} onChange={event=>{setShootLocation(event.target.value);setAddress('');}}>{NEWBORN_BOOKING_LOCATIONS.map(location=><option key={location.value} value={location.value}>{location.label}</option>)}</select></div><div className="field" style={{marginBottom:0}}><label>{bookingLocationLabel(shootLocation)} address</label><textarea value={address} onChange={(event) => setAddress(event.target.value)} placeholder={shootLocation==='confinement'?'Confinement center name, building, unit and postal code':'Building, unit number, street and postal code'} /></div></div>}
         </div>}
 

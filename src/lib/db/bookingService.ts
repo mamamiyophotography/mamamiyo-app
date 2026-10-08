@@ -320,7 +320,7 @@ export async function updateBookingAndNotify(
   db: any,
   bookingId: string,
   input: UpdateBookingInput,
-  options: { notifyClient?: boolean } = { notifyClient: true },
+  options: { notifyClient?: boolean; allowUnavailableSlot?: boolean } = { notifyClient: true },
 ) {
   const existing = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
   if (!['pending', 'confirmed'].includes(existing.status)) {
@@ -346,6 +346,16 @@ export async function updateBookingAndNotify(
     selectedSlot = slots.find((slot) => slot.date === input.date
       && slot.startTime === input.startTime
       && slot.endTime === input.endTime);
+    if (!selectedSlot && options.allowUnavailableSlot) {
+      const holidays = await db.publicHoliday.findMany();
+      const day = new Date(`${input.date}T00:00:00`).getDay();
+      selectedSlot = {
+        date: input.date,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        isWeekend: day === 0 || day === 6 || holidays.some((holiday: { date: string }) => holiday.date === input.date),
+      };
+    }
     if (!selectedSlot) throw new Error('SLOT_NOT_AVAILABLE');
   }
 
