@@ -199,7 +199,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       const photoBlockHeight = (photos: string[]) => 52 + (photos.length ? 218 : 0);
       const setupBlockHeight = setupGroups.reduce((sum, setup) => {
         const noteLines = setup.note ? wrap(ctx!, setup.note, 520).length : 0;
-        return sum + 58 + (setup.referencePhotoUrls?.length ? 218 : 36) + 52 + (noteLines ? Math.max(52, noteLines * 34 + 16) : 0) + 20;
+        return sum + 58 + (setup.referencePhotoUrls?.length ? 218 : 36) + (noteLines ? Math.max(52, noteLines * 34 + 16) : 0) + 20;
       }, 0);
       const contentHeight = 210 + 28 + preparedEntries.reduce((sum, entry) => sum + entry.height, 0)
         + setupBlockHeight + photoBlockHeight(inspirationPhotos) + additionalHeight
@@ -251,7 +251,8 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       };
       for (const setup of setupGroups) {
         y += 20;
-        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#8c6d3f'; ctx.font = '700 30px Arial'; ctx.fillText(`SETUP ${setup.slot}`, 82, y + 32);
+        const outfitLabel = setup.outfitSource === 'own' ? "Client's Own Outfit" : setup.outfitSource === 'mamamiyo' ? 'Mamamiyo Outfit' : 'Outfit Not Selected';
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#8c6d3f'; ctx.font = '700 30px Arial'; ctx.fillText(`SETUP ${setup.slot}: ${outfitLabel}`, 82, y + 32);
         y += 58;
         const photos = (setup.referencePhotoUrls || []).slice(0, 3);
         if (photos.length) {
@@ -272,8 +273,6 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
           ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#8f877b'; ctx.font = '24px Arial'; ctx.fillText('No setup photos uploaded', 82, y + 18);
           y += 36;
         }
-        const outfitLabel = setup.outfitSource === 'own' ? "Client's own outfit" : setup.outfitSource === 'mamamiyo' ? 'Mamamiyo outfit' : 'Outfit not selected';
-        drawRow('Outfit', [outfitLabel], 52);
         if (setup.note) {
           const setupNoteLines = wrap(ctx!, setup.note, 520);
           drawRow('Setup notes', setupNoteLines, Math.max(52, setupNoteLines.length * 34 + 16));
