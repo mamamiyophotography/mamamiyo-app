@@ -33,6 +33,13 @@ export default function LookupPage() {
   const [draftAddOns, setDraftAddOns] = useState<Record<string, number>>({});
   const [savingAddOns, setSavingAddOns] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [rescheduleSlots, setRescheduleSlots] = useState<CandidateSlot[]>([]);
+  const [rescheduleMonth, setRescheduleMonth] = useState(startOfMonth(new Date()));
+  const [rescheduleDate, setRescheduleDate] = useState<string | null>(null);
+  const [rescheduleSlot, setRescheduleSlot] = useState<CandidateSlot | null>(null);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [rescheduleSaving, setRescheduleSaving] = useState(false);
 
   async function search() {
     if (!email.trim()) return;
@@ -47,6 +54,7 @@ export default function LookupPage() {
   }
 
   async function cancelBooking(id: string) {
+    if (!confirm('Cancel this booking? Use Reschedule instead if you only want to change the date or time.')) return;
     setCancelError(null);
     const res = await fetch(`/api/bookings/${id}/cancel`, {
       method: 'POST',
@@ -60,6 +68,51 @@ export default function LookupPage() {
     }
     search();
     setSelected(null);
+  }
+
+  async function beginReschedule(booking: Booking) {
+    setReschedulingId(booking.id);
+    setRescheduleSlots([]);
+    setRescheduleDate(null);
+    setRescheduleSlot(null);
+    setRescheduleLoading(true);
+    setCancelError(null);
+    setSaveMessage(null);
+    try {
+      const response = await fetch(`/api/availability?sessionType=${encodeURIComponent(booking.sessionTypeId)}&excludeBookingId=${encodeURIComponent(booking.id)}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not load available dates.');
+      setRescheduleSlots(data.slots || []);
+    } catch (error) {
+      setCancelError((error as Error).message);
+      setReschedulingId(null);
+    } finally {
+      setRescheduleLoading(false);
+    }
+  }
+
+  async function confirmReschedule(booking: Booking) {
+    if (!rescheduleSlot) return;
+    setRescheduleSaving(true);
+    setCancelError(null);
+    try {
+      const response = await fetch(`/api/bookings/${booking.id}/reschedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, date: rescheduleSlot.date, startTime: rescheduleSlot.startTime, endTime: rescheduleSlot.endTime }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not reschedule this booking.');
+      setReschedulingId(null);
+      setRescheduleSlot(null);
+      setSaveMessage('Your booking has been rescheduled. An updated confirmation email has been sent.');
+      setSelected({ type: 'booking', item: data.booking });
+      setBookings((current) => current?.map((item) => item.id === data.booking.id ? data.booking : item) || null);
+    } catch (error) {
+      setCancelError((error as Error).message);
+    } finally {
+      setRescheduleSaving(false);
+    }
   }
 
   function beginEditAddOns(booking: Booking) {
@@ -154,7 +207,18 @@ export default function LookupPage() {
                 </section>
                 {saveMessage && <div className="notice" style={{marginTop:12}}>{saveMessage}</div>}
                 {(b.status === 'pending' || b.status === 'confirmed') && (
-                  <button className="btn btn-ghost" style={{ marginTop: 12 }} onClick={() => cancelBooking(b.id)}>Cancel / request reschedule</button>
+                  <div style={{marginTop:12}}>
+                    {reschedulingId !== b.id && <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-primary" onClick={() => beginReschedule(b)}>Reschedule</button><button className="btn btn-ghost" onClick={() => cancelBooking(b.id)}>Cancel booking</button></div>}
+                    {reschedulingId === b.id && <div className="card" style={{margin:'12px 0 0',padding:14}}>
+                      <h3 style={{fontSize:17,margin:'0 0 6px'}}>Choose a new date and time</h3>
+                      <div style={{fontSize:12.5,color:'var(--ink-soft)',marginBottom:12}}>Your deposit and booking details will stay the same.</div>
+                      {rescheduleLoading ? <div style={{fontSize:13,color:'var(--ink-faint)'}}>Loading availability…</div> : <>
+                        <MonthCalendar monthDate={rescheduleMonth} slotsByDate={rescheduleSlots.reduce<Record<string,CandidateSlot[]>>((grouped,slot)=>{(grouped[slot.date]=grouped[slot.date]||[]).push(slot);return grouped;},{})} selectedDate={rescheduleDate} onNav={(direction)=>setRescheduleMonth((month)=>addMonths(month,direction))} onSelectDay={(date)=>{setRescheduleDate(date);setRescheduleSlot(null);}} />
+                        {rescheduleDate && <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:12}}>{rescheduleSlots.filter((slot)=>slot.date===rescheduleDate).map((slot)=><button type="button" key={`${slot.date}-${slot.startTime}`} className={`chip ${rescheduleSlot?.startTime===slot.startTime?'selected':''}`} onClick={()=>setRescheduleSlot(slot)}>{fmtTime12(slot.startTime)}{slot.isWeekend?' +$50':''}</button>)}</div>}
+                        <div style={{display:'flex',gap:8,marginTop:14,flexWrap:'wrap'}}><button className="btn btn-ghost" disabled={rescheduleSaving} onClick={()=>setReschedulingId(null)}>Keep current booking</button><button className="btn btn-primary" disabled={!rescheduleSlot||rescheduleSaving} onClick={()=>confirmReschedule(b)}>{rescheduleSaving?'Updating…':'Confirm new date & time'}</button></div>
+                      </>}
+                    </div>}
+                  </div>
                 )}
                 {cancelError && <div className="error-text">{cancelError}</div>}
               </>

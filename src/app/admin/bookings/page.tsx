@@ -649,6 +649,7 @@ export default function AdminBookingsPage() {
                   <div className="workflow-panel-title">Status</div>
                   <div className="workflow-current">Current: {statusStyle.label}</div>
                   <div className="workflow-actions">
+                    {(b.status === 'pending' || b.status === 'confirmed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Reschedule</button>}
                     {b.status === 'pending' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-deposit')}>Confirm deposit received</button>}
                     {b.status === 'confirmed' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Confirm Photoshoot Done</button>}
                     {b.status === 'pending_basic_retouch' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Basic Retouch Done</button>}
