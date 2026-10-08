@@ -27,7 +27,10 @@ export async function GET(req: NextRequest) {
   const bookedProductBonus = 20 * (qty('album8x8') + qty('album10x10') + qty('album12x12'))
     + 5 * (qty('canvas11x14') + qty('canvas16x24'))
     + 2 * (qty('plaque5x7') + qty('plaque6x8'));
-  return NextResponse.json({...b, packageComplimentary:10, setupBonus:5 * qty('extraSetup'), bookedProductBonus});
+  const bundleSession = b.sessionTypeId === 'bundle' ? (b.bundleSessionNumber || 1) : null;
+  const packageComplimentary = bundleSession === null ? 10 : bundleSession < 3 ? 0 : 30;
+  const selectionEnabled = bundleSession === null || bundleSession >= 3;
+  return NextResponse.json({...b, packageComplimentary, selectionEnabled, setupBonus:5 * qty('extraSetup'), bookedProductBonus});
 }
 export async function POST(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({error:'Unauthorized'}, {status:401});

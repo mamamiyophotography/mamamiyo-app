@@ -54,7 +54,7 @@ function buildHtml(opts: {
   qrApiUrl?: string;        // external QR image URL (Gmail-compatible)
   payNowAmount?: number;
   payNowRef?: string;
-  postProcessFlow?: boolean;
+  postProcessFlow?: 'standard' | 'bundle-download-only';
 }): string {
   const gold = '#b08d57';
   const ink = '#2e2a22';
@@ -112,7 +112,12 @@ function buildHtml(opts: {
   if (calBtn && !bodyHtml.includes(calBtn)) bodyHtml += calBtn;
 
   if(opts.postProcessFlow){
-    const steps=[
+    const steps=opts.postProcessFlow==='bundle-download-only' ? [
+      ['1','Basic Retouch','#dcece7'],
+      ['2','View &amp; Download This Session Gallery','#f9e8bd'],
+      ['3','Complete the Remaining Bundle Sessions','#eedfd7'],
+      ['4','After Session 3: Select 30 Photos for Further Retouch','#e8def2'],
+    ] : [
       ['1','Basic Retouch','#dcece7'],
       ['2','Select Photos for Further Retouch<br><span style="font-size:10px;font-weight:400;">Choose Additional Products &amp; Add-ons, if any</span>','#f9e8bd'],
       ['3','Soft Copy Delivery<br><span style="font-size:10px;font-weight:400;">Basic &amp; Further Retouch</span>','#eedfd7'],
@@ -338,7 +343,11 @@ export async function dispatchNotification(
     qrApiUrl,
     payNowAmount: payNowAmount || undefined,
     payNowRef: payNowRef || undefined,
-    postProcessFlow:isInvoiceEmail,
+    postProcessFlow:isInvoiceEmail
+      ? receipt?.isBundle && (receipt.bundleSessionNumber || 1) < 3
+        ? 'bundle-download-only'
+        : 'standard'
+      : undefined,
   });
 
   const sends: Promise<void>[] = [];
