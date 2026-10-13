@@ -157,9 +157,14 @@ export async function POST(req: NextRequest) {
     const result = await tx.galleryInbox.upsert({where:{galleryId:p.galleryId},
       create:{galleryId:p.galleryId, bookingId:booking.id, version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt,expiresAt:p.expiresAt ? new Date(p.expiresAt) : null,selectionEnabled:p.selectionEnabled},
       update:{version:p.version, items:p.items, submitted:p.submitted, locked:p.locked, deliveredAt,expiresAt:p.expiresAt ? new Date(p.expiresAt) : null,selectionEnabled:p.selectionEnabled}});
-    if (p.locked && p.submitted && booking.status === 'basic_retouch') {
+    // Bundle sessions 1 and 2 are view/download-only. Their Gallery must
+    // never push the booking into the client-selection workflow, even if an
+    // older Gallery client sends stale submitted/locked flags.
+    const clientSelectionApplies = p.selectionEnabled
+      && !(booking.sessionTypeId === 'bundle' && (booking.bundleSessionNumber || 1) < 3);
+    if (clientSelectionApplies && p.locked && p.submitted && booking.status === 'basic_retouch') {
       await tx.booking.update({where:{id:booking.id},data:{status:'further_retouch'}});
-    } else if (!p.locked && p.submitted && booking.status === 'further_retouch') {
+    } else if (clientSelectionApplies && !p.locked && p.submitted && booking.status === 'further_retouch') {
       await tx.booking.update({where:{id:booking.id},data:{status:'basic_retouch'}});
     }
     return result;
