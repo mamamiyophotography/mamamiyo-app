@@ -129,6 +129,8 @@ model GiftVoucher {
   purchaserPhone String
   recipientName  String
   recipientEmail String    @default("")
+  recipientPhone String    @default("")
+  senderName     String    @default("")
   message        String    @default("")
   sessionTypeId  String
   sessionLabel   String

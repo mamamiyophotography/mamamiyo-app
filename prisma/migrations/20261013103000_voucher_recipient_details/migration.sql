@@ -1,0 +1,3 @@
+ALTER TABLE "GiftVoucher"
+ADD COLUMN "recipientPhone" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "senderName" TEXT NOT NULL DEFAULT '';

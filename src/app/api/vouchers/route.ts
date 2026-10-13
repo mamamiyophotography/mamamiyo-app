@@ -15,7 +15,8 @@ export async function POST(req: NextRequest) {
     while(await db.giftVoucher.findUnique({where:{code}})) code=giftVoucherCode();
     const voucher=await db.giftVoucher.create({data:{
       code,purchaserName,purchaserEmail,purchaserPhone,recipientName,
-      recipientEmail:String(body.recipientEmail||'').trim(),message:String(body.message||'').trim().slice(0,500),
+      recipientEmail:String(body.recipientEmail||'').trim(),recipientPhone:String(body.recipientPhone||'').trim(),
+      senderName:String(body.senderName||purchaserName).trim(),message:String(body.message||'').trim().slice(0,500),
       sessionTypeId:session.id,sessionLabel:session.name,amount:session.price,expiresAt:voucherExpiry(),
     }});
     const settings=await getSettings(db); let payNowPayload:null|string=null;
