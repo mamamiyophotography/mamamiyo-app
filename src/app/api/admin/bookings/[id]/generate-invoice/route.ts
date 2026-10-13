@@ -6,6 +6,7 @@ import { currentBalanceDue } from '@/lib/pricing';
 import { invoiceNotification } from '@/lib/notifications';
 import { dispatchNotification, PayNowQr, Receipt } from '@/lib/notify';
 import { ADDONS } from '@/lib/constants';
+import {finishNotification,reserveNotification} from '@/lib/notificationCooldown';
 
 function photographerContacts() {
   return {
@@ -77,7 +78,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       isInvoice: true,
     };
 
-    if (shouldSendEmail) try {
+    if (shouldSendEmail) {
+      const reservation=await reserveNotification(db,id,'invoice_email');
+      try {
       const pair = invoiceNotification(
         {
           ref: booking.ref, sessionTypeId: booking.sessionTypeId, sessionLabel: booking.sessionLabel,
@@ -93,8 +96,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         undefined, invoiceReceipt, payNowQr, undefined, undefined,
         { date: booking.date, clientName: booking.clientName, sessionLabel: booking.sessionLabel }
       );
-    } catch (notifyErr) {
-      throw new Error(`Invoice was not sent: ${(notifyErr as Error).message}`);
+      await finishNotification(db,reservation.id,'sent','Invoice email sent');
+      } catch (notifyErr) {
+        await finishNotification(db,reservation.id,'failed',(notifyErr as Error).message);
+        throw new Error(`Invoice was not sent: ${(notifyErr as Error).message}`);
+      }
     }
 
     const updated = await db.booking.update({

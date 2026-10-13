@@ -64,6 +64,8 @@ export default function AdminBookingsPage() {
   const [actionSuccess, setActionSuccess] = useState<{ id: string; message: string } | null>(null);
   const [invoiceGenerating, setInvoiceGenerating] = useState<{ id: string; sendEmail: boolean } | null>(null);
   const [manageGallery,setManageGallery]=useState<{bookingId:string;galleryId:string}|null>(null);
+  const [sendCooldowns,setSendCooldowns]=useState<Record<string,number>>({});
+  const [clock,setClock]=useState(Date.now());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,6 +81,9 @@ export default function AdminBookingsPage() {
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(()=>{const timer=window.setInterval(()=>setClock(Date.now()),1000);return()=>window.clearInterval(timer);},[]);
+  const cooldownSeconds=(key:string)=>Math.max(0,Math.ceil(((sendCooldowns[key]||0)-clock)/1000));
+  const startCooldown=(key:string)=>setSendCooldowns(current=>({...current,[key]:Date.now()+30_000}));
 
   function showCodexPhotoSelectionLaunch(booking: Booking) {
     setActionSuccess({ id: booking.id, message: 'Codex 会打开新的选片聊天并带入客户资料。按“发送”开始宽松初选，完成后人工复核。' });
@@ -372,9 +377,10 @@ export default function AdminBookingsPage() {
     if (result) setActionSuccess({ id: booking.id, message: completed ? `${workflow === 'basic' ? 'Basic' : 'Further'} Retouch progress updated.` : 'This step was reopened.' });
   }
 
-  async function notifyRetouchReady(booking: Booking, kind: 'basic'|'further') {
-    const result = await runAction(booking.id, 'retouch-notification', { kind });
-    if (result) setActionSuccess({ id: booking.id, message: `${kind === 'basic' ? 'Basic' : 'Further'} Retouch email and WhatsApp image sent to the client.` });
+  async function notifyRetouchReady(booking: Booking, kind: 'basic'|'further',channel:'email'|'whatsapp') {
+    const key=`${booking.id}:${kind}:${channel}`;startCooldown(key);
+    const result = await runAction(booking.id, 'retouch-notification', { kind,channel });
+    if (result) setActionSuccess({ id: booking.id, message: `${kind === 'basic' ? 'Basic' : 'Further'} Retouch ${channel==='email'?'Email':'WhatsApp image'} sent to the client.${result.bothSent?' Both notifications are complete.':''}` });
   }
 
   function photoSelectGalleryActionUrl(booking: Booking, galleryId: string, action: 'update-basic'|'unlock-selection'|'upload-further') {
@@ -383,6 +389,7 @@ export default function AdminBookingsPage() {
   }
 
   async function generateInvoice(booking: Booking, sendEmail: boolean) {
+    if(sendEmail)startCooldown(`${booking.id}:invoice:email`);
     setInvoiceGenerating({ id: booking.id, sendEmail });
     setActionError(null);
     try {
@@ -409,12 +416,16 @@ export default function AdminBookingsPage() {
         const statusStyle = STATUS_LABEL[displayStatus] || { label: displayStatus, color: '#3A2E28', bg: '#EDE6DC' };
         const isPostProcessing = ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'].includes(displayStatus);
         const retouchProgress = b.basicRetouchProgress || {};
-        const retouchDone = [Boolean(retouchProgress.folders), Boolean(retouchProgress.lightroom), Boolean(retouchProgress.codex), Boolean(retouchProgress.photoshop), hasClientGallery, Boolean(retouchProgress.notification)];
+        const basicEmailSent=Boolean(retouchProgress.notification||retouchProgress.notification_email);
+        const basicWhatsappSent=Boolean(retouchProgress.notification||retouchProgress.notification_whatsapp);
+        const retouchDone = [Boolean(retouchProgress.folders), Boolean(retouchProgress.lightroom), Boolean(retouchProgress.codex), Boolean(retouchProgress.photoshop), hasClientGallery, basicEmailSent&&basicWhatsappSent];
         const retouchCompletedCount = retouchDone.filter(Boolean).length;
         const retouchCurrentStep = retouchDone.findIndex(done => !done);
         const galleryState = b.gallerySelections?.find(g => g.clientUrl);
         const furtherProgress = b.furtherRetouchProgress || {};
-        const furtherDone = [Boolean(galleryState?.submitted && galleryState?.locked), Boolean(furtherProgress.pixelcake), Boolean(furtherProgress.photoshop), Boolean(galleryState?.deliveredAt), Boolean(furtherProgress.notification)];
+        const furtherEmailSent=Boolean(furtherProgress.notification||furtherProgress.notification_email);
+        const furtherWhatsappSent=Boolean(furtherProgress.notification||furtherProgress.notification_whatsapp);
+        const furtherDone = [Boolean(galleryState?.submitted && galleryState?.locked), Boolean(furtherProgress.pixelcake), Boolean(furtherProgress.photoshop), Boolean(galleryState?.deliveredAt), furtherEmailSent&&furtherWhatsappSent];
         const furtherCompletedCount = furtherDone.filter(Boolean).length;
         const furtherCurrentStep = furtherDone.findIndex(done => !done);
 
@@ -600,8 +611,8 @@ export default function AdminBookingsPage() {
                     </div>
                     <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--ink-faint)' }}>Use a positive amount for an extra charge or a negative amount for a one-off discount.</div>
                     <div className="final-bill-actions">
-                      <button className="btn btn-primary" disabled={isBusy || invoiceGenerating?.id === b.id} onClick={() => generateInvoice(b, true)}>
-                        Send invoice by email
+                      <button className="btn btn-primary" disabled={isBusy || invoiceGenerating?.id === b.id || cooldownSeconds(`${b.id}:invoice:email`)>0} onClick={() => generateInvoice(b, true)}>
+                        {cooldownSeconds(`${b.id}:invoice:email`)>0?`Email sent · wait ${cooldownSeconds(`${b.id}:invoice:email`)}s`:'Send invoice by email'}
                       </button>
                       <button className="btn btn-ghost" disabled={isBusy || invoiceGenerating?.id === b.id} onClick={() => generateInvoice(b, false)} aria-live="polite">
                         {invoiceGenerating?.id === b.id && !invoiceGenerating.sendEmail
@@ -641,7 +652,7 @@ export default function AdminBookingsPage() {
                       <div className={`retouch-step${retouchDone[2]?' complete':''}${retouchCurrentStep===2?' current':''}`}><span className="retouch-step-number">{retouchDone[2]?'✓':'3'}</span><div><b>Screen photos with Codex</b><p>Check duplicates, blinking, focus and group-photo alternatives, then review the results.</p><div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectionCodexUrl(b)} onClick={() => showCodexPhotoSelectionLaunch(b)}>Open Codex Photo Screening</a><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'basic','codex',!retouchDone[2])}>{retouchDone[2]?'Mark as not done':'Mark Screening Done'}</button></div></div></div>
                       <div className={`retouch-step${retouchDone[3]?' complete':''}${retouchCurrentStep===3?' current':''}`}><span className="retouch-step-number">{retouchDone[3]?'✓':'4'}</span><div><b>Photoshop editing</b><p>Complete the required manual corrections in Photoshop.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'basic','photoshop',!retouchDone[3])}>{retouchDone[3]?'Mark as not done':'Mark Photoshop Editing Done'}</button></div></div></div>
                       <div className={`retouch-step${retouchDone[4]?' complete':''}${retouchCurrentStep===4?' current':''}`}><span className="retouch-step-number">{retouchDone[4]?'✓':'5'}</span><div><b>Create &amp; upload photos to Gallery</b><p>{hasClientGallery?'Gallery connected successfully.':'Create the client Gallery after the edited photos are ready.'}</p>{!hasClientGallery&&<div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">Open Photo Select Pro · Upload Gallery</a></div>}</div></div>
-                      <div className={`retouch-step${retouchDone[5]?' complete':''}${retouchCurrentStep===5?' current':''}`}><span className="retouch-step-number">{retouchDone[5]?'✓':'6'}</span><div><b>Notify client</b><p>{downloadOnlyBundle?'Send the Basic Retouch Gallery for viewing and download only. Do not ask the client to select photos; the 30-photo selection happens after Session 3.':'Send the Basic Retouch image, a short WhatsApp message, the private Gallery link and an email. The booking moves to Awaiting Client Selection only after both messages succeed.'}</p>{hasClientGallery&&!retouchDone[5]&&<div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>notifyRetouchReady(b,'basic')}>{downloadOnlyBundle?'Send View & Download Gallery':'Send Basic Retouch Image + Gallery Link'}</button></div>}</div></div>
+                      <div className={`retouch-step${retouchDone[5]?' complete':''}${retouchCurrentStep===5?' current':''}`}><span className="retouch-step-number">{retouchDone[5]?'✓':'6'}</span><div><b>Notify client</b><p>{downloadOnlyBundle?'Send the Basic Retouch Gallery for viewing and download only. Do not ask the client to select photos; the 30-photo selection happens after Session 3.':'Send Email and WhatsApp separately. The booking moves to Awaiting Client Selection only after both messages succeed.'}</p>{hasClientGallery&&!retouchDone[5]&&<div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy||basicEmailSent||cooldownSeconds(`${b.id}:basic:email`)>0} onClick={()=>notifyRetouchReady(b,'basic','email')}>{basicEmailSent?'Email sent ✓':cooldownSeconds(`${b.id}:basic:email`)>0?`Wait ${cooldownSeconds(`${b.id}:basic:email`)}s`:'Send Email'}</button><button className="btn btn-ghost" disabled={isBusy||basicWhatsappSent||cooldownSeconds(`${b.id}:basic:whatsapp`)>0} onClick={()=>notifyRetouchReady(b,'basic','whatsapp')}>{basicWhatsappSent?'WhatsApp sent ✓':cooldownSeconds(`${b.id}:basic:whatsapp`)>0?`Wait ${cooldownSeconds(`${b.id}:basic:whatsapp`)}s`:'Send WhatsApp Image + Gallery Link'}</button></div>}</div></div>
                     </div>
                   </>}
                   {['further_retouch','order_product','soft_copy_delivered','completed'].includes(b.status) && <>
@@ -651,7 +662,7 @@ export default function AdminBookingsPage() {
                       <div className={`retouch-step${furtherDone[1]?' complete':''}${furtherCurrentStep===1?' current':''}`}><span className="retouch-step-number">{furtherDone[1]?'✓':'2'}</span><div><b>PixelCake initial retouch</b><p>Open PixelCake and complete the first retouch pass.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'further','pixelcake',!furtherDone[1])}>{furtherDone[1]?'Mark as not done':'Mark PixelCake Retouch Done'}</button></div></div></div>
                       <div className={`retouch-step${furtherDone[2]?' complete':''}${furtherCurrentStep===2?' current':''}`}><span className="retouch-step-number">{furtherDone[2]?'✓':'3'}</span><div><b>Photoshop detail retouch</b><p>Open Photoshop and complete the remaining detailed corrections.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'further','photoshop',!furtherDone[2])}>{furtherDone[2]?'Mark as not done':'Mark Photoshop Retouch Done'}</button></div></div></div>
                       <div className={`retouch-step${furtherDone[3]?' complete':''}${furtherCurrentStep===3?' current':''}`}><span className="retouch-step-number">{furtherDone[3]?'✓':'4'}</span><div><b>Upload Further Retouch to Gallery</b><p>{furtherDone[3]?'Further Retouch upload completed.':'Upload the completed photos through Photo Select Pro.'}</p>{galleryState&&!furtherDone[3]&&<div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'upload-further')} target="_blank" rel="noopener noreferrer">Upload Further Retouch</a></div>}</div></div>
-                      <div className={`retouch-step${furtherDone[4]?' complete':''}${furtherCurrentStep===4?' current':''}`}><span className="retouch-step-number">{furtherDone[4]?'✓':'5'}</span><div><b>Notify client</b><p>Send the completed Gallery by email and WhatsApp with the Mamamiyo character image.</p>{furtherDone[3]&&!furtherDone[4]&&<div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>notifyRetouchReady(b,'further')}>Send Email + WhatsApp</button></div>}</div></div>
+                      <div className={`retouch-step${furtherDone[4]?' complete':''}${furtherCurrentStep===4?' current':''}`}><span className="retouch-step-number">{furtherDone[4]?'✓':'5'}</span><div><b>Notify client</b><p>Send the completed Gallery by Email and WhatsApp separately.</p>{furtherDone[3]&&!furtherDone[4]&&<div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy||furtherEmailSent||cooldownSeconds(`${b.id}:further:email`)>0} onClick={()=>notifyRetouchReady(b,'further','email')}>{furtherEmailSent?'Email sent ✓':cooldownSeconds(`${b.id}:further:email`)>0?`Wait ${cooldownSeconds(`${b.id}:further:email`)}s`:'Send Email'}</button><button className="btn btn-ghost" disabled={isBusy||furtherWhatsappSent||cooldownSeconds(`${b.id}:further:whatsapp`)>0} onClick={()=>notifyRetouchReady(b,'further','whatsapp')}>{furtherWhatsappSent?'WhatsApp sent ✓':cooldownSeconds(`${b.id}:further:whatsapp`)>0?`Wait ${cooldownSeconds(`${b.id}:further:whatsapp`)}s`:'Send WhatsApp Image + Gallery Link'}</button></div>}</div></div>
                     </div>
                   </>}
                 </section>
