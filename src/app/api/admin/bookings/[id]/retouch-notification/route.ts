@@ -8,7 +8,7 @@ import {finishNotification,reserveNotification} from '@/lib/notificationCooldown
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const { kind,channel } = await req.json();
+    const { kind,channel,deliveryMode } = await req.json();
     if (!['basic','further'].includes(kind)) throw new Error('Invalid notification type.');
     if(!['email','whatsapp'].includes(channel))throw new Error('Choose Email or WhatsApp.');
     const booking = await db.booking.findUniqueOrThrow({ where: { id } });
@@ -33,12 +33,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const reservation=await reserveNotification(db,id,`retouch_${kind}_${channel}`);
     try{
       if(channel==='email')await sendEmail(booking.clientEmail, subject, body, undefined, buildEmailHtml({title:subject,paragraphs:body.split('\n\n'),businessName:'Mamamiyo Photography'}));
-      else{
+      else if(deliveryMode!=='manual'){
         if (!process.env.WHAPI_TOKEN) throw new Error('WHAPI_TOKEN is missing, so WhatsApp was not sent.');
         const mascotUrl = `${req.nextUrl.origin}/mascots/${isBasic ? 'basic-retouch-ready.png' : 'further-retouch-ready.png'}`;
         await sendWhatsAppImage(booking.clientPhone, mascotUrl, whatsappBody);
       }
-      await finishNotification(db,reservation.id,'sent',`${kind} retouch ${channel} sent`);
+      await finishNotification(db,reservation.id,'sent',`${kind} retouch ${channel} ${deliveryMode==='manual'?'shared manually':'sent'}`);
     }catch(error){await finishNotification(db,reservation.id,'failed',(error as Error).message);throw error;}
 
     let nextStatus = booking.status;
