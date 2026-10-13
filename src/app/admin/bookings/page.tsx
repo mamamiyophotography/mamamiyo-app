@@ -393,18 +393,19 @@ export default function AdminBookingsPage() {
       ? `Hi ${firstName}! Your photos with Basic Retouch are ready 😊\n\nView, select and download them here:\n${galleryUrl}\n\nMamamiyo Photography`
       : `Hi ${firstName}! Your photos with Further Retouch are ready 😊\n\nView and download them here:\n${galleryUrl}\n\nMamamiyo Photography`;
     try{
-      try{await navigator.clipboard.writeText(text);}catch{}
+      let copied=false;
+      try{await navigator.clipboard.writeText(text);copied=true;}catch{
+        const textarea=document.createElement('textarea');textarea.value=text;textarea.setAttribute('readonly','');textarea.style.position='fixed';textarea.style.opacity='0';document.body.append(textarea);textarea.select();copied=document.execCommand('copy');textarea.remove();
+      }
       const response=await fetch(`/mascots/${kind==='basic'?'basic-retouch-ready.png':'further-retouch-ready.png'}`);if(!response.ok)throw new Error('Could not load the Mamamiyo image.');
       const file=new File([await response.blob()],`Mamamiyo-${kind==='basic'?'Basic':'Further'}-Retouch-Ready.png`,{type:'image/png'});
-      if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
-        await navigator.share({title:`Mamamiyo ${kind==='basic'?'Basic':'Further'} Retouch`,text,files:[file]});
-      }else{
-        const objectUrl=URL.createObjectURL(file);const link=document.createElement('a');link.href=objectUrl;link.download=file.name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
-        const phone=booking.clientPhone.replace(/\D/g,'');window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,'_blank','noopener,noreferrer');
-      }
+      const objectUrl=URL.createObjectURL(file);const link=document.createElement('a');link.href=objectUrl;link.download=file.name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
       const result=await runAction(booking.id,'retouch-notification',{kind,channel:'whatsapp',deliveryMode:'manual'});
-      if(result)setActionSuccess({id:booking.id,message:'WhatsApp share opened with the message and Gallery link. On desktop, attach the downloaded Mamamiyo image; the full message is also copied to your clipboard.'});
-    }catch(error){if((error as Error).name==='AbortError'){setActionSuccess({id:booking.id,message:'WhatsApp sharing was cancelled. Nothing was marked as sent.'});return;}setActionError({id:booking.id,message:(error as Error).message||'Could not prepare the WhatsApp message.'});}
+      if(!result)return;
+      setActionSuccess({id:booking.id,message:`The Mamamiyo image was saved and the WhatsApp message is pre-filled${copied?' and copied':''}. Attach the saved image before sending.`});
+      const phone=booking.clientPhone.replace(/\D/g,'');
+      window.location.href=`https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+    }catch(error){setActionError({id:booking.id,message:(error as Error).message||'Could not prepare the WhatsApp message.'});}
   }
 
   function photoSelectGalleryActionUrl(booking: Booking, galleryId: string, action: 'update-basic'|'unlock-selection'|'upload-further') {
