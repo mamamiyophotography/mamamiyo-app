@@ -51,7 +51,7 @@ export default function PhotographerPreparationModal({ booking, onClose }: { boo
       const width = 1600;
       const margin = 80;
       const contentWidth = width - margin * 2;
-      const infoHeight = 400;
+      const infoHeight = 540;
       const setupHeight = 560;
       const height = Math.max(1200, 230 + infoHeight + setups.length * setupHeight + 130);
       const canvas = document.createElement('canvas');
@@ -86,22 +86,24 @@ export default function PhotographerPreparationModal({ booking, onClose }: { boo
       ctx.font='28px Arial'; ctx.fillText(`${booking.clientName} · ${booking.sessionLabel}`,width/2,187);
 
       const genderLower=details.gender.toLowerCase();
+      const gender=genderLower.includes('girl')?'Girl':genderLower.includes('boy')?'Boy':'Not specified';
       const genderColour=genderLower.includes('girl')?'#ef9db7':genderLower.includes('boy')?'#78aee5':'#b9a88d';
       let y=250;
       ctx.fillStyle='#ffffff'; roundedRect(margin,y,contentWidth,infoHeight-30,28); ctx.fill();
       ctx.strokeStyle='#e5d7ca'; ctx.lineWidth=3; ctx.stroke();
       ctx.textAlign='left'; ctx.fillStyle='#5e5147'; ctx.font='700 28px Arial'; ctx.fillText('DATE & TIME',margin+38,y+55);
       ctx.fillStyle='#2e2a22'; ctx.font='700 48px Arial'; ctx.fillText(`${fmtDatePretty(booking.date)} · ${fmtTime12(booking.startTime)}–${fmtTime12(booking.endTime)}`,margin+38,y+112);
-      ctx.fillStyle='#5e5147'; ctx.font='700 27px Arial'; ctx.fillText('ADDRESS',margin+38,y+168);
-      ctx.fillStyle='#2e2a22'; ctx.font='32px Arial';
-      const address=`${bookingLocationLabel(booking.location)}${booking.address?` — ${booking.address}`:''}`;
-      wrap(address,1000).slice(0,2).forEach((line,index)=>ctx.fillText(line,margin+38,y+212+index*39));
+      ctx.fillStyle='#5e5147'; ctx.font='700 27px Arial'; ctx.fillText('TYPE OF ADDRESS',margin+38,y+175);
+      ctx.fillStyle='#2e2a22'; ctx.font='700 48px Arial';
+      ctx.fillText(bookingLocationLabel(booking.location),margin+38,y+232);
+      ctx.fillStyle='#5e5147'; ctx.font='700 27px Arial'; ctx.fillText('ADDRESS',margin+38,y+282);
+      ctx.fillStyle='#2e2a22'; ctx.font='700 48px Arial';
+      wrap(booking.address||'Not provided',contentWidth-76).slice(0,2).forEach((line,index)=>ctx.fillText(line,margin+38,y+339+index*55));
       ctx.fillStyle=genderColour; roundedRect(width-420,y+42,300,118,24); ctx.fill();
-      ctx.textAlign='center'; ctx.fillStyle='#ffffff'; ctx.font='700 26px Arial'; ctx.fillText('BABY GENDER',width-270,y+83);
-      ctx.font='700 38px Arial'; ctx.fillText(details.gender,width-270,y+132);
-      ctx.textAlign='left'; ctx.fillStyle='#5e5147'; ctx.font='700 27px Arial'; ctx.fillText('CUSTOMER COMMENTS',margin+38,y+295);
+      ctx.textAlign='center'; ctx.fillStyle='#ffffff'; ctx.font='700 44px Arial'; ctx.fillText(gender,width-270,y+116);
+      ctx.textAlign='left'; ctx.fillStyle='#5e5147'; ctx.font='700 27px Arial'; ctx.fillText('CUSTOMER COMMENTS',margin+38,y+450);
       ctx.fillStyle='#2e2a22'; ctx.font='29px Arial';
-      wrap(details.comments,contentWidth-76).slice(0,2).forEach((line,index)=>ctx.fillText(line,margin+38,y+337+index*36));
+      wrap(details.comments,contentWidth-76).slice(0,2).forEach((line,index)=>ctx.fillText(line,margin+38,y+492+index*36));
 
       y += infoHeight;
       for (const setup of setups) {
