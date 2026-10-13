@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { ADDONS, STATUS_LABELS } from '@/lib/constants';
 import BookingSummaryModal from '@/components/BookingSummaryModal';
+import PhotographerPreparationModal from '@/components/PhotographerPreparationModal';
 import EditBookingModal from '@/components/EditBookingModal';
 import ManageGalleryModal from '@/components/ManageGalleryModal';
 import { photoSharingConsentLabel } from '@/lib/photoConsent';
@@ -58,6 +59,7 @@ export default function AdminBookingsPage() {
   const [invoiceQr, setInvoiceQr] = useState<{ bookingId: string; qrDataUrl: string | null; imageDataUrl: string; due: number; emailed: boolean } | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
   const [summaryBooking, setSummaryBooking] = useState<Booking | null>(null);
+  const [photographerPreparationBooking, setPhotographerPreparationBooking] = useState<Booking | null>(null);
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
   const [actionSuccess, setActionSuccess] = useState<{ id: string; message: string } | null>(null);
   const [invoiceGenerating, setInvoiceGenerating] = useState<{ id: string; sendEmail: boolean } | null>(null);
@@ -115,6 +117,12 @@ export default function AdminBookingsPage() {
     const res = await fetch(`/api/admin/bookings/${id}?t=${Date.now()}`, { cache: 'no-store' });
     const data = await res.json();
     if (data?.booking) setSummaryBooking(data.booking);
+  }
+
+  async function openPhotographerPreparation(id: string) {
+    const res = await fetch(`/api/admin/bookings/${id}?t=${Date.now()}`, { cache: 'no-store' });
+    const data = await res.json();
+    if (data?.booking) setPhotographerPreparationBooking(data.booking);
   }
 
   async function createInvoiceImage(booking: Booking, qrDataUrl: string | null, due: number) {
@@ -621,7 +629,7 @@ export default function AdminBookingsPage() {
                 {/* Photo processing */}
                 <section className="workflow-panel workflow-photo">
                   <div className="workflow-panel-title">Photo Processing</div>
-                  {b.status === 'confirmed' && <div className="workflow-actions"><button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button></div>}
+                  {(b.status === 'pending'||b.status === 'confirmed') && <div className="workflow-actions"><button className="btn btn-ghost" onClick={() => openPhotographerPreparation(b.id)}>摄影师准备清单</button>{b.status === 'confirmed'&&<button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>}</div>}
                   {['pending_balance','pending_basic_retouch','basic_retouch'].includes(b.status) && <>
                     <div className="retouch-progress-summary">Basic Retouch · {retouchCompletedCount} of 6 completed</div>
                     <div className="retouch-checklist">
@@ -745,6 +753,9 @@ export default function AdminBookingsPage() {
 
       {summaryBooking && (
         <BookingSummaryModal booking={summaryBooking} onClose={() => setSummaryBooking(null)} />
+      )}
+      {photographerPreparationBooking && (
+        <PhotographerPreparationModal booking={photographerPreparationBooking} onClose={() => setPhotographerPreparationBooking(null)} />
       )}
       {editBooking && (
         <EditBookingModal
