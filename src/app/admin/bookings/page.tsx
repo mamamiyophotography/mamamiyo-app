@@ -19,7 +19,7 @@ type Booking = {
   gallerySelections?: {galleryId:string;clientUrl:string|null;version:number;submitted:boolean;locked:boolean;deliveredAt:string|null;emailSentAt:string|null}[];
   id: string; ref: string; sessionTypeId: string; sessionLabel: string; location: string;
   date: string; startTime: string; endTime: string; isWeekend: boolean; addOns: Record<string, number>;
-  notes: string; setupChoiceNotes: string; address: string; discountCode: string | null; discountAmount: number;
+  notes: string; setupChoiceNotes: string; address: string; discountCode: string | null; discountAmount: number; voucherCode?:string|null; voucherAmount?:number;
   clientName: string; clientEmail: string; clientPhone: string;
   photoSharingConsent?: string;
   subtotal: number; total: number; depositAmount: number; balanceDue: number;
@@ -134,6 +134,7 @@ export default function AdminBookingsPage() {
     Object.entries(booking.addOns || {}).filter(([, q]) => q > 0).forEach(([id, q]) => rows.push({ label: `${ADDONS[id]?.name || id} ×${q}`, amount: `+$${(ADDONS[id]?.price || 0) * q}` }));
     if (weekendFee) rows.push({ label: 'Weekend / PH surcharge', amount: `+$${weekendFee}` });
     if (booking.discountAmount) rows.push({ label: `Discount (${booking.discountCode || ''})`, amount: `−$${booking.discountAmount}` });
+    if (booking.voucherAmount) rows.push({ label: `Gift voucher (${booking.voucherCode || ''})`, amount: `−$${booking.voucherAmount}` });
     booking.extraLineItems.forEach((item) => rows.push({ label: item.description, amount: item.amount < 0 ? `−$${Math.abs(item.amount)}` : `+$${item.amount}` }));
     const extraTotal = booking.extraLineItems.reduce((sum, item) => sum + item.amount, 0);
     const invoiceTotal = booking.total + extraTotal;
@@ -465,6 +466,7 @@ export default function AdminBookingsPage() {
                 <div className="ticket-row"><span>Add-ons</span><b>{Object.entries(b.addOns).filter(([, q]) => q > 0).map(([id, q]) => `${ADDONS[id]?.name} ×${q}`).join(', ') || '—'}</b></div>
                 {b.isWeekend && <div className="ticket-row"><span>Weekend surcharge</span><b>+$50</b></div>}
                 {b.discountCode && <div className="ticket-row"><span>Discount</span><b>−${b.discountAmount} ({b.discountCode})</b></div>}
+                {b.voucherCode && <div className="ticket-row"><span>Gift voucher</span><b>−${b.voucherAmount} ({b.voucherCode})</b></div>}
                 <div className="ticket-row"><span>Notes</span><b style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>{b.notes || '—'}</b></div>
 
                 {(expandedSetups.length > 0 || expandedPhotos.length > 0) && (
@@ -514,6 +516,7 @@ export default function AdminBookingsPage() {
                     ))}
                     {weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${weekendFee}</b></div>}
                     {b.discountAmount > 0 && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount ({b.discountCode})</span><b>−${b.discountAmount}</b></div>}
+                    {!!b.voucherAmount && <div className="ticket-row" style={{color:'var(--sage)'}}><span>Gift voucher ({b.voucherCode})</span><b>−${b.voucherAmount}</b></div>}
 
                     <div style={{ marginTop: 8, padding: '9px', border: '1px solid var(--line)', borderRadius: 8, background: '#fffdf9' }}>
                       <div style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 6 }}>Promotion code</div>

@@ -57,6 +57,9 @@ export default function BookPage() {
   const [discountInput, setDiscountInput] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number; description: string } | null>(null);
   const [discountError, setDiscountError] = useState<string | null>(null);
+  const [voucherInput,setVoucherInput]=useState('');
+  const [appliedVoucher,setAppliedVoucher]=useState<{code:string;sessionTypeId:string;sessionLabel:string;amount:number;recipientName:string}|null>(null);
+  const [voucherError,setVoucherError]=useState<string|null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -118,6 +121,8 @@ export default function BookPage() {
     setInspirationPhotos([]);
     setDiscountInput('');
     setAppliedDiscount(null);
+    setVoucherInput('');
+    setAppliedVoucher(null);
   }
 
   async function applyDiscount() {
@@ -130,6 +135,14 @@ export default function BookPage() {
     }
     const data = await res.json();
     setAppliedDiscount({ code: data.code, amount: data.amount, description: data.description });
+  }
+
+  async function applyVoucher(){
+    setVoucherError(null); if(!voucherInput.trim())return;
+    const res=await fetch(`/api/vouchers/${encodeURIComponent(voucherInput.trim().toUpperCase())}`); const data=await res.json();
+    if(!res.ok){setVoucherError(data.error||'Voucher not recognised.');return;}
+    if(data.sessionTypeId!==sessionTypeId){setVoucherError(`This voucher is for ${data.sessionLabel}.`);return;}
+    setAppliedVoucher(data);setAppliedDiscount(null);setDiscountInput('');
   }
 
   async function handlePhotoUpload(slotIndex: number, files: FileList | null) {
@@ -222,6 +235,7 @@ export default function BookPage() {
           referencePhotoUrls: referencePhotoUrls,
           address,
           discountCode: appliedDiscount?.code || null,
+          voucherCode: appliedVoucher?.code || null,
           clientName: `${firstName.trim()} ${lastName.trim()}`,
           clientEmail: email,
           countryCode,
@@ -279,7 +293,9 @@ export default function BookPage() {
             📅 Add to Google Calendar
           </a>
           <div className="notice" style={{ marginTop: 12 }}>
-            We&apos;ll confirm your booking by email once the deposit is received — the confirmation email includes a calendar invite (.ics) that works with all calendar apps. Save your reference code <b>{result.booking.ref}</b> to look up your booking anytime.
+            {result.booking.depositAmount===0
+              ? <>Your gift voucher has been redeemed and the booking is confirmed. Save your reference code <b>{result.booking.ref}</b> to look up your booking anytime.</>
+              : <>We&apos;ll confirm your booking by email once the deposit is received — the confirmation email includes a calendar invite (.ics) that works with all calendar apps. Save your reference code <b>{result.booking.ref}</b> to look up your booking anytime.</>}
           </div>
         </div>
       </div>
@@ -520,11 +536,16 @@ export default function BookPage() {
       {/* Step 4: review */}
       {sessionType && selectedSlot && pricing && step==='review' && (
         <div style={{ marginTop: 24 }}>
-          <h3 style={{ fontSize: 15 }}>Review &amp; pay deposit</h3>
+          <h3 style={{ fontSize: 15 }}>{appliedVoucher?'Review voucher booking':'Review & pay deposit'}</h3>
+          <div className="field" style={{maxWidth:420}}>
+            <label>Gift voucher — optional</label>
+            <div style={{display:'flex',gap:8}}><input value={voucherInput} onChange={e=>setVoucherInput(e.target.value)} placeholder="GIFT-XXXXXXXX" disabled={!!appliedVoucher} style={{textTransform:'uppercase'}}/>{appliedVoucher?<button type="button" className="btn btn-ghost" onClick={()=>{setAppliedVoucher(null);setVoucherInput('');}}>Remove</button>:<button type="button" className="btn btn-ghost" onClick={applyVoucher}>Apply</button>}</div>
+            {voucherError&&<div className="error-text">{voucherError}</div>}{appliedVoucher&&<div className="notice">Gift voucher applied for {appliedVoucher.recipientName}: −${Math.min(appliedVoucher.amount,pricing.total)}</div>}
+          </div>
           <div className="field" style={{ maxWidth: 320 }}>
             <label>Discount code — optional</label>
             <div style={{ display: 'flex', gap: 8 }}>
-              <input value={discountInput} onChange={(e) => setDiscountInput(e.target.value)} placeholder="Enter code, if you have one" disabled={!!appliedDiscount} style={{ textTransform: 'uppercase' }} />
+              <input value={discountInput} onChange={(e) => setDiscountInput(e.target.value)} placeholder="Enter code, if you have one" disabled={!!appliedDiscount||!!appliedVoucher} style={{ textTransform: 'uppercase' }} />
               {appliedDiscount ? (
                 <button type="button" className="btn btn-ghost" onClick={() => { setAppliedDiscount(null); setDiscountInput(''); }}>Remove</button>
               ) : (
@@ -572,16 +593,17 @@ export default function BookPage() {
               ))}
               {pricing.weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${pricing.weekendFee}</b></div>}
               {pricing.discountAmount > 0 && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount ({appliedDiscount?.code})</span><b style={{ color: 'var(--sage)' }}>−${pricing.discountAmount}</b></div>}
+              {appliedVoucher&&<div className="ticket-row" style={{color:'var(--sage)'}}><span>Gift voucher ({appliedVoucher.code})</span><b style={{color:'var(--sage)'}}>−${Math.min(appliedVoucher.amount,pricing.total)}</b></div>}
               <div style={{ borderTop: '1.5px solid var(--ink)', margin: '10px 0' }} />
               <div className="ticket-row" style={{ fontWeight: 700 }}><span>Total</span><b>${pricing.total}</b></div>
               <div style={{ borderTop: '1px dashed var(--line)', margin: '14px 0 10px' }} />
-              <div className="ticket-total" style={{ marginTop: 0, marginBottom: 8 }}><span style={{ fontWeight: 700 }}>Deposit due now</span><span className="amt">${pricing.depositAmount}</span></div>
-              <div className="ticket-row" style={{ color: 'var(--ink-soft)' }}><span>Balance due after session</span><b style={{ color: 'var(--ink-soft)' }}>${pricing.balanceDue}</b></div>
+              <div className="ticket-total" style={{ marginTop: 0, marginBottom: 8 }}><span style={{ fontWeight: 700 }}>{appliedVoucher?'Due now':'Deposit due now'}</span><span className="amt">${appliedVoucher?0:pricing.depositAmount}</span></div>
+              <div className="ticket-row" style={{ color: 'var(--ink-soft)' }}><span>{appliedVoucher?'Additional amount due after session':'Balance due after session'}</span><b style={{ color: 'var(--ink-soft)' }}>${appliedVoucher?Math.max(0,pricing.total-appliedVoucher.amount):pricing.balanceDue}</b></div>
             </>)}
           </div>
 
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:16}}><button type="button" className="btn btn-ghost" onClick={goBack}>Back</button><button className="btn btn-primary" disabled={submitting} onClick={submitBooking}>
-            {submitting ? (uploading ? 'Uploading photos…' : 'Creating booking…') : 'Generate payment QR'}
+            {submitting ? (uploading ? 'Uploading photos…' : 'Creating booking…') : appliedVoucher?'Confirm voucher booking':'Generate payment QR'}
           </button></div>
           {missingFields.length > 0 && (
             <div style={{ marginTop: 10, padding: '10px 14px', background: 'var(--rust-pale)', borderRadius: 8, border: '1px solid #e7c3a8' }}>

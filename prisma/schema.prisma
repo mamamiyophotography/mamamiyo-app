@@ -84,6 +84,10 @@ model Booking {
   address             String    @default("")
   discountCode        String?
   discountAmount      Int       @default(0)
+  voucherCode         String?
+  voucherAmount       Int       @default(0)
+  voucherId           String?   @unique
+  voucher             GiftVoucher? @relation(fields: [voucherId], references: [id])
   clientName          String
   clientEmail         String
   clientPhone         String
@@ -115,6 +119,31 @@ model Booking {
   @@index([status])
   @@index([date])
   @@index([clientPhone])
+}
+
+model GiftVoucher {
+  id             String    @id @default(cuid())
+  code           String    @unique
+  purchaserName  String
+  purchaserEmail String
+  purchaserPhone String
+  recipientName  String
+  recipientEmail String    @default("")
+  message        String    @default("")
+  sessionTypeId  String
+  sessionLabel   String
+  amount         Int
+  paymentStatus  String    @default("pending")
+  status         String    @default("pending_payment")
+  paidAt         DateTime?
+  expiresAt      DateTime?
+  redeemedAt     DateTime?
+  booking        Booking?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([purchaserEmail])
 }
 
 model BookingAuditLog {

@@ -34,6 +34,8 @@ type SummaryBooking = {
   balanceStatus?: string;
   discountCode?: string | null;
   discountAmount?: number;
+  voucherCode?: string | null;
+  voucherAmount?: number;
   setupSelections?: { slot:number; referencePhotoUrls:string[]; note?:string; outfitSource?:'mamamiyo'|'own'|null }[];
 };
 
@@ -177,6 +179,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
         ...(weekendSurcharge ? [['Weekend / public holiday surcharge', `$${weekendSurcharge}`]] : []),
         ...extraRows,
         ...((booking.discountAmount || 0) > 0 ? [[`Discount${booking.discountCode ? ` (${booking.discountCode})` : ''}`, `−$${booking.discountAmount}`]] : []),
+        ...((booking.voucherAmount || 0) > 0 ? [[`Gift voucher${booking.voucherCode ? ` (${booking.voucherCode})` : ''}`, `−$${booking.voucherAmount}`]] : []),
         ...(typeof booking.total === 'number' ? [['Total price', `$${totalPrice}`]] : []),
         ...(typeof booking.depositAmount === 'number' ? [['Deposit paid', `$${booking.depositAmount}`]] : []),
         ...(typeof booking.balanceDue === 'number' ? [['Remaining balance', `$${remainingBalance} · ${booking.balanceStatus || 'pending'}`]] : []),

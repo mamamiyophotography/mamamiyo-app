@@ -9,6 +9,7 @@ export default function HomePage() {
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20 }}>
         <Link href="/book" className="btn btn-primary">Book a session</Link>
         <Link href="/lookup" className="btn btn-ghost">Look up my booking</Link>
+        <Link href="/voucher" className="btn btn-ghost">Purchase a gift voucher</Link>
       </div>
     </div>
   );

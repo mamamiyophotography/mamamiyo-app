@@ -39,6 +39,7 @@ import { balancePaymentReference } from '../paynow';
 import { isPhotoSharingConsent } from '../photoConsent';
 import { sendWhatsApp } from '../whatsapp';
 import { isBookingLocation, bookingLocationWithAddress } from '../location';
+import { voucherUsability } from '../giftVoucher';
 
 const PHOTOGRAPHER_EMAIL_ENV = 'PHOTOGRAPHER_EMAIL';
 const PHOTOGRAPHER_PHONE_ENV = 'PHOTOGRAPHER_PHONE';
@@ -108,6 +109,7 @@ export type CreateBookingInput = {
   address: string;
   location?: string;
   discountCode?: string | null;
+  voucherCode?: string | null;
   clientName: string;
   clientEmail: string;
   countryCode: string;
@@ -134,6 +136,15 @@ export async function createBooking(db: any, input: CreateBookingInput) {
   const settings = await getSettings(db);
 
   let discount: { code: string; amount: number } | null = null;
+  let voucher: any = null;
+  if (input.voucherCode) {
+    voucher = await db.giftVoucher.findUnique({ where: { code: input.voucherCode.trim().toUpperCase() } });
+    if (!voucher) throw new Error('Voucher not recognised.');
+    const voucherError = voucherUsability(voucher);
+    if (voucherError) throw new Error(voucherError);
+    if (voucher.sessionTypeId !== st.id) throw new Error(`This voucher is for ${voucher.sessionLabel}.`);
+  }
+  if (voucher && input.discountCode) throw new Error('A voucher and discount code cannot be used together.');
   if (input.discountCode) {
     const found = await db.discountCode.findUnique({ where: { code: input.discountCode.toUpperCase() } });
     if (found) discount = { code: found.code, amount: found.amount };
@@ -147,6 +158,8 @@ export async function createBooking(db: any, input: CreateBookingInput) {
     depositAmount: settings.depositAmount,
     discount,
   });
+  const voucherAmount = voucher ? Math.min(voucher.amount, pricing.total) : 0;
+  const amountAfterVoucher = Math.max(0, pricing.total - voucherAmount);
 
   const clientPhone = fullPhone(input.countryCode, input.phone);
   const ref = refCode('MMY');
@@ -168,6 +181,13 @@ export async function createBooking(db: any, input: CreateBookingInput) {
     });
     if (clash) throw new Error('SLOT_TAKEN');
 
+    let txVoucher: any = null;
+    if (voucher) {
+      txVoucher = await tx.giftVoucher.findUnique({ where: { id: voucher.id } });
+      const voucherError = txVoucher ? voucherUsability(txVoucher) : 'Voucher not recognised.';
+      if (voucherError) throw new Error(voucherError);
+    }
+
     let bundleId: string | null = null;
     if (st.isBundle) {
       const bundle = await tx.bundle.create({
@@ -176,7 +196,10 @@ export async function createBooking(db: any, input: CreateBookingInput) {
           clientName: input.clientName,
           clientEmail: input.clientEmail,
           clientPhone,
-          depositAmount: settings.depositAmount,
+          depositAmount: voucher ? 0 : settings.depositAmount,
+          depositStatus: voucher ? 'paid' : 'pending',
+          activated: !!voucher,
+          activatedAt: voucher ? new Date() : null,
         },
       });
       bundleId = bundle.id;
@@ -207,6 +230,9 @@ export async function createBooking(db: any, input: CreateBookingInput) {
         address: bookingLocation === 'studio' ? '' : input.address.trim(),
         discountCode: discount?.code,
         discountAmount: pricing.discountAmount,
+        voucherId: voucher?.id || null,
+        voucherCode: voucher?.code || null,
+        voucherAmount,
         clientName: input.clientName,
         clientEmail: input.clientEmail,
         clientPhone,
@@ -214,17 +240,19 @@ export async function createBooking(db: any, input: CreateBookingInput) {
         photoSharingConsentAt: photoSharingConsent === 'not_recorded' ? null : new Date(),
         subtotal: pricing.subtotal,
         total: pricing.total,
-        depositAmount: pricing.depositAmount,
-        balanceDue: pricing.balanceDue,
-        status: 'pending',
-        holdExpiresAt,
+        depositAmount: voucher ? 0 : pricing.depositAmount,
+        balanceDue: voucher ? amountAfterVoucher : pricing.balanceDue,
+        status: voucher ? 'confirmed' : 'pending',
+        holdExpiresAt: voucher ? null : holdExpiresAt,
         depositRef: ref,
-        depositStatus: 'pending',
-        balanceStatus: pricing.balanceDue > 0 ? 'pending' : 'n/a',
+        depositStatus: voucher ? 'paid' : 'pending',
+        balanceStatus: (voucher ? amountAfterVoucher : pricing.balanceDue) > 0 ? 'pending' : 'n/a',
         bundleParentId: bundleId,
         bundleSessionNumber: st.isBundle ? 1 : null,
       },
     });
+
+    if (voucher) await tx.giftVoucher.update({where:{id:voucher.id},data:{status:'redeemed',redeemedAt:new Date()}});
 
     return booking;
   });
