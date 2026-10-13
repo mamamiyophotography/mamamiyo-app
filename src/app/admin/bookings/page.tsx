@@ -619,12 +619,13 @@ export default function AdminBookingsPage() {
                           ? <span className="invoice-generating">Creating image <span className="loading-dots" aria-label="Please wait"><i></i><i></i><i></i></span></span>
                           : 'Create image for WhatsApp'}
                       </button>
-                      <button className="btn btn-primary final-bill-confirm" disabled={isBusy} onClick={() => {
+                      <button className="btn btn-primary final-bill-confirm" disabled={isBusy||cooldownSeconds(`${b.id}:balance:confirmation`)>0} onClick={() => {
                         if (confirm('Confirm that the balance payment has been received? A payment receipt will be emailed to the client.')) {
+                          startCooldown(`${b.id}:balance:confirmation`);
                           runAction(b.id, 'confirm-balance');
                         }
                       }}>
-                        Confirm Balance Payment Received
+                        {cooldownSeconds(`${b.id}:balance:confirmation`)>0?`Confirmation sent · wait ${cooldownSeconds(`${b.id}:balance:confirmation`)}s`:'Confirm Balance Payment Received'}
                       </button>
                     </div>
                     {invoiceQr?.bookingId === b.id && <div style={{ marginTop: 10 }}>
@@ -673,7 +674,7 @@ export default function AdminBookingsPage() {
                   <div className="workflow-current">Current: {statusStyle.label}</div>
                   <div className="workflow-actions">
                     {(b.status === 'pending' || b.status === 'confirmed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Reschedule</button>}
-                    {b.status === 'pending' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'confirm-deposit')}>Confirm deposit received</button>}
+                    {b.status === 'pending' && <button className="btn btn-primary" disabled={isBusy||cooldownSeconds(`${b.id}:deposit:confirmation`)>0} onClick={() => {startCooldown(`${b.id}:deposit:confirmation`);runAction(b.id, 'confirm-deposit');}}>{cooldownSeconds(`${b.id}:deposit:confirmation`)>0?`Confirmation sent · wait ${cooldownSeconds(`${b.id}:deposit:confirmation`)}s`:'Confirm deposit received'}</button>}
                     {b.status === 'confirmed' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Confirm Photoshoot Done</button>}
                     {b.status === 'pending_basic_retouch' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Basic Retouch Done</button>}
                     {b.status === 'order_product' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Ordered · Move to Delivery</button>}

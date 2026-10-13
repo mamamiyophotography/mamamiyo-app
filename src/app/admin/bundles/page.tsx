@@ -10,6 +10,8 @@ type Bundle = {
 export default function AdminBundlesPage() {
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [cooldowns,setCooldowns]=useState<Record<string,number>>({});
+  const [clock,setClock]=useState(Date.now());
 
   async function load() {
     const res = await fetch('/api/admin/bundles');
@@ -20,8 +22,11 @@ export default function AdminBundlesPage() {
   useEffect(() => {
     load();
   }, []);
+  useEffect(()=>{const timer=window.setInterval(()=>setClock(Date.now()),1000);return()=>window.clearInterval(timer);},[]);
+  const remaining=(id:string)=>Math.max(0,Math.ceil(((cooldowns[id]||0)-clock)/1000));
 
   async function activate(id: string) {
+    setCooldowns(current=>({...current,[id]:Date.now()+30_000}));
     setBusyId(id);
     await fetch(`/api/admin/bundles/${id}/activate`, { method: 'POST' });
     setBusyId(null);
@@ -50,7 +55,7 @@ export default function AdminBundlesPage() {
               <div style={{ fontSize: 12.5, marginTop: 6 }}>{statusLabel(bd)} · {bd.redeemedCount}/3 sessions used</div>
             </div>
             {bd.depositStatus === 'paid' && !bd.activated && (
-              <button className="btn btn-ghost" disabled={busyId === bd.id} onClick={() => activate(bd.id)}>Activate manually</button>
+              <button className="btn btn-ghost" disabled={busyId === bd.id||remaining(bd.id)>0} onClick={() => activate(bd.id)}>{remaining(bd.id)>0?`Notification sent · wait ${remaining(bd.id)}s`:'Activate manually'}</button>
             )}
           </div>
         </div>
