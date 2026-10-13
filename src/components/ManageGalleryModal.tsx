@@ -1,6 +1,7 @@
 'use client';
 
 import {useEffect,useMemo,useState} from 'react';
+import {createPortal} from 'react-dom';
 
 type Photo={id:string;filename:string;code:string};
 type GalleryData={title:string;photos:Photo[];canDelete:boolean;reason:string};
@@ -36,7 +37,8 @@ export default function ManageGalleryModal({bookingId,galleryId,onClose,onChange
     }catch(e){setError((e as Error).message)}finally{setBusy(false)}
   };
   const selectedLabel=useMemo(()=>selected.size?`${selected.size} selected`:'Select photos to delete',[selected]);
-  return <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(46,42,34,.55)',display:'grid',placeItems:'center',padding:16}}>
+  useEffect(()=>{const previous=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=previous};},[]);
+  return createPortal(<div onClick={onClose} style={{position:'fixed',inset:0,zIndex:10000,background:'rgba(46,42,34,.55)',display:'grid',placeItems:'center',padding:16}}>
     <section onClick={e=>e.stopPropagation()} style={{background:'#fbf8f2',width:'min(760px,100%)',maxHeight:'90vh',overflow:'auto',borderRadius:18,padding:20,boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:16,alignItems:'start'}}>
         <div><h2 style={{margin:0,color:'#3a2e28'}}>Manage Gallery</h2><p style={{margin:'6px 0 16px',color:'#75695f'}}>Delete individual photos, or remove the full Gallery and create it again.</p></div>
@@ -64,5 +66,5 @@ export default function ManageGalleryModal({bookingId,galleryId,onClose,onChange
         </div>
       </>}
     </section>
-  </div>
+  </div>,document.body)
 }
