@@ -991,6 +991,37 @@ export async function checkAndSendGalleryReminders(db: any, now = new Date()) {
   return {selectionSent,expirySent};
 }
 
+/** Permanently removes expired online Galleries for clients who explicitly
+ * selected Private — do not publish anyone. Local synced folders are removed
+ * by the authorised admin browser on its next visit. */
+export async function deleteExpiredPrivateGalleries(db:any,now=new Date()){
+  const base=(process.env.GALLERY_PUBLIC_URL||'https://mamamiyo-gallery.mamamiyo-gallery.workers.dev').replace(/\/$/,'');
+  const secret=process.env.GALLERY_SYNC_SECRET||'';
+  if(!secret)return {deleted:0,failed:0,skipped:'Gallery connection is not configured.'};
+  const galleries=await db.galleryInbox.findMany({where:{expiresAt:{lte:now},privacyGalleryDeletedAt:null}});
+  let deleted=0,failed=0;
+  for(const gallery of galleries){
+    const booking=await db.booking.findUnique({where:{id:gallery.bookingId}});
+    if(!booking||booking.photoSharingConsent!=='private')continue;
+    try{
+      const headers={Authorization:`Bearer ${secret}`};
+      const manage=await fetch(`${base}/api/${gallery.galleryId}/manage`,{headers,cache:'no-store'});
+      if(manage.status!==404){
+        if(!manage.ok)throw new Error(`Gallery lookup failed (${manage.status}): ${(await manage.text()).slice(0,300)}`);
+        const data=await manage.json() as {photos?:{id:string}[]};
+        const response=await fetch(`${base}/api/${gallery.galleryId}/manage-delete`,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({photoIds:(data.photos||[]).map(photo=>photo.id),deleteAll:true})});
+        if(!response.ok&&response.status!==404)throw new Error(`Gallery deletion failed (${response.status}): ${(await response.text()).slice(0,300)}`);
+      }
+      await db.$transaction([
+        db.galleryInbox.update({where:{galleryId:gallery.galleryId},data:{privacyGalleryDeletedAt:now,items:[],clientUrl:null,submitted:false,locked:false}}),
+        db.bookingAuditLog.create({data:{bookingId:booking.id,action:'private_gallery_expired_deleted',before:{galleryId:gallery.galleryId,expiresAt:gallery.expiresAt},after:{deletedAt:now,localFolderPending:true}}}),
+      ]);
+      deleted++;
+    }catch(error){console.error(`Private Gallery cleanup failed for ${gallery.galleryId}:`,(error as Error).message);failed++;}
+  }
+  return {deleted,failed};
+}
+
 /** Backward-compatible entry point used by existing operational checks. */
 export async function checkAndSendFurtherRetouchReminders(db: any, now = new Date()) {
   if (db.galleryInbox) return (await checkAndSendGalleryReminders(db, now)).selectionSent;

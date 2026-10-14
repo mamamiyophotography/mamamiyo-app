@@ -185,6 +185,8 @@ model GalleryInbox {
   selectionEnabled Boolean @default(true)
   selectionReminderSentAt DateTime?
   expiryReminderSentAt DateTime?
+  privacyGalleryDeletedAt DateTime?
+  privacyLocalDeletedAt DateTime?
   createdAt DateTime @default(now())
   emailKey String?
   emailSentAt DateTime?

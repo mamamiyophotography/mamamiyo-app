@@ -66,6 +66,7 @@ export default function AdminBookingsPage() {
   const [manageGallery,setManageGallery]=useState<{bookingId:string;galleryId:string}|null>(null);
   const [sendCooldowns,setSendCooldowns]=useState<Record<string,number>>({});
   const [clock,setClock]=useState(Date.now());
+  const [privacyCleanupNotice,setPrivacyCleanupNotice]=useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,6 +82,7 @@ export default function AdminBookingsPage() {
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(()=>{void processPrivacyCleanup(false);},[]);
   useEffect(()=>{const timer=window.setInterval(()=>setClock(Date.now()),1000);return()=>window.clearInterval(timer);},[]);
   const cooldownSeconds=(key:string)=>Math.max(0,Math.ceil(((sendCooldowns[key]||0)-clock)/1000));
   const startCooldown=(key:string)=>setSendCooldowns(current=>({...current,[key]:Date.now()+30_000}));
@@ -254,6 +256,29 @@ export default function AdminBookingsPage() {
     root = await picker({ mode: 'readwrite', id: 'mamamiyo-customer-photos', startIn: 'documents' });
     await savedDropboxRoot('set', root);
     return root;
+  }
+
+  async function processPrivacyCleanup(requestAccess:boolean){
+    try{
+      const response=await fetch('/api/admin/privacy-cleanup',{cache:'no-store'});const data=await response.json();
+      const jobs=(data.jobs||[]) as {galleryId:string;booking:Partial<Booking>}[];
+      if(!jobs.length){setPrivacyCleanupNotice('');return;}
+      let root=await savedDropboxRoot('get').catch(()=>null);
+      let permission=await root?.queryPermission?.({mode:'readwrite'});
+      if((!root||permission!=='granted')&&requestAccess){root=await getDropboxRoot();permission=root?'granted':'denied';}
+      if(!root||permission!=='granted'){
+        setPrivacyCleanupNotice(`${jobs.length} expired private client folder${jobs.length===1?' is':'s are'} ready for permanent deletion. Folder permission is required.`);return;
+      }
+      let deleted=0;
+      for(const job of jobs){
+        const folderName=jobFolderName(job.booking as Booking);
+        try{await root.removeEntry(folderName,{recursive:true});}catch(error){if((error as DOMException).name!=='NotFoundError')throw error;}
+        const mark=await fetch('/api/admin/privacy-cleanup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({galleryId:job.galleryId})});
+        if(!mark.ok)throw new Error((await mark.json()).error||'Could not record local deletion.');
+        deleted++;
+      }
+      setPrivacyCleanupNotice(`${deleted} expired private client folder${deleted===1?' was':'s were'} permanently deleted from the computer and synced Dropbox folder.`);
+    }catch(error){setPrivacyCleanupNotice(`Private folder cleanup needs attention: ${(error as Error).message}`);}
   }
 
   async function createLocalJobFolder(booking: Booking) {
@@ -759,6 +784,7 @@ export default function AdminBookingsPage() {
         </div>
         <div className="bookings-count">{loading ? '—' : bookings.length}</div>
       </div>
+      {privacyCleanupNotice&&<div className="notice" style={{marginBottom:12}}>{privacyCleanupNotice}{privacyCleanupNotice.includes('permission is required')&&<button className="btn btn-primary" style={{marginLeft:10}} onClick={()=>processPrivacyCleanup(true)}>Authorize folder and delete now</button>}</div>}
       {/* Status filter chips wrap into two clean rows so later stages remain visible. */}
       <div className="status-filter" style={{ flexWrap: 'wrap', overflowX: 'visible' }} aria-label="Filter bookings by status">
         {STATUS_TABS.map((t) => (
