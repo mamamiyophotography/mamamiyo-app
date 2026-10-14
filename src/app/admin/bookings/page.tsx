@@ -436,19 +436,21 @@ export default function AdminBookingsPage() {
     const key=`${booking.id}:invoice:whatsapp`;startCooldown(key);
     setInvoiceGenerating({id:booking.id,sendEmail:false});setActionError(null);setActionSuccess(null);
     try{
-      const data=await runAction(booking.id,'generate-invoice',{sendEmail:false});
-      if(!data)return;
-      const qrDataUrl=data.payNowPayload?await (await import('qrcode')).default.toDataURL(data.payNowPayload,{margin:1,width:320}):null;
-      const imageDataUrl=await createInvoiceImage(booking,qrDataUrl,data.due);
-      setInvoiceQr({bookingId:booking.id,qrDataUrl,imageDataUrl,due:data.due,emailed:false});
+      const due=Math.max(0,booking.balanceDue+booking.extraLineItems.reduce((sum,item)=>sum+item.amount,0));
       const firstName=booking.clientName.trim().split(/\s+/)[0]||booking.clientName;
       const singaporeToday=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Singapore'}).format(new Date());
       const tomorrow=new Date(`${singaporeToday}T00:00:00+08:00`);tomorrow.setDate(tomorrow.getDate()+1);
       const singaporeTomorrow=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Singapore'}).format(tomorrow);
       const shootWhen=booking.date===singaporeTomorrow?"tomorrow's photoshoot":`your photoshoot on ${fmtDatePretty(booking.date)}`;
-      const message=`Hi ${firstName}, thank you. The balance payment for ${shootWhen} is $${data.due}. Please find the invoice and payment details below.\n\nBooking reference: ${booking.ref}\n\nThank you!`;
-      const sent=await runAction(booking.id,'send-invoice-whatsapp',{imageDataUrl,caption:message});
-      if(sent)setActionSuccess({id:booking.id,message:`Invoice image and WhatsApp message sent to ${booking.clientPhone}.`});
+      const message=`Hi ${firstName}, thank you. The balance payment for ${shootWhen} is $${due}. Please find the invoice and payment details below.\n\nBooking reference: ${booking.ref}\n\nThank you!`;
+      try{await navigator.clipboard.writeText(message);}catch{const textarea=document.createElement('textarea');textarea.value=message;textarea.style.position='fixed';textarea.style.left='0';textarea.style.top='0';document.body.append(textarea);textarea.focus();textarea.select();const copied=document.execCommand('copy');textarea.remove();if(!copied)throw new Error('Your browser did not allow copying. Please allow clipboard access and try again.');}
+      const data=await runAction(booking.id,'generate-invoice',{sendEmail:false});
+      if(!data)return;
+      const qrDataUrl=data.payNowPayload?await (await import('qrcode')).default.toDataURL(data.payNowPayload,{margin:1,width:320}):null;
+      const imageDataUrl=await createInvoiceImage(booking,qrDataUrl,data.due);
+      setInvoiceQr({bookingId:booking.id,qrDataUrl,imageDataUrl,due:data.due,emailed:false});
+      const link=document.createElement('a');link.href=imageDataUrl;link.download=`Mamamiyo-Invoice-${booking.ref}.png`;document.body.append(link);link.click();link.remove();
+      setActionSuccess({id:booking.id,message:'WhatsApp message copied and invoice image downloaded. Open the customer chat, paste the message, then attach the downloaded invoice image.'});
     }catch(error){setActionError({id:booking.id,message:`Could not prepare the WhatsApp invoice: ${(error as Error).message}`});}
     finally{setInvoiceGenerating(null);}
   }
@@ -663,7 +665,7 @@ export default function AdminBookingsPage() {
                       <button className="btn btn-ghost" disabled={isBusy || invoiceGenerating?.id === b.id || cooldownSeconds(`${b.id}:invoice:whatsapp`)>0} onClick={() => shareInvoiceWhatsApp(b)} aria-live="polite">
                         {invoiceGenerating?.id === b.id && !invoiceGenerating.sendEmail
                           ? <span className="invoice-generating">Preparing WhatsApp <span className="loading-dots" aria-label="Please wait"><i></i><i></i><i></i></span></span>
-                          : cooldownSeconds(`${b.id}:invoice:whatsapp`)>0?`WhatsApp sent · wait ${cooldownSeconds(`${b.id}:invoice:whatsapp`)}s`:'Send invoice by WhatsApp'}
+                          : cooldownSeconds(`${b.id}:invoice:whatsapp`)>0?`Prepared · wait ${cooldownSeconds(`${b.id}:invoice:whatsapp`)}s`:'Send invoice by WhatsApp'}
                       </button>
                       <button className="btn btn-primary final-bill-confirm" disabled={isBusy||cooldownSeconds(`${b.id}:balance:confirmation`)>0} onClick={() => {
                         if (confirm('Confirm that the balance payment has been received? A payment receipt will be emailed to the client.')) {
