@@ -432,6 +432,25 @@ export default function AdminBookingsPage() {
     }
   }
 
+  async function shareInvoiceWhatsApp(booking: Booking) {
+    const key=`${booking.id}:invoice:whatsapp`;startCooldown(key);
+    setInvoiceGenerating({id:booking.id,sendEmail:false});setActionError(null);setActionSuccess(null);
+    try{
+      const data=await runAction(booking.id,'generate-invoice',{sendEmail:false});
+      if(!data)return;
+      const qrDataUrl=data.payNowPayload?await (await import('qrcode')).default.toDataURL(data.payNowPayload,{margin:1,width:320}):null;
+      const imageDataUrl=await createInvoiceImage(booking,qrDataUrl,data.due);
+      setInvoiceQr({bookingId:booking.id,qrDataUrl,imageDataUrl,due:data.due,emailed:false});
+      const link=document.createElement('a');link.href=imageDataUrl;link.download=`Mamamiyo-Invoice-${booking.ref}.png`;document.body.append(link);link.click();link.remove();
+      const firstName=booking.clientName.trim().split(/\s+/)[0]||booking.clientName;
+      const message=`Hi ${firstName}, here is your Mamamiyo Photography invoice for $${data.due}. Please refer to the attached invoice image for the payment details.\n\nBooking reference: ${booking.ref}\n\nThank you!`;
+      try{await navigator.clipboard.writeText(message);}catch{const textarea=document.createElement('textarea');textarea.value=message;textarea.setAttribute('readonly','');textarea.style.position='fixed';textarea.style.opacity='0';document.body.append(textarea);textarea.select();document.execCommand('copy');textarea.remove();}
+      setActionSuccess({id:booking.id,message:'The invoice image was saved and the WhatsApp message is ready. Attach the saved invoice image before sending.'});
+      const phone=booking.clientPhone.replace(/\D/g,'');window.location.href=`https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    }catch(error){setActionError({id:booking.id,message:`Could not prepare the WhatsApp invoice: ${(error as Error).message}`});}
+    finally{setInvoiceGenerating(null);}
+  }
+
   function renderBookingCard(b: Booking) {
         const isOpen = expandedId === b.id;
         const isBusy = busyId === b.id;
@@ -639,10 +658,10 @@ export default function AdminBookingsPage() {
                       <button className="btn btn-primary" disabled={isBusy || invoiceGenerating?.id === b.id || cooldownSeconds(`${b.id}:invoice:email`)>0} onClick={() => generateInvoice(b, true)}>
                         {cooldownSeconds(`${b.id}:invoice:email`)>0?`Email sent · wait ${cooldownSeconds(`${b.id}:invoice:email`)}s`:'Send invoice by email'}
                       </button>
-                      <button className="btn btn-ghost" disabled={isBusy || invoiceGenerating?.id === b.id} onClick={() => generateInvoice(b, false)} aria-live="polite">
+                      <button className="btn btn-ghost" disabled={isBusy || invoiceGenerating?.id === b.id || cooldownSeconds(`${b.id}:invoice:whatsapp`)>0} onClick={() => shareInvoiceWhatsApp(b)} aria-live="polite">
                         {invoiceGenerating?.id === b.id && !invoiceGenerating.sendEmail
-                          ? <span className="invoice-generating">Creating image <span className="loading-dots" aria-label="Please wait"><i></i><i></i><i></i></span></span>
-                          : 'Create image for WhatsApp'}
+                          ? <span className="invoice-generating">Preparing WhatsApp <span className="loading-dots" aria-label="Please wait"><i></i><i></i><i></i></span></span>
+                          : cooldownSeconds(`${b.id}:invoice:whatsapp`)>0?`WhatsApp opened · wait ${cooldownSeconds(`${b.id}:invoice:whatsapp`)}s`:'Send invoice by WhatsApp'}
                       </button>
                       <button className="btn btn-primary final-bill-confirm" disabled={isBusy||cooldownSeconds(`${b.id}:balance:confirmation`)>0} onClick={() => {
                         if (confirm('Confirm that the balance payment has been received? A payment receipt will be emailed to the client.')) {
