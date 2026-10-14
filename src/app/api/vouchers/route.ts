@@ -7,6 +7,7 @@ import { giftVoucherCode, voucherExpiry, voucherPackage } from '@/lib/giftVouche
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    if(body.termsAccepted!==true)return NextResponse.json({error:'Please read and agree to the Gift Voucher Terms.'},{status:400});
     const purchaserName=String(body.purchaserName||'').trim(), purchaserEmail=String(body.purchaserEmail||'').trim();
     const purchaserPhone=String(body.purchaserPhone||'').trim(), recipientName=String(body.recipientName||'').trim();
     if(!purchaserName||!purchaserEmail||!purchaserPhone||!recipientName) return NextResponse.json({error:'Complete the purchaser and recipient details.'},{status:400});

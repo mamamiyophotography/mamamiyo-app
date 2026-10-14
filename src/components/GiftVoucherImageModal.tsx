@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
+import {VOUCHER_SHORT_TERMS} from '@/lib/voucherTerms';
 
 type Voucher={code:string;recipientName:string;senderName:string;purchaserName:string;message:string;sessionLabel:string;expiresAt:string|null};
 
@@ -22,7 +23,7 @@ export default function GiftVoucherImageModal({voucher,onClose}:{voucher:Voucher
     ctx.fillStyle='#6f6b66';ctx.font='25px Arial';ctx.fillText(`Voucher code: ${voucher.code}`,900,950);
     const expiry=voucher.expiresAt?new Intl.DateTimeFormat('en-SG',{day:'numeric',month:'long',year:'numeric'}).format(new Date(voucher.expiresAt)):'No expiry date';
     ctx.fillText(`Valid until: ${expiry}`,900,990);
-    ctx.font='22px Arial';ctx.fillStyle='#7d7872';ctx.fillText('Non-refundable · Transferable · Advance booking is required',900,1065);
+    ctx.font='20px Arial';ctx.fillStyle='#7d7872';ctx.fillText(VOUCHER_SHORT_TERMS,900,1065);
     ctx.fillText('www.mamamiyo-photography.com · WhatsApp +65 9760 0798',900,1110);
     if(!cancelled)setImage(canvas.toDataURL('image/jpeg',.94));
   }create();return()=>{cancelled=true};},[voucher]);

@@ -105,6 +105,13 @@ a { color: inherit; }
 .voucher-page .field input, .voucher-page .field textarea, .voucher-page .field select { background: #fff; border-color: #c7b394; }
 .voucher-discount-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
 .voucher-discount-success { color: #52684b !important; margin-top: 6px; font-weight: 700; }
+.voucher-terms { text-align: left; color: var(--ink-soft); }
+.voucher-terms summary { cursor: pointer; font-weight: 800; color: var(--ink); }
+.voucher-terms ol { margin: 12px 0 4px; padding-left: 22px; font-size: 12.5px; line-height: 1.55; }
+.voucher-terms li + li { margin-top: 7px; }
+.voucher-short-terms { font-size: 11.5px; color: var(--ink-faint); margin: 12px 0; }
+.voucher-terms-agree { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; font-weight: 700; color: var(--ink); }
+.voucher-terms-agree input { width: 18px; height: 18px; margin-top: 1px; }
 .final-bill-panel { margin-top: 14px; padding: 14px; border-radius: 10px; background: var(--gold-pale); }
 .workflow-panel { margin-top: 14px; padding: 14px; border: 1px solid rgba(80,70,60,.1); border-radius: 12px; }
 .workflow-panel.compact { margin-top: 10px; padding: 12px; }

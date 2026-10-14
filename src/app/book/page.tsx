@@ -9,6 +9,7 @@ import { fmtDatePretty, fmtTime12 } from '@/lib/format';
 import { MonthCalendar, CandidateSlot, startOfMonth, addMonths, fmtDateISO } from '@/components/MonthCalendar';
 import { PHOTO_SHARING_OPTIONS, photoSharingConsentLabel } from '@/lib/photoConsent';
 import { NEWBORN_BOOKING_LOCATIONS, bookingLocationLabel } from '@/lib/location';
+import {VOUCHER_TERMS} from '@/lib/voucherTerms';
 
 type Step = 'package' | 'calendar' | 'information' | 'setup' | 'addons' | 'review' | 'result';
 const BOOKING_STEPS: {id:Exclude<Step,'result'>;label:string}[] = [
@@ -60,6 +61,7 @@ export default function BookPage() {
   const [voucherInput,setVoucherInput]=useState('');
   const [appliedVoucher,setAppliedVoucher]=useState<{code:string;sessionTypeId:string;sessionLabel:string;amount:number;recipientName:string}|null>(null);
   const [voucherError,setVoucherError]=useState<string|null>(null);
+  const [voucherTermsAccepted,setVoucherTermsAccepted]=useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -142,7 +144,7 @@ export default function BookPage() {
     const res=await fetch(`/api/vouchers/${encodeURIComponent(voucherInput.trim().toUpperCase())}`); const data=await res.json();
     if(!res.ok){setVoucherError(data.error||'Voucher not recognised.');return;}
     if(data.sessionTypeId!==sessionTypeId){setVoucherError(`This voucher is for ${data.sessionLabel}.`);return;}
-    setAppliedVoucher(data);setAppliedDiscount(null);setDiscountInput('');
+    setAppliedVoucher(data);setAppliedDiscount(null);setDiscountInput('');setVoucherTermsAccepted(false);
   }
 
   async function handlePhotoUpload(slotIndex: number, files: FileList | null) {
@@ -199,6 +201,7 @@ export default function BookPage() {
   async function submitBooking() {
     if (!sessionType || !selectedSlot) return;
     if (missingFields.length > 0) return; // validation shown inline
+    if(appliedVoucher&&!voucherTermsAccepted){setSubmitError('Please read and agree to the Gift Voucher Terms.');return;}
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -539,9 +542,10 @@ export default function BookPage() {
           <h3 style={{ fontSize: 15 }}>{appliedVoucher?'Review voucher booking':'Review & pay deposit'}</h3>
           <div className="field" style={{maxWidth:420}}>
             <label>Gift voucher — optional</label>
-            <div style={{display:'flex',gap:8}}><input value={voucherInput} onChange={e=>setVoucherInput(e.target.value)} placeholder="GIFT-XXXXXXXX" disabled={!!appliedVoucher} style={{textTransform:'uppercase'}}/>{appliedVoucher?<button type="button" className="btn btn-ghost" onClick={()=>{setAppliedVoucher(null);setVoucherInput('');}}>Remove</button>:<button type="button" className="btn btn-ghost" onClick={applyVoucher}>Apply</button>}</div>
-            {voucherError&&<div className="error-text">{voucherError}</div>}{appliedVoucher&&<div className="notice">Gift voucher applied for {appliedVoucher.recipientName}: −${Math.min(appliedVoucher.amount,pricing.total)}</div>}
+            <div style={{display:'flex',gap:8}}><input value={voucherInput} onChange={e=>setVoucherInput(e.target.value)} placeholder="GIFT-XXXXXXXX" disabled={!!appliedVoucher} style={{textTransform:'uppercase'}}/>{appliedVoucher?<button type="button" className="btn btn-ghost" onClick={()=>{setAppliedVoucher(null);setVoucherInput('');setVoucherTermsAccepted(false);}}>Remove</button>:<button type="button" className="btn btn-ghost" onClick={applyVoucher}>Apply</button>}</div>
+            {voucherError&&<div className="error-text">{voucherError}</div>}{appliedVoucher&&<div className="notice"><b>Gift voucher applied for {appliedVoucher.recipientName}: −${Math.min(appliedVoucher.amount,pricing.total)}</b><div style={{marginTop:6}}>You may keep all selected Setups, family members, pets and products. Charges above the Voucher value are paid separately.</div></div>}
           </div>
+          {appliedVoucher&&<div className="card" style={{marginTop:10}}><details className="voucher-terms"><summary>Gift Voucher Terms</summary><ol>{VOUCHER_TERMS.map(term=><li key={term}>{term}</li>)}</ol></details><label className="voucher-terms-agree" style={{marginTop:12}}><input type="checkbox" checked={voucherTermsAccepted} onChange={event=>setVoucherTermsAccepted(event.target.checked)}/><span>I have read and agree to the Gift Voucher Terms.</span></label></div>}
           <div className="field" style={{ maxWidth: 320 }}>
             <label>Discount code — optional</label>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -602,7 +606,7 @@ export default function BookPage() {
             </>)}
           </div>
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:16}}><button type="button" className="btn btn-ghost" onClick={goBack}>Back</button><button className="btn btn-primary" disabled={submitting} onClick={submitBooking}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:16}}><button type="button" className="btn btn-ghost" onClick={goBack}>Back</button><button className="btn btn-primary" disabled={submitting||Boolean(appliedVoucher&&!voucherTermsAccepted)} onClick={submitBooking}>
             {submitting ? (uploading ? 'Uploading photos…' : 'Creating booking…') : appliedVoucher?'Confirm voucher booking':'Generate payment QR'}
           </button></div>
           {missingFields.length > 0 && (
