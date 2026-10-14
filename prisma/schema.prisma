@@ -109,6 +109,9 @@ model Booking {
   balanceStatus       String    @default("pending")
   balancePaidAt       DateTime?
   furtherRetouchReminderSentAt DateTime?
+  googleCalendarEventId String?
+  googleCalendarEventUrl String?
+  googleCalendarSyncedAt DateTime?
   bundleParentId      String?
   bundle              Bundle?   @relation(fields: [bundleParentId], references: [id])
   bundleSessionNumber Int?

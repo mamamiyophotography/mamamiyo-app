@@ -113,6 +113,13 @@ export default function AdminBookingsPage() {
       });
       const data = await res.json();
       if (!res.ok) { setActionError({ id, message: data.error || 'Action failed' }); return null; }
+      if (path === 'confirm-deposit') {
+        if (data.calendar?.synced) {
+          setActionSuccess({ id, message: 'Booking fee confirmed. Google Calendar event created.' });
+        } else if (data.calendar?.message) {
+          setActionSuccess({ id, message: `Booking fee confirmed. ${data.calendar.message}` });
+        }
+      }
       await load();
       return data;
     } finally {

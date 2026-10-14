@@ -17,6 +17,7 @@ import { bookingAnalytics, confirmWithAnalytics } from '../analytics/server';
 
 import { Db, Settings } from './types';
 import { sessionById, BUNDLE_SESSION_BALANCES, STATUS_ORDER, hasBookedPhysicalProduct } from '../constants';
+import { syncBookingToGoogleCalendar } from '../googleCalendar';
 import { computeAddOnsTotal, computeBookingPricing, currentBalanceDue } from '../pricing';
 import { generateCandidateSlots, CandidateSlot } from '../availability';
 import {
@@ -512,6 +513,10 @@ export async function updateBookingAndNotify(
     }
     return booking;
   });
+
+  if (updated.depositStatus === 'paid' && updated.googleCalendarEventId) {
+    await syncBookingToGoogleCalendar(db, updated);
+  }
 
   const changedFields: string[] = [];
   if (previous.sessionTypeId !== updated.sessionTypeId) changedFields.push('package');
