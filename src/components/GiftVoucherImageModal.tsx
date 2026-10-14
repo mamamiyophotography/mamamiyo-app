@@ -7,14 +7,14 @@ export default function GiftVoucherImageModal({voucher,onClose}:{voucher:Voucher
   const [image,setImage]=useState('');
   useEffect(()=>{let cancelled=false;async function create(){
     const canvas=document.createElement('canvas');canvas.width=1800;canvas.height=1400;const ctx=canvas.getContext('2d');if(!ctx)return;
-    const bg=new Image();bg.src='/voucher/floral-reference.jpg';await new Promise<void>((resolve,reject)=>{bg.onload=()=>resolve();bg.onerror=()=>reject();});
+    const bg=new Image();bg.src='/voucher/floral-background-clean.png';await new Promise<void>((resolve,reject)=>{bg.onload=()=>resolve();bg.onerror=()=>reject();});
     const scale=Math.max(canvas.width/bg.naturalWidth,canvas.height/bg.naturalHeight),w=bg.naturalWidth*scale,h=bg.naturalHeight*scale;
     ctx.drawImage(bg,(canvas.width-w)/2,(canvas.height-h)/2,w,h);
     ctx.fillStyle='rgba(255,255,255,.94)';ctx.beginPath();ctx.roundRect(300,190,1200,1010,42);ctx.fill();
     ctx.strokeStyle='rgba(194,154,124,.42)';ctx.lineWidth=3;ctx.stroke();ctx.textAlign='center';
     ctx.fillStyle='#e7a995';ctx.font='italic 88px Georgia';ctx.fillText('Gift Voucher',900,330);
     ctx.fillStyle='#71856c';ctx.font='700 32px Arial';ctx.fillText('MAMAMIYO PHOTOGRAPHY',900,390);
-    ctx.fillStyle='#b08d57';ctx.font='700 52px Arial';ctx.fillText(voucher.sessionLabel,900,510);
+    ctx.fillStyle='#b08d57';ctx.font='700 48px Arial';ctx.fillText(`Complimentary ${voucher.sessionLabel}`,900,510);
     ctx.fillStyle='#5e766f';ctx.font='42px Arial';ctx.fillText(`Dear ${voucher.recipientName},`,900,610);
     const wrap=(text:string,max:number)=>{const words=text.split(/\s+/);const lines:string[]=[];let line='';for(const word of words){const next=line?`${line} ${word}`:word;if(ctx.measureText(next).width>max&&line){lines.push(line);line=word;}else line=next;}if(line)lines.push(line);return lines;};
     ctx.fillStyle='#d99684';ctx.font='36px Arial';wrap(voucher.message||'Wishing you beautiful memories with the people you love.',960).slice(0,3).forEach((line,i)=>ctx.fillText(line,900,690+i*50));
