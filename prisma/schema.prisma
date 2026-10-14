@@ -135,6 +135,9 @@ model GiftVoucher {
   sessionTypeId  String
   sessionLabel   String
   amount         Int
+  discountCode   String?
+  discountAmount Int       @default(0)
+  paymentAmount  Int?
   paymentStatus  String    @default("pending")
   status         String    @default("pending_payment")
   paidAt         DateTime?

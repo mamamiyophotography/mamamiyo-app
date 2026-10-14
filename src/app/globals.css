@@ -100,6 +100,11 @@ a { color: inherit; }
 .booking-review-card .ticket-row{grid-template-columns:minmax(145px,.42fr) minmax(0,1fr)}
 .ticket-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .ticket-total .amt { font-family: Georgia, serif; font-size: 24px; color: var(--gold-deep); }
+.voucher-page { min-height: 100vh; background: #eadcc7; }
+.voucher-page .card { background: #fffaf2; border-color: #cdbb9f; box-shadow: 0 8px 22px rgba(82,62,38,.12); }
+.voucher-page .field input, .voucher-page .field textarea, .voucher-page .field select { background: #fff; border-color: #c7b394; }
+.voucher-discount-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
+.voucher-discount-success { color: #52684b !important; margin-top: 6px; font-weight: 700; }
 .final-bill-panel { margin-top: 14px; padding: 14px; border-radius: 10px; background: var(--gold-pale); }
 .workflow-panel { margin-top: 14px; padding: 14px; border: 1px solid rgba(80,70,60,.1); border-radius: 12px; }
 .workflow-panel.compact { margin-top: 10px; padding: 12px; }
