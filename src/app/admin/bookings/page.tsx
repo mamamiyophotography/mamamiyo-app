@@ -755,6 +755,7 @@ export default function AdminBookingsPage() {
                   <div className="workflow-current">Current: {statusStyle.label}</div>
                   <div className="workflow-actions">
                     {(b.status === 'pending' || b.status === 'confirmed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Reschedule</button>}
+                    {b.status === 'pending' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => openSummary(b.id)}>WhatsApp confirmation</button>}
                     {b.status === 'pending' && <button className="btn btn-primary" disabled={isBusy||cooldownSeconds(`${b.id}:deposit:confirmation`)>0} onClick={() => {startCooldown(`${b.id}:deposit:confirmation`);runAction(b.id, 'confirm-deposit');}}>{cooldownSeconds(`${b.id}:deposit:confirmation`)>0?`Confirmation sent · wait ${cooldownSeconds(`${b.id}:deposit:confirmation`)}s`:'Confirm deposit received'}</button>}
                     {b.depositStatus === 'paid' && !b.googleCalendarEventId && <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'calendar-sync')}>Add to Google Calendar</button>}
                     {b.status === 'confirmed' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Confirm Photoshoot Done</button>}

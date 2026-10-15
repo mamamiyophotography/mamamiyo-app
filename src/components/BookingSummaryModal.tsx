@@ -414,7 +414,7 @@ export default function BookingSummaryModal({ booking, onClose }: { booking: Sum
       >
         <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Booking Confirmation + Summary + What to Prepare</div>
         {imageDataUrl && <>
-          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 8 }}>Share all three images with the client through WhatsApp after the deposit is confirmed. If your device cannot share them together, use the separate buttons below.</div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 8 }}>Share all three confirmation images with the client through WhatsApp. If your device cannot share them together, use the separate buttons below.</div>
           <img className="invoice-image-preview" src="/mascots/booking-confirmed.png" alt="Thank you for your confirmation" />
           <div style={{ fontWeight: 700, fontSize: 14, margin: '16px 0 8px' }}>Booking Summary</div>
           <img className="invoice-image-preview" src={imageDataUrl} alt={`Booking summary for ${booking.clientName}`} />
