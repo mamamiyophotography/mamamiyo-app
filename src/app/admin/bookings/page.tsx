@@ -117,7 +117,7 @@ export default function AdminBookingsPage() {
         if (data.calendar?.synced) {
           setActionSuccess({ id, message: 'Booking fee confirmed. Google Calendar event created.' });
         } else if (data.calendar?.message) {
-          setActionSuccess({ id, message: `Booking fee confirmed. ${data.calendar.message}` });
+          setActionError({ id, message: `Booking fee confirmed, but Google Calendar was not updated: ${data.calendar.message}` });
         }
       }
       await load();

@@ -51,7 +51,9 @@ function eventBody(booking: CalendarBooking) {
 }
 
 function stableEventId(bookingId: string) {
-  return `mmy${createHash('sha256').update(bookingId).digest('hex').slice(0, 40)}`;
+  // Google Calendar event IDs only accept base32hex characters (a-v and 0-9).
+  // Keep the readable Mamamiyo prefix within that alphabet; "y" is invalid.
+  return `m${createHash('sha256').update(bookingId).digest('hex').slice(0, 40)}`;
 }
 
 export async function syncBookingToGoogleCalendar(db: any, booking: CalendarBooking) {
