@@ -26,6 +26,7 @@ type Booking = {
   extraLineItems: { description: string; amount: number }[]; invoiceRef: string | null;
   invoiceStale: boolean; version: number;
   status: string; depositStatus: string; balanceStatus: string;
+  googleCalendarEventId?: string | null; googleCalendarEventUrl?: string | null; googleCalendarSyncedAt?: string | null;
   referencePhotoUrls: string[]; remindersSent: string[]; bundleSessionNumber: number | null;
   setupSelectionCount?: number; setupSelections?: {slot:number;referencePhotoUrls:string[];note?:string;outfitSource?:'mamamiyo'|'own'|null}[]; inspirationReferencePhotoUrls?:string[];
 };
@@ -755,6 +756,7 @@ export default function AdminBookingsPage() {
                   <div className="workflow-actions">
                     {(b.status === 'pending' || b.status === 'confirmed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Reschedule</button>}
                     {b.status === 'pending' && <button className="btn btn-primary" disabled={isBusy||cooldownSeconds(`${b.id}:deposit:confirmation`)>0} onClick={() => {startCooldown(`${b.id}:deposit:confirmation`);runAction(b.id, 'confirm-deposit');}}>{cooldownSeconds(`${b.id}:deposit:confirmation`)>0?`Confirmation sent · wait ${cooldownSeconds(`${b.id}:deposit:confirmation`)}s`:'Confirm deposit received'}</button>}
+                    {b.depositStatus === 'paid' && !b.googleCalendarEventId && <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'calendar-sync')}>Add to Google Calendar</button>}
                     {b.status === 'confirmed' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Confirm Photoshoot Done</button>}
                     {b.status === 'pending_basic_retouch' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Basic Retouch Done</button>}
                     {b.status === 'order_product' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Ordered · Move to Delivery</button>}
