@@ -38,6 +38,7 @@ function locationLabel(location: string, address: string) {
 function eventBody(booking: CalendarBooking) {
   return {
     summary: `${booking.clientName} — ${booking.sessionLabel}`,
+    colorId: '7', // Peacock blue in Google Calendar.
     location: locationLabel(booking.location, booking.address),
     description: [
       `Booking: ${booking.ref}`, `Client: ${booking.clientName}`, `Phone: ${booking.clientPhone}`,
