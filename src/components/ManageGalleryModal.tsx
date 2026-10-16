@@ -48,6 +48,11 @@ export default function ManageGalleryModal({bookingId,galleryId,addPhotosUrl,onC
       {!data&&!error&&<p>Loading Gallery…</p>}
       {data&&<>
         {!data.canDelete&&<div style={{padding:12,background:'#fff0d8',color:'#74572d',borderRadius:8,marginBottom:14}}>{data.reason} Photos cannot be deleted here.</div>}
+        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:18,paddingBottom:16,borderBottom:'1px solid #ddd3c7'}}>
+          {data.canDelete&&<a href={addPhotosUrl} target="_blank" rel="noopener noreferrer" style={{border:'2px solid #557970',background:'#557970',color:'#fff',borderRadius:9,padding:'11px 16px',fontWeight:700,textDecoration:'none'}}>Add New Photos</a>}
+          <button type="button" disabled={!data.canDelete||!selected.size||busy} onClick={()=>remove(false)} style={{border:'2px solid #b9695a',background:'#fff',color:'#3a2e28',borderRadius:9,padding:'11px 16px',fontWeight:700}}>Delete Selected Photos</button>
+          <button type="button" disabled={!data.canDelete||!data.photos.length||busy} onClick={()=>remove(true)} style={{border:'2px solid #8f3f35',background:'#8f3f35',color:'#fff',borderRadius:9,padding:'11px 16px',fontWeight:700}}>Delete Entire Gallery</button>
+        </div>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:12}}>
           <b>{selectedLabel}</b>
           <button type="button" onClick={toggleAll} disabled={!data.canDelete||busy} style={{border:'1px solid #638a82',background:'#fff',color:'#3a2e28',borderRadius:8,padding:'8px 12px'}}>{allSelected?'Clear selection':'Select all'}</button>
@@ -60,11 +65,6 @@ export default function ManageGalleryModal({bookingId,galleryId,addPhotosUrl,onC
           </label>)}
         </div>
         {!data.photos.length&&<p style={{textAlign:'center',padding:30,color:'#75695f'}}>No photos remain in this Gallery.</p>}
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:18}}>
-          {data.canDelete&&<a href={addPhotosUrl} target="_blank" rel="noopener noreferrer" style={{border:'2px solid #557970',background:'#557970',color:'#fff',borderRadius:9,padding:'11px 16px',fontWeight:700,textDecoration:'none'}}>Add New Photos</a>}
-          <button type="button" disabled={!data.canDelete||!selected.size||busy} onClick={()=>remove(false)} style={{border:'2px solid #b9695a',background:'#fff',color:'#3a2e28',borderRadius:9,padding:'11px 16px',fontWeight:700}}>Delete Selected Photos</button>
-          <button type="button" disabled={!data.canDelete||!data.photos.length||busy} onClick={()=>remove(true)} style={{border:'2px solid #8f3f35',background:'#8f3f35',color:'#fff',borderRadius:9,padding:'11px 16px',fontWeight:700}}>Delete Entire Gallery</button>
-        </div>
       </>}
     </section>
   </div>,document.body)
