@@ -45,6 +45,21 @@ const STATUS_TABS = [
 ];
 
 const STATUS_LABEL = STATUS_LABELS;
+const POST_PROCESSING_ORDER: Record<string, number> = {
+  pending_balance: 3,
+  pending_basic_retouch: 4,
+  basic_retouch: 5,
+  further_retouch: 6,
+  order_product: 7,
+  soft_copy_delivered: 8,
+  completed: 9,
+};
+
+function comparePostProcessingBookings(a: Booking, b: Booking) {
+  const stepDifference = (POST_PROCESSING_ORDER[a.status] ?? 99) - (POST_PROCESSING_ORDER[b.status] ?? 99);
+  if (stepDifference !== 0) return stepDifference;
+  return `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`);
+}
 
 export default function AdminBookingsPage() {
   const [filter, setFilter] = useState('active');
@@ -855,7 +870,7 @@ export default function AdminBookingsPage() {
             <div className="booking-list">
               {[...bookings]
                 .filter((booking) => ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'].includes(booking.status))
-                .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`))
+                .sort(comparePostProcessingBookings)
                 .map(renderBookingCard)}
             </div>
           </section>
