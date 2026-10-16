@@ -509,6 +509,17 @@ export default function AdminBookingsPage() {
         const furtherDone = [Boolean(galleryState?.submitted && galleryState?.locked), Boolean(furtherProgress.pixelcake), Boolean(furtherProgress.photoshop), Boolean(galleryState?.deliveredAt), furtherEmailSent&&furtherWhatsappSent];
         const furtherCompletedCount = furtherDone.filter(Boolean).length;
         const furtherCurrentStep = furtherDone.findIndex(done => !done);
+        const statusControls = <div className="workflow-actions" style={{marginTop:8}}>
+          {(b.status === 'pending' || b.status === 'confirmed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Reschedule</button>}
+          {b.status === 'pending' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => openSummary(b.id)}>WhatsApp confirmation</button>}
+          {b.status === 'pending' && <button className="btn btn-primary" disabled={isBusy||cooldownSeconds(`${b.id}:deposit:confirmation`)>0} onClick={() => {startCooldown(`${b.id}:deposit:confirmation`);runAction(b.id, 'confirm-deposit');}}>{cooldownSeconds(`${b.id}:deposit:confirmation`)>0?`Confirmation sent · wait ${cooldownSeconds(`${b.id}:deposit:confirmation`)}s`:'Confirm deposit received'}</button>}
+          {b.status === 'confirmed' && b.depositStatus === 'paid' && !b.googleCalendarEventId && <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'calendar-sync')}>Add to Google Calendar</button>}
+          {b.status === 'confirmed' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Confirm Photoshoot Done</button>}
+          {b.status === 'pending_basic_retouch' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Basic Retouch Done</button>}
+          {b.status === 'order_product' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Ordered · Move to Delivery</button>}
+          {b.status === 'soft_copy_delivered' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Delivered · Complete Photoshoot</button>}
+          {(b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'further_retouch' || b.status === 'order_product' || b.status === 'soft_copy_delivered' || b.status === 'completed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'revert-stage')}>{b.status === 'completed' ? 'Go back to previous delivery stage' : b.status === 'soft_copy_delivered' ? 'Go back to order product' : b.status === 'order_product' ? 'Go back to further retouch' : b.status === 'further_retouch' ? 'Go back to client selection' : b.status === 'basic_retouch' ? 'Go back to pending basic retouch' : 'Go back to booking confirmed'}</button>}
+        </div>;
 
         return (
           <div key={b.id} className={`booking-card${isOpen ? ' open' : ''}${filter === 'active' ? ((b.status === 'pending' || b.status === 'confirmed') ? ' pre-shoot-card' : ' post-shoot-card') : ''}`}>
@@ -519,7 +530,8 @@ export default function AdminBookingsPage() {
                 <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>
                 <div style={{ fontWeight: 600, fontSize: 12.5, color: '#3A2E28', marginTop: 4, lineHeight: 1.35 }}>{fmtDatePretty(b.date)} · {fmtTime12(b.startTime)}</div>
                 <div style={{marginTop:8}}><span style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 999, background: statusStyle.bg, color: statusStyle.color, whiteSpace: 'nowrap', display:'inline-block' }}>Status · {statusStyle.label}</span></div>
-                {isOpen && b.gallerySelections?.map(g => <div key={g.galleryId} className="workflow-panel workflow-photo compact">
+                {isOpen&&statusControls}
+                {isOpen && b.gallerySelections?.filter(g=>downloadOnlyBundle||Boolean(g.deliveredAt||g.locked||g.submitted)||Boolean(b.downloadFeedback?.some(item=>item.galleryId===g.galleryId))||!g.clientUrl).map(g => <div key={g.galleryId} className="workflow-panel workflow-photo compact">
                   {downloadOnlyBundle ? <span style={{width:'100%'}}>Bundle Session {b.bundleSessionNumber || 1} · Basic Retouch Gallery only</span> : (g.deliveredAt || g.locked || g.submitted) && <span style={{width:'100%'}}>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : 'Client selection received'}</span>}
                   {g.clientUrl ? <div style={{display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,width:'100%',maxWidth:320}}>
                     {b.downloadFeedback?.filter(item=>item.galleryId===g.galleryId).map((item,index)=><div key={`${item.downloadType}-${item.downloadedAt}-${index}`} style={{padding:'7px 9px',borderRadius:7,background:'#e5f0e9',color:'#3f6557',fontSize:12,fontWeight:700}}>Downloaded: {item.downloadType === 'basic' ? 'Basic Retouch' : item.downloadType === 'further' ? 'Further Retouch' : 'All photos'} · {new Intl.DateTimeFormat('en-SG',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Singapore'}).format(new Date(item.downloadedAt))}</div>)}
@@ -749,23 +761,6 @@ export default function AdminBookingsPage() {
                     </div>
                   </>}
                 </details>
-
-                {/* Status controls */}
-                <section className="workflow-panel workflow-status">
-                  <div className="workflow-panel-title">Status</div>
-                  <div className="workflow-current">Current: {statusStyle.label}</div>
-                  <div className="workflow-actions">
-                    {(b.status === 'pending' || b.status === 'confirmed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => openEditBooking(b.id)}>Reschedule</button>}
-                    {b.status === 'pending' && <button className="btn btn-ghost" disabled={isBusy} onClick={() => openSummary(b.id)}>WhatsApp confirmation</button>}
-                    {b.status === 'pending' && <button className="btn btn-primary" disabled={isBusy||cooldownSeconds(`${b.id}:deposit:confirmation`)>0} onClick={() => {startCooldown(`${b.id}:deposit:confirmation`);runAction(b.id, 'confirm-deposit');}}>{cooldownSeconds(`${b.id}:deposit:confirmation`)>0?`Confirmation sent · wait ${cooldownSeconds(`${b.id}:deposit:confirmation`)}s`:'Confirm deposit received'}</button>}
-                    {b.status === 'confirmed' && b.depositStatus === 'paid' && !b.googleCalendarEventId && <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'calendar-sync')}>Add to Google Calendar</button>}
-                    {b.status === 'confirmed' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'mark-completed')}>Confirm Photoshoot Done</button>}
-                    {b.status === 'pending_basic_retouch' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Basic Retouch Done</button>}
-                    {b.status === 'order_product' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Ordered · Move to Delivery</button>}
-                    {b.status === 'soft_copy_delivered' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Delivered · Complete Photoshoot</button>}
-                    {(b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'further_retouch' || b.status === 'order_product' || b.status === 'soft_copy_delivered' || b.status === 'completed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'revert-stage')}>{b.status === 'completed' ? 'Go back to previous delivery stage' : b.status === 'soft_copy_delivered' ? 'Go back to order product' : b.status === 'order_product' ? 'Go back to further retouch' : b.status === 'further_retouch' ? 'Go back to client selection' : b.status === 'basic_retouch' ? 'Go back to pending basic retouch' : 'Go back to booking confirmed'}</button>}
-                  </div>
-                </section>
 
                 <details className="workflow-more">
                   <summary>More options</summary>
