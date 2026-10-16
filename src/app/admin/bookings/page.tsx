@@ -144,7 +144,7 @@ export default function AdminBookingsPage() {
     const rows: { label: string; amount: string }[] = [];
     const addOnsTotal = Object.entries(booking.addOns || {}).filter(([, q]) => q > 0).reduce((sum, [id, q]) => sum + (ADDONS[id]?.price || 0) * q, 0);
     const weekendFee = booking.isWeekend ? 50 : 0;
-    const basePrice = booking.total - addOnsTotal - weekendFee + booking.discountAmount;
+    const basePrice = booking.total - addOnsTotal - weekendFee + booking.discountAmount + (booking.voucherAmount || 0);
     rows.push({ label: booking.sessionTypeId === 'bundle' ? `Session ${booking.bundleSessionNumber || 1} balance` : 'Package price', amount: `$${basePrice}` });
     Object.entries(booking.addOns || {}).filter(([, q]) => q > 0).forEach(([id, q]) => rows.push({ label: `${ADDONS[id]?.name || id} ×${q}`, amount: `+$${(ADDONS[id]?.price || 0) * q}` }));
     if (weekendFee) rows.push({ label: 'Weekend / PH surcharge', amount: `+$${weekendFee}` });
@@ -591,10 +591,32 @@ export default function AdminBookingsPage() {
                   </div>
                 </details>
 
-                {(!isPostProcessing || b.balanceStatus !== 'pending') && <section className="workflow-panel workflow-billing">
-                  <div className="workflow-panel-title">Billing</div>
-                  <div className="workflow-current">{b.balanceStatus === 'paid' ? 'Balance paid ✓' : b.status === 'pending' ? `Deposit pending · $${b.depositAmount}` : b.balanceStatus === 'n/a' ? 'No balance due' : `Balance: $${b.balanceDue}`}</div>
-                </section>}
+                {(!isPostProcessing || b.balanceStatus !== 'pending') && (() => {
+                  const addOnsRecord = (b.addOns || {}) as Record<string, number>;
+                  const addOnsTotal = Object.entries(addOnsRecord).filter(([, q]) => q > 0).reduce((sum, [id, q]) => sum + (ADDONS[id]?.price || 0) * q, 0);
+                  const weekendFee = b.isWeekend ? 50 : 0;
+                  const isBundle = b.sessionTypeId === 'bundle';
+                  const basePrice = b.total - addOnsTotal - weekendFee + b.discountAmount + (b.voucherAmount || 0);
+                  const extraTotal = b.extraLineItems.reduce((sum, item) => sum + item.amount, 0);
+                  const balanceDue = Math.max(0, b.balanceDue + extraTotal);
+                  return <details className="workflow-panel workflow-billing">
+                    <summary className="workflow-panel-title" style={{ cursor: 'pointer' }}>Billing</summary>
+                    <div className="workflow-current">{b.balanceStatus === 'paid' ? 'Balance paid ✓' : b.status === 'pending' ? `Deposit pending · $${b.depositAmount}` : b.balanceStatus === 'n/a' ? 'No balance due' : `Balance: $${balanceDue}`}</div>
+                    <div className="ticket-row"><span>{isBundle ? `Session ${b.bundleSessionNumber || 1} price` : 'Package price'}</span><b>${basePrice}</b></div>
+                    {Object.entries(addOnsRecord).filter(([, q]) => q > 0).map(([id, q]) => (
+                      <div className="ticket-row" key={id}><span>{ADDONS[id]?.name || id} ×{q}</span><b>+${(ADDONS[id]?.price || 0) * q}</b></div>
+                    ))}
+                    {weekendFee > 0 && <div className="ticket-row"><span>Weekend / PH surcharge</span><b>+${weekendFee}</b></div>}
+                    {b.discountAmount > 0 && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Discount{b.discountCode ? ` (${b.discountCode})` : ''}</span><b>−${b.discountAmount}</b></div>}
+                    {!!b.voucherAmount && <div className="ticket-row" style={{ color: 'var(--sage)' }}><span>Gift voucher{b.voucherCode ? ` (${b.voucherCode})` : ''}</span><b>−${b.voucherAmount}</b></div>}
+                    {b.extraLineItems.map((item, index) => <div className="ticket-row" key={`${item.description}-${index}`}><span>{item.description}</span><b>{item.amount < 0 ? '−' : '+'}${Math.abs(item.amount)}</b></div>)}
+                    <div style={{ borderTop: '1.5px solid var(--ink)', margin: '8px 0 6px', paddingTop: 6 }}>
+                      <div className="ticket-row"><span>Total</span><b>${b.total + extraTotal}</b></div>
+                      {!isBundle && b.depositAmount > 0 && <div className="ticket-row"><span>{b.depositStatus === 'paid' ? 'Deposit paid' : 'Deposit required'}</span><b>{b.depositStatus === 'paid' ? '−' : ''}${b.depositAmount}</b></div>}
+                      <div className="ticket-total" style={{ marginTop: 6 }}><span style={{ fontWeight: 700 }}>Balance due</span><span className="amt">${balanceDue}</span></div>
+                    </div>
+                  </details>;
+                })()}
 
                 {/* Final bill panel */}
                 {isPostProcessing && b.balanceStatus === 'pending' && (() => {
@@ -602,15 +624,15 @@ export default function AdminBookingsPage() {
                   const addOnsTotal = Object.entries(addOnsRecord).filter(([,q]) => q > 0).reduce((s, [id, q]) => s + (ADDONS[id]?.price || 0) * q, 0);
                   const weekendFee = b.isWeekend ? 50 : 0;
                   const isBundle = b.sessionTypeId === 'bundle';
-                  const basePrice = b.total - addOnsTotal - weekendFee + b.discountAmount;
+                  const basePrice = b.total - addOnsTotal - weekendFee + b.discountAmount + (b.voucherAmount || 0);
                   const baseLabel = isBundle
                     ? `Session ${b.bundleSessionNumber || 1} balance`
                     : 'Package price';
                   const extraTotal = b.extraLineItems.reduce((s, i) => s + i.amount, 0);
                   const totalDue = Math.max(0, b.balanceDue + extraTotal);
                   return (
-                  <div className="final-bill-panel">
-                    <div className="workflow-panel-title">Billing · Final bill</div>
+                  <details className="final-bill-panel">
+                    <summary className="workflow-panel-title" style={{ cursor: 'pointer' }}>Billing · Final bill</summary>
                     {b.invoiceStale && <div className="notice" style={{ marginBottom: 10 }}>Add-ons changed after invoice {b.invoiceRef}. Please generate and send a new invoice.</div>}
 
                     {/* Full breakdown */}
@@ -729,7 +751,7 @@ export default function AdminBookingsPage() {
                         {invoiceQr.qrDataUrl && <a className="btn btn-ghost" href={invoiceQr.qrDataUrl} download={`Mamamiyo-PayNow-QR-${b.ref}.png`}>Download QR code only</a>}
                       </div>
                     </div>}
-                  </div>
+                  </details>
                   );
                 })()}
 
