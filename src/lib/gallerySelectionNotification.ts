@@ -33,7 +33,7 @@ export async function notifyGallerySelection(
       text: body,
       html,
       attachments: [{filename:`${booking.ref}-retouch-notes.html`,content:Buffer.from(html).toString('base64')}],
-    }, {idempotencyKey:`gallery-${entry.galleryId}-${eventKey}`});
+    }, {idempotencyKey:`gallery-owner-selection-${entry.galleryId}-${eventKey}`});
     if (result.error) throw new Error(`Selection email failed: ${result.error.message}`);
     await db.galleryInbox.update({where:{galleryId:entry.galleryId},data:{emailKey:eventKey,emailSentAt:new Date()}});
     emailSent = true;
