@@ -518,6 +518,7 @@ export default function AdminBookingsPage() {
                 <div style={{ fontFamily: "'Quicksand', sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: '#3A2E28' }}>{b.clientName}</div>
                 <div style={{ fontSize: 13, color: '#9A8C7F', marginTop: 4, lineHeight: 1.35 }}>{b.sessionLabel}</div>
                 <div style={{ fontWeight: 600, fontSize: 12.5, color: '#3A2E28', marginTop: 4, lineHeight: 1.35 }}>{fmtDatePretty(b.date)} · {fmtTime12(b.startTime)}</div>
+                <div style={{marginTop:8}}><span style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 999, background: statusStyle.bg, color: statusStyle.color, whiteSpace: 'nowrap', display:'inline-block' }}>Status · {statusStyle.label}</span></div>
                 {isOpen && b.gallerySelections?.map(g => <div key={g.galleryId} className="workflow-panel workflow-photo compact">
                   {downloadOnlyBundle ? <span style={{width:'100%'}}>Bundle Session {b.bundleSessionNumber || 1} · Basic Retouch Gallery only</span> : (g.deliveredAt || g.locked || g.submitted) && <span style={{width:'100%'}}>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : 'Client selection received'}</span>}
                   {g.clientUrl ? <div style={{display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,width:'100%',maxWidth:320}}>
@@ -527,9 +528,6 @@ export default function AdminBookingsPage() {
                 {isOpen && b.additionalOrders?.map(order=><div key={order.id} style={{marginTop:8,padding:'10px 12px',background:order.status==='paid'?'#e4eadf':'#fff0d8',borderRadius:7,fontSize:13}}><div style={{display:'flex',justifyContent:'space-between',gap:8,fontWeight:700}}><span>Additional Order · {order.status==='paid'?'Paid':'Payment pending'}</span><span>${order.total}</span></div><div style={{marginTop:5,color:'#6f6258'}}>{order.items.map(item=>`${item.name} ×${item.quantity}`).join(' · ')}</div><div style={{marginTop:4}}>Ref: {order.invoiceRef} · +{order.bonusRetouches} complimentary retouch{order.bonusRetouches===1?'':'es'}</div>{order.status!=='paid'&&<button className="btn btn-sm" style={{marginTop:8}} disabled={busyId===b.id} onClick={()=>runAction(b.id,'confirm-additional-order',{orderId:order.id})}>Payment received</button>}</div>)}
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, minWidth: 92 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 999, background: statusStyle.bg, color: statusStyle.color, whiteSpace: 'nowrap' }}>
-                  {statusStyle.label}
-                </span>
                 {isPostProcessing && b.balanceStatus !== 'n/a' && (
                   <span style={{ fontSize: 10.5, fontWeight: 700, padding: '4px 9px', borderRadius: 999, background: b.balanceStatus === 'paid' ? '#E4E9DD' : '#F4E4C1', color: b.balanceStatus === 'paid' ? '#4B5940' : '#7A5F2F', whiteSpace: 'nowrap' }}>
                     {b.balanceStatus !== 'paid' ? 'Balance pending' : 'Balance paid'}
@@ -546,6 +544,9 @@ export default function AdminBookingsPage() {
               <div className="booking-detail">
                 {actionError?.id === b.id && <div className="notice warn" style={{ marginTop: 0, marginBottom: 12 }}>{actionError.message}</div>}
 
+                <details className="workflow-more" style={{marginBottom:12}}>
+                  <summary>Booking Details</summary>
+                  <div style={{paddingTop:10}}>
                 <div className="ticket-row"><span>Reference</span><b style={{ fontFamily: 'monospace' }}>{b.ref}</b></div>
                 <div className="ticket-row"><span>Location</span><b>{bookingLocationLabel(b.location)}</b></div>
                 <div className="ticket-row"><span>Email</span><b>{b.clientEmail}</b></div>
@@ -575,6 +576,8 @@ export default function AdminBookingsPage() {
                 {b.status === 'confirmed' && (
                   <div style={{ marginTop: 8, fontSize: 12 }}>Reminders sent: {b.remindersSent?.length ? b.remindersSent.join(', ') : 'none yet'}</div>
                 )}
+                  </div>
+                </details>
 
                 {(!isPostProcessing || b.balanceStatus !== 'pending') && <section className="workflow-panel workflow-billing">
                   <div className="workflow-panel-title">Billing</div>
@@ -720,8 +723,8 @@ export default function AdminBookingsPage() {
 
 
                 {/* Photo processing */}
-                <section className="workflow-panel workflow-photo">
-                  <div className="workflow-panel-title">Photo Processing</div>
+                <details className="workflow-panel workflow-photo" open={['pending_basic_retouch','basic_retouch'].includes(b.status)}>
+                  <summary className="workflow-panel-title" style={{cursor:'pointer'}}>Photo Processing</summary>
                   {(b.status === 'pending'||b.status === 'confirmed') && <div className="workflow-actions"><button className="btn btn-ghost" onClick={() => openPhotographerPreparation(b.id)}>摄影师准备清单</button>{b.status === 'confirmed'&&<button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>}</div>}
                   {['pending_balance','pending_basic_retouch','basic_retouch'].includes(b.status) && <>
                     <div className="retouch-progress-summary">Basic Retouch · {retouchCompletedCount} of 7 completed</div>
@@ -745,7 +748,7 @@ export default function AdminBookingsPage() {
                       <div className={`retouch-step${furtherDone[4]?' complete':''}${furtherCurrentStep===4?' current':''}`}><span className="retouch-step-number">{furtherDone[4]?'✓':'5'}</span><div><b>Notify client</b><p>Send the completed Gallery by Email and WhatsApp separately.</p>{furtherDone[3]&&!furtherDone[4]&&<div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy||furtherEmailSent||cooldownSeconds(`${b.id}:further:email`)>0} onClick={()=>notifyRetouchReady(b,'further','email')}>{furtherEmailSent?'Email sent ✓':cooldownSeconds(`${b.id}:further:email`)>0?`Wait ${cooldownSeconds(`${b.id}:further:email`)}s`:'Send Email'}</button><button className="btn btn-ghost" disabled={isBusy||furtherWhatsappSent||cooldownSeconds(`${b.id}:further:whatsapp`)>0} onClick={()=>shareRetouchWhatsApp(b,galleryState!.clientUrl!,'further')}>{furtherWhatsappSent?'WhatsApp shared ✓':cooldownSeconds(`${b.id}:further:whatsapp`)>0?`Wait ${cooldownSeconds(`${b.id}:further:whatsapp`)}s`:'Share WhatsApp Image + Gallery Link'}</button></div>}</div></div>
                     </div>
                   </>}
-                </section>
+                </details>
 
                 {/* Status controls */}
                 <section className="workflow-panel workflow-status">
