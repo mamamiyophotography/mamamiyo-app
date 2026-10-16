@@ -7,6 +7,7 @@ import QRCode from 'qrcode';
 import { brandedFromAddress } from '@/lib/email';
 import { socialMediaUploadReminder } from '@/lib/notifications';
 import { sendWhatsApp } from '@/lib/whatsapp';
+import { notifyGallerySelection } from '@/lib/gallerySelectionNotification';
 
 const prisma = new PrismaClient();
 function authorized(req: NextRequest) {
@@ -180,6 +181,15 @@ export async function POST(req: NextRequest) {
     bundleRetention = {galleryIds:bundleGalleries.map(item=>item.galleryId),expiresAt};
   }
   if (!entry.submitted) return NextResponse.json({ok:true,bundleRetention});
+  const adminUrl = `${req.nextUrl.origin}/admin/bookings`;
+  if (!entry.deliveredAt) {
+    try {
+      const notification = await notifyGallerySelection(prisma, booking, entry, adminUrl);
+      return NextResponse.json({ok:true,bundleRetention,notification});
+    } catch (error) {
+      return NextResponse.json({error:(error as Error).message,selectionSaved:true}, {status:503});
+    }
+  }
   // A lock-only change does not create another selection email.
   const fingerprint = JSON.stringify({items:entry.items, deliveredAt:entry.deliveredAt});
   const {createHash} = await import('node:crypto');
@@ -191,7 +201,6 @@ export async function POST(req: NextRequest) {
   const items = entry.items as {filename:string;note:string}[];
   const heading = entry.deliveredAt ? 'Further retouch is finished' : 'Client selection submitted';
   const lines = items.map(i => `${i.filename}: ${i.note || 'No special requests'}`).join('\n');
-  const adminUrl = `${req.nextUrl.origin}/admin/bookings`;
   const body = `${heading}\n${booking.clientName} · ${booking.ref}\nSelection version ${entry.version} · ${items.length} photos\n\n${lines}\n\nView booking and selection: ${adminUrl}`;
   const html = `<!doctype html><meta charset="utf-8"><h1>${escape(heading)}</h1><p>${escape(booking.clientName)} · ${escape(booking.ref)}</p><p>Version ${entry.version} · ${items.length} photos</p><table><tr><th>Photo</th><th>Retouch notes</th></tr>${items.map(i=>`<tr><td>${escape(i.filename)}</td><td style="white-space:pre-wrap">${escape(i.note || 'No special requests')}</td></tr>`).join('')}</table><p><a href="${escape(adminUrl)}">View booking and selection</a></p>`;
   const result = await new Resend(process.env.RESEND_API_KEY).emails.send({from:brandedFromAddress(process.env.RESEND_FROM_EMAIL),

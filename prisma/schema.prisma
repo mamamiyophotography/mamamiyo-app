@@ -193,6 +193,8 @@ model GalleryInbox {
   createdAt DateTime @default(now())
   emailKey String?
   emailSentAt DateTime?
+  whatsappKey String?
+  whatsappSentAt DateTime?
   updatedAt DateTime @updatedAt
   @@index([bookingId])
 }
