@@ -6,7 +6,7 @@ import {createPortal} from 'react-dom';
 type Photo={id:string;filename:string;code:string};
 type GalleryData={title:string;photos:Photo[];canDelete:boolean;reason:string};
 
-export default function ManageGalleryModal({bookingId,galleryId,onClose,onChanged}:{bookingId:string;galleryId:string;onClose:()=>void;onChanged:()=>Promise<void>}){
+export default function ManageGalleryModal({bookingId,galleryId,addPhotosUrl,onClose,onChanged}:{bookingId:string;galleryId:string;addPhotosUrl:string;onClose:()=>void;onChanged:()=>Promise<void>}){
   const [data,setData]=useState<GalleryData|null>(null);
   const [selected,setSelected]=useState<Set<string>>(new Set());
   const [error,setError]=useState('');
@@ -41,7 +41,7 @@ export default function ManageGalleryModal({bookingId,galleryId,onClose,onChange
   return createPortal(<div onClick={onClose} style={{position:'fixed',inset:0,zIndex:10000,background:'rgba(46,42,34,.55)',display:'grid',placeItems:'center',padding:16}}>
     <section onClick={e=>e.stopPropagation()} style={{background:'#fbf8f2',width:'min(760px,100%)',maxHeight:'90vh',overflow:'auto',borderRadius:18,padding:20,boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:16,alignItems:'start'}}>
-        <div><h2 style={{margin:0,color:'#3a2e28'}}>Manage Gallery</h2><p style={{margin:'6px 0 16px',color:'#75695f'}}>Delete individual photos, or remove the full Gallery and create it again.</p></div>
+        <div><h2 style={{margin:0,color:'#3a2e28'}}>Manage Gallery</h2><p style={{margin:'6px 0 16px',color:'#75695f'}}>Add new photos, delete individual photos, or remove the full Gallery and create it again.</p></div>
         <button type="button" onClick={onClose} style={{border:'1px solid #cfc5b8',background:'#fff',borderRadius:999,width:36,height:36,fontSize:22}}>×</button>
       </div>
       {error&&<div style={{padding:10,background:'#f8dfd9',color:'#8b3f35',borderRadius:8,marginBottom:12}}>{error}</div>}
@@ -61,6 +61,7 @@ export default function ManageGalleryModal({bookingId,galleryId,onClose,onChange
         </div>
         {!data.photos.length&&<p style={{textAlign:'center',padding:30,color:'#75695f'}}>No photos remain in this Gallery.</p>}
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:18}}>
+          {data.canDelete&&<a href={addPhotosUrl} target="_blank" rel="noopener noreferrer" style={{border:'2px solid #557970',background:'#557970',color:'#fff',borderRadius:9,padding:'11px 16px',fontWeight:700,textDecoration:'none'}}>Add New Photos</a>}
           <button type="button" disabled={!data.canDelete||!selected.size||busy} onClick={()=>remove(false)} style={{border:'2px solid #b9695a',background:'#fff',color:'#3a2e28',borderRadius:9,padding:'11px 16px',fontWeight:700}}>Delete Selected Photos</button>
           <button type="button" disabled={!data.canDelete||!data.photos.length||busy} onClick={()=>remove(true)} style={{border:'2px solid #8f3f35',background:'#8f3f35',color:'#fff',borderRadius:9,padding:'11px 16px',fontWeight:700}}>Delete Entire Gallery</button>
         </div>

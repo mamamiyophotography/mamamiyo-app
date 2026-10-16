@@ -64,7 +64,7 @@ export default function AdminBookingsPage() {
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
   const [actionSuccess, setActionSuccess] = useState<{ id: string; message: string } | null>(null);
   const [invoiceGenerating, setInvoiceGenerating] = useState<{ id: string; sendEmail: boolean } | null>(null);
-  const [manageGallery,setManageGallery]=useState<{bookingId:string;galleryId:string}|null>(null);
+  const [manageGallery,setManageGallery]=useState<{bookingId:string;galleryId:string;addPhotosUrl:string}|null>(null);
   const [sendCooldowns,setSendCooldowns]=useState<Record<string,number>>({});
   const [clock,setClock]=useState(Date.now());
   const [privacyCleanupNotice,setPrivacyCleanupNotice]=useState('');
@@ -441,7 +441,7 @@ export default function AdminBookingsPage() {
     }catch(error){setActionError({id:booking.id,message:(error as Error).message||'Could not prepare the WhatsApp message.'});}
   }
 
-  function photoSelectGalleryActionUrl(booking: Booking, galleryId: string, action: 'update-basic'|'unlock-selection'|'upload-further') {
+  function photoSelectGalleryActionUrl(booking: Booking, galleryId: string, action: 'add-basic'|'update-basic'|'unlock-selection'|'upload-further') {
     const params = new URLSearchParams({ action, gallery: galleryId, booking: booking.ref });
     return `http://127.0.0.1:8766/restart?${params.toString()}`;
   }
@@ -522,7 +522,7 @@ export default function AdminBookingsPage() {
                   {downloadOnlyBundle ? <span style={{width:'100%'}}>Bundle Session {b.bundleSessionNumber || 1} · Basic Retouch Gallery only</span> : (g.deliveredAt || g.locked || g.submitted) && <span style={{width:'100%'}}>{g.deliveredAt ? 'Further retouch finished' : g.locked ? 'Selection confirmed' : 'Client selection received'}</span>}
                   {g.clientUrl ? <div style={{display:'flex',flexDirection:'column',alignItems:'stretch',gap:8,width:'100%',maxWidth:320}}>
                     {b.downloadFeedback?.filter(item=>item.galleryId===g.galleryId).map((item,index)=><div key={`${item.downloadType}-${item.downloadedAt}-${index}`} style={{padding:'7px 9px',borderRadius:7,background:'#e5f0e9',color:'#3f6557',fontSize:12,fontWeight:700}}>Downloaded: {item.downloadType === 'basic' ? 'Basic Retouch' : item.downloadType === 'further' ? 'Further Retouch' : 'All photos'} · {new Intl.DateTimeFormat('en-SG',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Singapore'}).format(new Date(item.downloadedAt))}</div>)}
-                    {!(g.submitted||g.locked||g.deliveredAt) && <button type="button" onClick={()=>setManageGallery({bookingId:b.id,galleryId:g.galleryId})} style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Manage Gallery</button>}
+                    {!(g.submitted||g.locked||g.deliveredAt) && <button type="button" onClick={()=>setManageGallery({bookingId:b.id,galleryId:g.galleryId,addPhotosUrl:photoSelectGalleryActionUrl(b,g.galleryId,'add-basic')})} style={{border:'1px solid #557970',background:'#fff',padding:'7px 10px',borderRadius:6,color:'#354c47',fontWeight:700,cursor:'pointer',textAlign:'left'}}>Manage Gallery</button>}
                     <a href={`/g/${g.galleryId.slice(0,12)}`} target="_blank" rel="noopener noreferrer" style={{border:'1px solid #7d918b',background:'#f8fbfa',padding:'7px 10px',borderRadius:6,color:'#415e58',fontWeight:700,textDecoration:'none',textAlign:'left'}}>Open Client Gallery</a>
                     {(downloadOnlyBundle||g.submitted||g.locked||g.deliveredAt)&&<details className="workflow-more compact"><summary>More Gallery options</summary><div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,g.galleryId,'update-basic')} target="_blank" rel="noopener noreferrer">Update Basic Retouch</a>{!downloadOnlyBundle&&g.submitted&&<a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,g.galleryId,'unlock-selection')} target="_blank" rel="noopener noreferrer">Allow Client to Change Selection</a>}{!downloadOnlyBundle&&(g.submitted||g.locked)&&<a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,g.galleryId,'upload-further')} target="_blank" rel="noopener noreferrer">Upload Further Retouch</a>}{!g.deliveredAt&&<button className="btn btn-ghost" type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'basic')}>Create Basic Retouch WhatsApp Image</button>}{!downloadOnlyBundle&&g.deliveredAt&&<button className="btn btn-ghost" type="button" onClick={()=>shareClientGallery(b.id,g.galleryId,'further')}>Create Further Retouch WhatsApp Image</button>}</div></details>}
                   </div> : <span style={{color:'#8b5b43'}}>Link this Gallery again in Photo Clean Up Agent to enable the mobile client link.</span>}
@@ -866,7 +866,7 @@ export default function AdminBookingsPage() {
           }}
         />
       )}
-      {manageGallery&&<ManageGalleryModal bookingId={manageGallery.bookingId} galleryId={manageGallery.galleryId} onClose={()=>setManageGallery(null)} onChanged={load}/>}
+      {manageGallery&&<ManageGalleryModal bookingId={manageGallery.bookingId} galleryId={manageGallery.galleryId} addPhotosUrl={manageGallery.addPhotosUrl} onClose={()=>setManageGallery(null)} onChanged={load}/>}
     </div>
   );
 }
