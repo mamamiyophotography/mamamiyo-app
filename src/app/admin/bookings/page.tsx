@@ -37,10 +37,10 @@ const STATUS_TABS = [
   { key: 'confirmed', label: '2. Booking confirmed' },
   { key: 'pending_balance', label: '3. Pending balance payment' },
   { key: 'basic_retouch', label: '4. Basic retouch' },
-  { key: 'further_retouch', label: '5. Further retouch' },
-  { key: 'order_product', label: '6. Order product' },
-  { key: 'soft_copy_delivered', label: '7. Delivery' },
-  { key: 'completed', label: '8. Photoshoot complete' },
+  { key: 'further_retouch', label: '6. Client selection received' },
+  { key: 'order_product', label: '7. Order product' },
+  { key: 'soft_copy_delivered', label: '8. Delivery' },
+  { key: 'completed', label: '9. Photoshoot complete' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
@@ -791,7 +791,7 @@ export default function AdminBookingsPage() {
                   {['further_retouch','order_product','soft_copy_delivered','completed'].includes(b.status) && <>
                     <div className="retouch-progress-summary">Further Retouch · {furtherCompletedCount} of 5 completed</div>
                     <div className="retouch-checklist">
-                      <div className={`retouch-step${furtherDone[0]?' complete':''}${furtherCurrentStep===0?' current':''}`}><span className="retouch-step-number">{furtherDone[0]?'✓':'1'}</span><div><b>Get client selection from Gallery</b><p>{furtherDone[0]?'Client selection received and confirmed.':'Wait for the client to submit and confirm the selected photos.'}</p></div></div>
+                      <div className={`retouch-step${furtherDone[0]?' complete':''}${furtherCurrentStep===0?' current':''}`}><span className="retouch-step-number">{furtherDone[0]?'✓':'1'}</span><div><b>Review client selection</b><p>{furtherDone[0]?'Client selection reviewed and locked.':galleryState?.submitted?'The client selection has been received. Review and lock it before retouching.':'Wait for the client to submit the selected photos.'}</p>{galleryState?.submitted&&!galleryState.locked&&<div className="workflow-actions"><a className="btn btn-primary" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'get-selected')} target="_blank" rel="noopener noreferrer">Review Client Selection</a></div>}</div></div>
                       <div className={`retouch-step${furtherDone[1]?' complete':''}${furtherCurrentStep===1?' current':''}`}><span className="retouch-step-number">{furtherDone[1]?'✓':'2'}</span><div><b>PixelCake initial retouch</b><p>Open PixelCake and complete the first retouch pass.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'further','pixelcake',!furtherDone[1])}>{furtherDone[1]?'Mark as not done':'Mark PixelCake Retouch Done'}</button></div></div></div>
                       <div className={`retouch-step${furtherDone[2]?' complete':''}${furtherCurrentStep===2?' current':''}`}><span className="retouch-step-number">{furtherDone[2]?'✓':'3'}</span><div><b>Photoshop detail retouch</b><p>Open Photoshop and complete the remaining detailed corrections.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'further','photoshop',!furtherDone[2])}>{furtherDone[2]?'Mark as not done':'Mark Photoshop Retouch Done'}</button></div></div></div>
                       <div className={`retouch-step${furtherDone[3]?' complete':''}${furtherCurrentStep===3?' current':''}`}><span className="retouch-step-number">{furtherDone[3]?'✓':'4'}</span><div><b>Upload Further Retouch to Gallery</b><p>{furtherDone[3]?'Further Retouch upload completed.':'Upload the completed photos through Photo Select Pro.'}</p>{galleryState&&!furtherDone[3]&&<div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'upload-further')} target="_blank" rel="noopener noreferrer">Upload Further Retouch</a></div>}</div></div>
