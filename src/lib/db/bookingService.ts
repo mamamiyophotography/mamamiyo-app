@@ -870,8 +870,8 @@ export async function purgeExpiredHolds(db: any) {
   return count;
 }
 
-/** Editing pipeline only — moving a booking from 'basic_retouch' to
- *  'further_retouch', then 'order_product' when products remain,
+/** Editing pipeline only — moving a booking from 'basic_retouch' through
+ *  'selection_received' and 'further_retouch', then 'order_product' when products remain,
  *  followed by 'soft_copy_delivered'
  *  and finally 'completed'. Earlier stages have
  *  their own dedicated transitions (confirmDepositAndNotify, markCompleted,
@@ -880,7 +880,8 @@ const ADVANCEABLE_STATUSES = ['pending_balance', 'pending_basic_retouch', 'basic
 const REVERSIBLE_POST_PROCESSING_STATUSES: Record<string, string> = {
   pending_basic_retouch: 'confirmed',
   basic_retouch: 'pending_basic_retouch',
-  further_retouch: 'basic_retouch',
+  selection_received: 'basic_retouch',
+  further_retouch: 'selection_received',
   order_product: 'further_retouch',
   soft_copy_delivered: 'order_product',
 };
@@ -1122,7 +1123,7 @@ function singaporeDateAfterDays(now: Date, days: number): string {
  * route controls the time; this function protects against duplicates. */
 export async function sendShootDayBalanceInvoices(db: any, now = new Date()) {
   const commonWhere = {
-      status: { in: ['confirmed', 'pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'] },
+      status: { in: ['confirmed', 'pending_balance', 'pending_basic_retouch', 'basic_retouch', 'selection_received', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'] },
       balanceStatus: 'pending',
       invoiceGeneratedAt: null,
   };

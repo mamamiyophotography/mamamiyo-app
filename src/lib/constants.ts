@@ -202,6 +202,7 @@ export const STATUS_ORDER = [
   'pending_balance',
   'pending_basic_retouch',
   'basic_retouch',
+  'selection_received',
   'further_retouch',
   'order_product',
   'soft_copy_delivered',
@@ -216,10 +217,11 @@ export const STATUS_LABELS: Record<string, { label: string; color: string; bg: s
   pending_balance:      { label: '3. Pending balance payment', color: '#FFFFFF', bg: '#8FB4D4' },
   pending_basic_retouch:{ label: '4. Basic retouch',           color: '#FFFFFF', bg: '#8FB4D4' },
   basic_retouch:        { label: '5. Awaiting client selection', color: '#FFFFFF', bg: '#7898AA' },
-  further_retouch:      { label: '6. Client selection received', color: '#FFFFFF', bg: '#5FA89A' },
-  order_product:        { label: '7. Order product',            color: '#5A4B3A', bg: '#F3D9B8' },
-  soft_copy_delivered:  { label: '8. Delivery',                 color: '#4E5F48', bg: '#DCE9D5' },
-  completed:            { label: '9. Photoshoot complete',      color: '#5A4B7A', bg: '#D0C4DD' },
+  selection_received:   { label: '6. Client selection received', color: '#FFFFFF', bg: '#5FA89A' },
+  further_retouch:      { label: '7. Further retouch',           color: '#FFFFFF', bg: '#4E9185' },
+  order_product:        { label: '8. Order product',             color: '#5A4B3A', bg: '#F3D9B8' },
+  soft_copy_delivered:  { label: '9. Delivery',                  color: '#4E5F48', bg: '#DCE9D5' },
+  completed:            { label: '10. Photoshoot complete',      color: '#5A4B7A', bg: '#D0C4DD' },
   cancelled:       { label: 'Cancelled',              color: '#7A6F62', bg: '#E4DED6' },
 };
 

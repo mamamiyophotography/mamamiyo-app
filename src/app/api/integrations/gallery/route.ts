@@ -163,10 +163,14 @@ export async function POST(req: NextRequest) {
     // older Gallery client sends stale submitted/locked flags.
     const clientSelectionApplies = p.selectionEnabled
       && !(booking.sessionTypeId === 'bundle' && (booking.bundleSessionNumber || 1) < 3);
-    // A submitted selection must become visible as an actionable Step 6 immediately.
-    // Reviewing/locking remains the first task inside that stage.
+    // Submission creates an actionable Step 6 immediately. Locking the
+    // reviewed selection advances it to Step 7 Further Retouch.
     if (clientSelectionApplies && p.submitted && booking.status === 'basic_retouch') {
+      await tx.booking.update({where:{id:booking.id},data:{status:p.locked ? 'further_retouch' : 'selection_received'}});
+    } else if (clientSelectionApplies && p.submitted && p.locked && booking.status === 'selection_received') {
       await tx.booking.update({where:{id:booking.id},data:{status:'further_retouch'}});
+    } else if (clientSelectionApplies && p.submitted && !p.locked && booking.status === 'further_retouch') {
+      await tx.booking.update({where:{id:booking.id},data:{status:'selection_received'}});
     }
     return result;
   });

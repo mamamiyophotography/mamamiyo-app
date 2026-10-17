@@ -37,10 +37,11 @@ const STATUS_TABS = [
   { key: 'confirmed', label: '2. Booking confirmed' },
   { key: 'pending_balance', label: '3. Pending balance payment' },
   { key: 'basic_retouch', label: '4. Basic retouch' },
-  { key: 'further_retouch', label: '6. Client selection received' },
-  { key: 'order_product', label: '7. Order product' },
-  { key: 'soft_copy_delivered', label: '8. Delivery' },
-  { key: 'completed', label: '9. Photoshoot complete' },
+  { key: 'selection_received', label: '6. Client selection received' },
+  { key: 'further_retouch', label: '7. Further retouch' },
+  { key: 'order_product', label: '8. Order product' },
+  { key: 'soft_copy_delivered', label: '9. Delivery' },
+  { key: 'completed', label: '10. Photoshoot complete' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
@@ -49,10 +50,11 @@ const POST_PROCESSING_ORDER: Record<string, number> = {
   pending_balance: 3,
   pending_basic_retouch: 4,
   basic_retouch: 5,
-  further_retouch: 6,
-  order_product: 7,
-  soft_copy_delivered: 8,
-  completed: 9,
+  selection_received: 6,
+  further_retouch: 7,
+  order_product: 8,
+  soft_copy_delivered: 9,
+  completed: 10,
 };
 
 function comparePostProcessingBookings(a: Booking, b: Booking) {
@@ -510,7 +512,7 @@ export default function AdminBookingsPage() {
         const downloadOnlyBundle = b.sessionTypeId === 'bundle' && (b.bundleSessionNumber || 1) < 3;
         const displayStatus = b.status;
         const statusStyle = STATUS_LABEL[displayStatus] || { label: displayStatus, color: '#3A2E28', bg: '#EDE6DC' };
-        const isPostProcessing = ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'].includes(displayStatus);
+        const isPostProcessing = ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'selection_received', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'].includes(displayStatus);
         const retouchProgress = b.basicRetouchProgress || {};
         const basicEmailSent=Boolean(retouchProgress.notification||retouchProgress.notification_email);
         const basicWhatsappSent=Boolean(retouchProgress.notification||retouchProgress.notification_whatsapp);
@@ -533,7 +535,7 @@ export default function AdminBookingsPage() {
           {b.status === 'pending_basic_retouch' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Basic Retouch Done</button>}
           {b.status === 'order_product' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Ordered · Move to Delivery</button>}
           {b.status === 'soft_copy_delivered' && <button className="btn btn-primary" disabled={isBusy} onClick={() => runAction(b.id, 'advance-stage')}>Product Delivered · Complete Photoshoot</button>}
-          {(b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'further_retouch' || b.status === 'order_product' || b.status === 'soft_copy_delivered' || b.status === 'completed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'revert-stage')}>{b.status === 'completed' ? 'Go back to previous delivery stage' : b.status === 'soft_copy_delivered' ? 'Go back to order product' : b.status === 'order_product' ? 'Go back to further retouch' : b.status === 'further_retouch' ? 'Go back to client selection' : b.status === 'basic_retouch' ? 'Go back to pending basic retouch' : 'Go back to booking confirmed'}</button>}
+          {(b.status === 'pending_basic_retouch' || b.status === 'basic_retouch' || b.status === 'selection_received' || b.status === 'further_retouch' || b.status === 'order_product' || b.status === 'soft_copy_delivered' || b.status === 'completed') && <button className="btn btn-ghost" disabled={isBusy} onClick={() => runAction(b.id, 'revert-stage')}>{b.status === 'completed' ? 'Go back to previous delivery stage' : b.status === 'soft_copy_delivered' ? 'Go back to order product' : b.status === 'order_product' ? 'Go back to further retouch' : b.status === 'further_retouch' ? 'Go back to client selection received' : b.status === 'selection_received' ? 'Go back to awaiting client selection' : b.status === 'basic_retouch' ? 'Go back to pending basic retouch' : 'Go back to booking confirmed'}</button>}
         </div>;
 
         return (
@@ -773,7 +775,7 @@ export default function AdminBookingsPage() {
 
 
                 {/* Photo processing */}
-                <details className="workflow-panel workflow-photo" open={['pending_basic_retouch','basic_retouch'].includes(b.status)}>
+                <details className="workflow-panel workflow-photo" open={['pending_basic_retouch','basic_retouch','selection_received','further_retouch'].includes(b.status)}>
                   <summary className="workflow-panel-title" style={{cursor:'pointer'}}>Photo Processing</summary>
                   {(b.status === 'pending'||b.status === 'confirmed') && <div className="workflow-actions"><button className="btn btn-ghost" onClick={() => openPhotographerPreparation(b.id)}>摄影师准备清单</button>{b.status === 'confirmed'&&<button className="btn btn-ghost" onClick={() => openSummary(b.id)}>Generate booking summary</button>}</div>}
                   {['pending_balance','pending_basic_retouch','basic_retouch'].includes(b.status) && <>
@@ -788,7 +790,7 @@ export default function AdminBookingsPage() {
                       <div className={`retouch-step${retouchDone[6]?' complete':''}${retouchCurrentStep===6?' current':''}`}><span className="retouch-step-number">{retouchDone[6]?'✓':'7'}</span><div><b>Manage Gallery</b><p>{galleryState?.submitted&&!galleryState.locked?'The client has submitted a selection. Review and confirm it before starting Further Retouch.':'Add or remove Gallery photos, open the client view, or use additional Gallery controls.'}</p>{galleryState?.clientUrl&&<><div className="workflow-actions">{!downloadOnlyBundle&&galleryState.submitted&&!galleryState.locked&&<a className="btn btn-primary" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'get-selected')} target="_blank" rel="noopener noreferrer">Review Client Selection</a>}{!(galleryState.submitted||galleryState.locked||galleryState.deliveredAt)&&<button className="btn btn-ghost" type="button" onClick={()=>setManageGallery({bookingId:b.id,galleryId:galleryState.galleryId,addPhotosUrl:photoSelectGalleryActionUrl(b,galleryState.galleryId,'add-basic')})}>Manage Gallery</button>}<a className="btn btn-ghost" href={`/g/${galleryState.galleryId.slice(0,12)}`} target="_blank" rel="noopener noreferrer">Open Client Gallery</a></div>{(downloadOnlyBundle||galleryState.submitted||galleryState.locked||galleryState.deliveredAt)&&<details className="workflow-more compact"><summary>More Gallery options</summary><div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'update-basic')} target="_blank" rel="noopener noreferrer">Update Basic Retouch</a>{!downloadOnlyBundle&&galleryState.locked&&<a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'unlock-selection')} target="_blank" rel="noopener noreferrer">Allow Client to Change Selection</a>}{!downloadOnlyBundle&&galleryState.locked&&<a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'upload-further')} target="_blank" rel="noopener noreferrer">Upload Further Retouch</a>}{!galleryState.deliveredAt&&<button className="btn btn-ghost" type="button" onClick={()=>shareClientGallery(b.id,galleryState.galleryId,'basic')}>Create Basic Retouch WhatsApp Image</button>}{!downloadOnlyBundle&&galleryState.deliveredAt&&<button className="btn btn-ghost" type="button" onClick={()=>shareClientGallery(b.id,galleryState.galleryId,'further')}>Create Further Retouch WhatsApp Image</button>}</div></details>}</>}</div></div>
                     </div>
                   </>}
-                  {['further_retouch','order_product','soft_copy_delivered','completed'].includes(b.status) && <>
+                  {['selection_received','further_retouch','order_product','soft_copy_delivered','completed'].includes(b.status) && <>
                     <div className="retouch-progress-summary">Further Retouch · {furtherCompletedCount} of 5 completed</div>
                     <div className="retouch-checklist">
                       <div className={`retouch-step${furtherDone[0]?' complete':''}${furtherCurrentStep===0?' current':''}`}><span className="retouch-step-number">{furtherDone[0]?'✓':'1'}</span><div><b>Review client selection</b><p>{furtherDone[0]?'Client selection reviewed and locked.':galleryState?.submitted?'The client selection has been received. Review and lock it before retouching.':'Wait for the client to submit the selected photos.'}</p>{galleryState?.submitted&&!galleryState.locked&&<div className="workflow-actions"><a className="btn btn-primary" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'get-selected')} target="_blank" rel="noopener noreferrer">Review Client Selection</a></div>}</div></div>
@@ -866,11 +868,11 @@ export default function AdminBookingsPage() {
           <section className="booking-group">
             <div className="booking-group-heading post-shoot-heading">
               <span>Photoshoot done · Post-processing</span>
-              <b>{bookings.filter((booking) => ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'].includes(booking.status)).length}</b>
+              <b>{bookings.filter((booking) => ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'selection_received', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'].includes(booking.status)).length}</b>
             </div>
             <div className="booking-list">
               {[...bookings]
-                .filter((booking) => ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'].includes(booking.status))
+                .filter((booking) => ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'selection_received', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'].includes(booking.status))
                 .sort(comparePostProcessingBookings)
                 .map(renderBookingCard)}
             </div>
