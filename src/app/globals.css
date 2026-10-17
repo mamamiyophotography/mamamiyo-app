@@ -254,6 +254,16 @@ a { color: inherit; }
 .booking-group-heading b { display: grid; min-width: 25px; height: 25px; padding: 0 7px; place-items: center; border-radius: 999px; background: rgba(255,255,255,.72); font-size: 12px; }
 .pre-shoot-heading { grid-column: 1; background: #f5dfd7; }
 .post-shoot-heading { grid-column: 2; background: #dfeaf0; }
+.post-processing-steps { display: flex; flex-direction: column; gap: 9px; margin-top: 11px; }
+.post-processing-step { overflow: hidden; border: 1px solid #d9e5ea; border-radius: 14px; background: #f8fbfc; }
+.post-processing-step > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; color: #526d7a; font-size: 12px; font-weight: 800; letter-spacing: .025em; cursor: pointer; list-style: none; }
+.post-processing-step > summary::-webkit-details-marker { display: none; }
+.post-processing-step > summary::before { content: '›'; flex: 0 0 auto; font-size: 19px; line-height: 1; transition: transform .18s ease; }
+.post-processing-step[open] > summary::before { transform: rotate(90deg); }
+.post-processing-step > summary span { flex: 1; }
+.post-processing-step > summary b { border-radius: 999px; padding: 4px 9px; background: #e5eff3; color: #557788; font-size: 11px; white-space: nowrap; }
+.post-processing-step > .booking-list { padding: 0 10px 10px; }
+.post-processing-empty { margin: 0; padding: 12px; border-radius: 10px; background: #fff; color: #8b8580; font-size: 12px; text-align: center; }
 .pre-shoot-card { grid-column: 1; }
 .post-shoot-card { grid-column: 2; }
 .booking-card { padding: 16px; border: 1px solid #ebe4e2; border-radius: 20px; background: #fff; box-shadow: 0 8px 24px rgba(77,63,69,.06); transition: border .18s ease, box-shadow .18s ease, transform .18s ease; }

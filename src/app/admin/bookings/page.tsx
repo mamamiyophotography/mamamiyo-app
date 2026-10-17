@@ -46,22 +46,16 @@ const STATUS_TABS = [
 ];
 
 const STATUS_LABEL = STATUS_LABELS;
-const POST_PROCESSING_ORDER: Record<string, number> = {
-  pending_balance: 3,
-  pending_basic_retouch: 4,
-  basic_retouch: 5,
-  selection_received: 6,
-  further_retouch: 7,
-  order_product: 8,
-  soft_copy_delivered: 9,
-  completed: 10,
-};
-
-function comparePostProcessingBookings(a: Booking, b: Booking) {
-  const stepDifference = (POST_PROCESSING_ORDER[a.status] ?? 99) - (POST_PROCESSING_ORDER[b.status] ?? 99);
-  if (stepDifference !== 0) return stepDifference;
-  return `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`);
-}
+const POST_PROCESSING_GROUPS = [
+  { status: 'pending_balance', label: 'Step 3 · Pending balance payment' },
+  { status: 'pending_basic_retouch', label: 'Step 4 · Basic retouch' },
+  { status: 'basic_retouch', label: 'Step 5 · Awaiting client selection' },
+  { status: 'selection_received', label: 'Step 6 · Client selection received' },
+  { status: 'further_retouch', label: 'Step 7 · Further retouch' },
+  { status: 'order_product', label: 'Step 8 · Order product' },
+  { status: 'soft_copy_delivered', label: 'Step 9 · Delivery' },
+  { status: 'completed', label: 'Step 10 · Photoshoot complete' },
+];
 
 export default function AdminBookingsPage() {
   const [filter, setFilter] = useState('active');
@@ -870,11 +864,18 @@ export default function AdminBookingsPage() {
               <span>Photoshoot done · Post-processing</span>
               <b>{bookings.filter((booking) => ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'selection_received', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'].includes(booking.status)).length}</b>
             </div>
-            <div className="booking-list">
-              {[...bookings]
-                .filter((booking) => ['pending_balance', 'pending_basic_retouch', 'basic_retouch', 'selection_received', 'further_retouch', 'order_product', 'soft_copy_delivered', 'completed'].includes(booking.status))
-                .sort(comparePostProcessingBookings)
-                .map(renderBookingCard)}
+            <div className="post-processing-steps">
+              {POST_PROCESSING_GROUPS.map((group) => {
+                const stepBookings = bookings
+                  .filter((booking) => booking.status === group.status)
+                  .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
+                return <details className="post-processing-step" key={group.status}>
+                  <summary><span>{group.label}</span><b>{stepBookings.length} {stepBookings.length === 1 ? 'client' : 'clients'}</b></summary>
+                  <div className="booking-list">
+                    {stepBookings.length ? stepBookings.map(renderBookingCard) : <p className="post-processing-empty">No clients in this step.</p>}
+                  </div>
+                </details>;
+              })}
             </div>
           </section>
         </div>
