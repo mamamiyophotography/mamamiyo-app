@@ -13,28 +13,34 @@ export default function ManageGalleryModal({bookingId,galleryId,addPhotosUrl,onC
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
   const endpoint=`/api/admin/bookings/${bookingId}/gallery?galleryId=${galleryId}`;
-  async function load(){
+  async function load(nextLightboxIndex:number|null=null){
     setError('');const response=await fetch(endpoint);const body=await response.json();
     if(!response.ok)throw new Error(body.error||'Could not load this Gallery.');
-    setData(body);setSelected(new Set());setLightboxIndex(null);
+    setData(body);setSelected(new Set());setLightboxIndex(nextLightboxIndex);
   }
   useEffect(()=>{load().catch(e=>setError(e.message));},[bookingId,galleryId]);
   const allSelected=Boolean(data?.photos.length)&&selected.size===data?.photos.length;
   const toggleAll=()=>setSelected(allSelected?new Set():new Set(data?.photos.map(p=>p.id)));
-  const remove=async(deleteAll:boolean)=>{
-    const count=deleteAll?data?.photos.length||0:selected.size;
+  const remove=async(deleteAll:boolean,photoIdsOverride?:string[])=>{
+    const chosenIds=photoIdsOverride||[...selected];
+    const count=deleteAll?data?.photos.length||0:chosenIds.length;
     if(!count||!data)return;
     const message=deleteAll
       ? 'Delete this entire Gallery and all uploaded photos? The client link will stop working and Create Gallery will appear again.'
-      : `Delete ${count} selected photo${count===1?'':'s'}? The Basic Retouch ZIP will need to be created again.`;
+      : count===1&&photoIdsOverride
+        ? `Delete ${data.photos.find(photo=>photo.id===chosenIds[0])?.filename||'this photo'} from the Gallery?`
+        : `Delete ${count} selected photo${count===1?'':'s'} from the Gallery?`;
     if(!window.confirm(message))return;
     setBusy(true);setError('');
     try{
-      const photoIds=deleteAll?data.photos.map(p=>p.id):[...selected];
+      const photoIds=deleteAll?data.photos.map(p=>p.id):chosenIds;
       const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({photoIds,deleteAll})});
       const body=await response.json();if(!response.ok)throw new Error(body.error||'Could not delete the photos.');
       await onChanged();
-      if(deleteAll)onClose();else await load();
+      if(deleteAll)onClose();else {
+        const nextIndex=photoIdsOverride&&body.remaining>0?Math.min(lightboxIndex||0,body.remaining-1):null;
+        await load(nextIndex);
+      }
     }catch(e){setError((e as Error).message)}finally{setBusy(false)}
   };
   const selectedLabel=useMemo(()=>selected.size?`${selected.size} selected`:'Select photos to delete',[selected]);
@@ -87,6 +93,7 @@ export default function ManageGalleryModal({bookingId,galleryId,addPhotosUrl,onC
       </>}
     </section>
     {lightboxPhoto&&<div role="dialog" aria-modal="true" aria-label={`Enlarged photo ${lightboxPhoto.filename}`} onClick={event=>{event.stopPropagation();setLightboxIndex(null)}} style={{position:'fixed',inset:0,zIndex:10001,background:'rgba(15,18,17,.94)',display:'grid',gridTemplateColumns:'minmax(52px,90px) minmax(0,1fr) minmax(52px,90px)',gridTemplateRows:'64px minmax(0,1fr) 58px',alignItems:'center'}}>
+      {data?.canDelete&&<button type="button" disabled={busy} onClick={event=>{event.stopPropagation();remove(false,[lightboxPhoto.id])}} aria-label={`Delete ${lightboxPhoto.filename}`} style={{position:'absolute',top:14,left:14,zIndex:2,border:'1px solid #f1aaa0',background:'#9a4036',color:'#fff',borderRadius:9,padding:'10px 14px',fontWeight:700,cursor:busy?'wait':'pointer'}}>{busy?'Deleting…':'Delete Photo'}</button>}
       <button type="button" onClick={event=>{event.stopPropagation();setLightboxIndex(null)}} aria-label="Close enlarged photo" style={{position:'absolute',top:12,right:14,zIndex:2,border:'1px solid rgba(255,255,255,.55)',background:'rgba(0,0,0,.35)',color:'#fff',borderRadius:999,width:42,height:42,fontSize:28,lineHeight:1,cursor:'pointer'}}>×</button>
       <button type="button" onClick={event=>{event.stopPropagation();moveLightbox(-1)}} aria-label="Previous photo" style={{gridColumn:1,gridRow:2,justifySelf:'center',border:0,background:'rgba(255,255,255,.16)',color:'#fff',borderRadius:999,width:48,height:48,fontSize:36,lineHeight:1,cursor:'pointer'}}>‹</button>
       <img onClick={event=>event.stopPropagation()} src={`${endpoint}&photoId=${encodeURIComponent(lightboxPhoto.id)}`} alt={lightboxPhoto.filename} style={{gridColumn:2,gridRow:2,width:'100%',height:'100%',maxHeight:'calc(100vh - 122px)',objectFit:'contain',display:'block'}}/>
