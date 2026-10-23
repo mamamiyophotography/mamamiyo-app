@@ -27,7 +27,7 @@ export const SESSION_TYPES: SessionType[] = [
   {
     id: 'newborn',
     name: 'Newborn Photoshoot',
-    price: 588,
+    price: 688,
     durationMin: 120,
     location: 'home',
     meta: '2 hours · At your home · 3 setups',
