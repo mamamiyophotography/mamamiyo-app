@@ -4,7 +4,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Resend } from 'resend';
 import { buildPayNowPayload } from '@/lib/paynow';
 import QRCode from 'qrcode';
-import { brandedFromAddress } from '@/lib/email';
+import { brandedFromAddress, buildEmailHtml } from '@/lib/email';
 import { socialMediaUploadReminder } from '@/lib/notifications';
 import { sendWhatsApp } from '@/lib/whatsapp';
 import { notifyGallerySelection } from '@/lib/gallerySelectionNotification';
@@ -199,22 +199,40 @@ export async function POST(req: NextRequest) {
   const {createHash} = await import('node:crypto');
   const eventKey = createHash('sha256').update(fingerprint).digest('hex');
   if (entry.emailKey === eventKey) return NextResponse.json({ok:true,bundleRetention});
-  if (!process.env.PHOTOGRAPHER_EMAIL || !process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
-    return NextResponse.json({error:'Photographer email is not configured; selection is saved'}, {status:503});
+  if (!booking.clientEmail || !entry.clientUrl || !process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
+    return NextResponse.json({error:'Client email or Gallery link is missing; delivery is saved'}, {status:503});
   }
-  const items = entry.items as {filename:string;note:string}[];
-  const heading = entry.deliveredAt ? 'Further retouch is finished' : 'Client selection submitted';
-  const lines = items.map(i => `${i.filename}: ${i.note || 'No special requests'}`).join('\n');
-  const body = `${heading}\n${booking.clientName} · ${booking.ref}\nSelection version ${entry.version} · ${items.length} photos\n\n${lines}\n\nView booking and selection: ${adminUrl}`;
-  const html = `<!doctype html><meta charset="utf-8"><h1>${escape(heading)}</h1><p>${escape(booking.clientName)} · ${escape(booking.ref)}</p><p>Version ${entry.version} · ${items.length} photos</p><table><tr><th>Photo</th><th>Retouch notes</th></tr>${items.map(i=>`<tr><td>${escape(i.filename)}</td><td style="white-space:pre-wrap">${escape(i.note || 'No special requests')}</td></tr>`).join('')}</table><p><a href="${escape(adminUrl)}">View booking and selection</a></p>`;
-  const result = await new Resend(process.env.RESEND_API_KEY).emails.send({from:brandedFromAddress(process.env.RESEND_FROM_EMAIL),
-    to:process.env.PHOTOGRAPHER_EMAIL, subject:`${heading} — ${booking.ref}`, text:body, html,
-    attachments:[{filename:`${booking.ref}-retouch-notes.html`,content:Buffer.from(html).toString('base64')}]},
-    {idempotencyKey:`gallery-${entry.galleryId}-${eventKey}`});
-  if (result.error) return NextResponse.json({error:'Email pending retry; selection is saved'}, {status:503});
+  const firstName = booking.clientName.trim().split(/\s+/)[0] || booking.clientName;
+  const subject = `Your Further Retouch Gallery is ready — ${booking.sessionLabel}`;
+  const body = `Hi ${firstName},\n\nYour Further Retouch photos are ready. We have completed the requested edits, and your finished photos are now available in your private Gallery.\n\nView and download your photos:\n${entry.clientUrl}\n\nWe hope you love the finished photos. If you have any questions, please contact us via WhatsApp.\n\nWarmly,\nMamamiyo Photography`;
+  const html = buildEmailHtml({
+    title:'Your Further Retouch Gallery is ready',
+    paragraphs:[
+      `Hi ${escape(firstName)},`,
+      'Your Further Retouch photos are ready. We have completed the requested edits, and your finished photos are now available in your private Gallery.',
+      `<a href="${escape(entry.clientUrl)}" style="display:inline-block;background:#b08d57;color:#fff;text-decoration:none;font-weight:700;font-family:sans-serif;padding:12px 22px;border-radius:10px;">View and download your photos</a>`,
+      'We hope you love the finished photos. If you have any questions, please contact us via WhatsApp.',
+      'Warmly,<br>Mamamiyo Photography',
+    ],
+    businessName:'Mamamiyo Photography',
+  });
+  const photographerEmail = process.env.PHOTOGRAPHER_EMAIL?.trim();
+  const result = await new Resend(process.env.RESEND_API_KEY).emails.send({
+    from:brandedFromAddress(process.env.RESEND_FROM_EMAIL),
+    to:booking.clientEmail,
+    bcc:photographerEmail && photographerEmail.toLowerCase() !== booking.clientEmail.toLowerCase() ? photographerEmail : undefined,
+    subject,
+    text:body,
+    html,
+  }, {idempotencyKey:`gallery-client-delivery-${entry.galleryId}-${eventKey}`});
+  if (result.error) return NextResponse.json({error:'Client email pending retry; delivery is saved'}, {status:503});
   if (entry.deliveredAt && process.env.PHOTOGRAPHER_PHONE) {
     await sendWhatsApp(process.env.PHOTOGRAPHER_PHONE, socialMediaUploadReminder(booking));
   }
-  await prisma.galleryInbox.updateMany({where:{galleryId:entry.galleryId,version:entry.version},data:{emailKey:eventKey,emailSentAt:new Date()}});
+  await prisma.$transaction([
+    prisma.galleryInbox.updateMany({where:{galleryId:entry.galleryId,version:entry.version},data:{emailKey:eventKey,emailSentAt:new Date()}}),
+    prisma.notificationLog.create({data:{bookingId:booking.id,channel:'retouch_further_email',message:'Further Retouch Gallery ready email sent automatically after upload',status:'sent'}}),
+    prisma.bookingAuditLog.create({data:{bookingId:booking.id,action:'further_retouch_progress',before:{},after:{step:'notification_email',completed:true}}}),
+  ]);
   return NextResponse.json({ok:true,bundleRetention});
 }
