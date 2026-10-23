@@ -449,7 +449,7 @@ export default function BookPage() {
               </div>
             )}
             {/* Service add-ons: setup & headcount */}
-            {sessionType.addOns.filter(id => ['extraSetup','extraOutfit','headcount'].includes(id)).map((id) => (
+            {sessionType.addOns.filter(id => ['twins','extraSetup','extraOutfit','headcount'].includes(id)).map((id) => (
               <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px dashed var(--line)' }}>
                 <span>
                   {ADDONS[id].name} <span style={{ fontSize: 12.5, color: 'var(--ink-soft)' }}>${ADDONS[id].price} each</span>
@@ -457,7 +457,7 @@ export default function BookPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: Math.max(0, (a[id] || 0) - 1) }))} style={{ width: 26, height: 26, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>−</button>
                   <span style={{ minWidth: 16, textAlign: 'center', fontWeight: 700 }}>{addOns[id] || 0}</span>
-                  <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: ['extraSetup','extraOutfit'].includes(id) ? Math.min(3-includedSetupCount,(a[id]||0)+1) : (a[id]||0)+1 }))} style={{ width: 26, height: 26, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>+</button>
+                  <button type="button" onClick={() => setAddOns((a) => ({ ...a, [id]: id==='twins' ? 1 : ['extraSetup','extraOutfit'].includes(id) ? Math.min(3-includedSetupCount,(a[id]||0)+1) : (a[id]||0)+1 }))} style={{ width: 26, height: 26, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)' }}>+</button>
                 </div>
               </div>
             ))}

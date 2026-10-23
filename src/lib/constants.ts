@@ -27,7 +27,7 @@ export const SESSION_TYPES: SessionType[] = [
   {
     id: 'newborn',
     name: 'Newborn Photoshoot',
-    price: 688,
+    price: 588,
     durationMin: 120,
     location: 'home',
     meta: '2 hours · At your home · 3 setups',
@@ -36,7 +36,7 @@ export const SESSION_TYPES: SessionType[] = [
       'Approximately 70 softcopy photos with basic editing',
       '10 photos with detailed retouching',
     ],
-    addOns: ['extraSetup', 'headcount', 'album8x8', 'album10x10', 'album12x12', 'canvas11x14', 'canvas16x24', 'plaque5x7', 'plaque6x8'],
+    addOns: ['twins', 'extraSetup', 'headcount', 'album8x8', 'album10x10', 'album12x12', 'canvas11x14', 'canvas16x24', 'plaque5x7', 'plaque6x8'],
     referenceSetups: 2,  // 2 baby solo setups
     icon: 'N',
     swatch: '#C98B7A',
@@ -124,6 +124,7 @@ export const ADDONS: Record<string, { name: string; price: number }> = {
   extraSetup: { name: 'Additional Setup', price: 100 },
   extraOutfit: { name: 'Additional Outfit', price: 100 },
   headcount: { name: 'Additional Family / Grandparents / Pet', price: 30 },
+  twins: { name: 'Twins surcharge', price: 100 },
   // Photo Album (layflat, rigid paper)
   album8x8: { name: 'Layflat Photo Album\n8in × 8in / 20cm × 20cm\n20 pages, up to 30 images\nIncludes 20 Bonus Further Retouch', price: 108 },
   album10x10: { name: 'Layflat Photo Album\n10in × 10in / 25cm × 25cm\n20 pages, up to 30 images\nIncludes 20 Bonus Further Retouch', price: 138 },

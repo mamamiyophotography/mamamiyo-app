@@ -181,7 +181,7 @@ export default function EditBookingModal({
     setAddOns((current) => {
       const next = { ...current };
       if (qty <= 0) delete next[id];
-      else next[id] = qty;
+      else next[id] = id === 'twins' ? 1 : qty;
       return next;
     });
   }

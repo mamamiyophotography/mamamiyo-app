@@ -121,6 +121,8 @@ export type CreateBookingInput = {
 export async function createBooking(db: any, input: CreateBookingInput) {
   const st = sessionById(input.sessionTypeId);
   if (!st) throw new Error(`Unknown session type: ${input.sessionTypeId}`);
+  const twinsQuantity = Number(input.addOns?.twins || 0);
+  if (!Number.isSafeInteger(twinsQuantity) || twinsQuantity < 0 || twinsQuantity > 1 || (twinsQuantity > 0 && st.id !== 'newborn')) throw new Error('Twins surcharge is available once for a Newborn Photoshoot only.');
   const bookingLocation = st.id === 'newborn' ? (input.location || 'home') : st.location;
   if (!isBookingLocation(bookingLocation)) throw new Error('Please select a valid photoshoot location.');
   if (bookingLocation !== 'studio' && !input.address.trim()) throw new Error('The photoshoot location address is required.');
@@ -402,7 +404,7 @@ export async function updateBookingAndNotify(
   const cleanedAddOns = Object.fromEntries(
     Object.entries(input.addOns || {})
       .filter(([id, qty]) => sessionType.addOns.includes(id) && Number.isFinite(qty) && qty > 0)
-      .map(([id, qty]) => [id, Math.floor(qty)]),
+      .map(([id, qty]) => [id, id === 'twins' ? 1 : Math.floor(qty)]),
   );
 
   let subtotal: number;
