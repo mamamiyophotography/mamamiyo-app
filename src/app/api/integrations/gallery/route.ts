@@ -226,13 +226,21 @@ export async function POST(req: NextRequest) {
     html,
   }, {idempotencyKey:`gallery-client-delivery-${entry.galleryId}-${eventKey}`});
   if (result.error) return NextResponse.json({error:'Client email pending retry; delivery is saved'}, {status:503});
-  if (entry.deliveredAt && process.env.PHOTOGRAPHER_PHONE) {
-    await sendWhatsApp(process.env.PHOTOGRAPHER_PHONE, socialMediaUploadReminder(booking));
-  }
+  // Record the successful client email before attempting the independent
+  // photographer WhatsApp alert. If WhatsApp is unavailable, the Gallery
+  // retry must not send the client email again after Resend's idempotency
+  // window expires.
   await prisma.$transaction([
     prisma.galleryInbox.updateMany({where:{galleryId:entry.galleryId,version:entry.version},data:{emailKey:eventKey,emailSentAt:new Date()}}),
     prisma.notificationLog.create({data:{bookingId:booking.id,channel:'retouch_further_email',message:'Further Retouch Gallery ready email sent automatically after upload',status:'sent'}}),
     prisma.bookingAuditLog.create({data:{bookingId:booking.id,action:'further_retouch_progress',before:{},after:{step:'notification_email',completed:true}}}),
   ]);
+  if (entry.deliveredAt && process.env.PHOTOGRAPHER_PHONE) {
+    try {
+      await sendWhatsApp(process.env.PHOTOGRAPHER_PHONE, socialMediaUploadReminder(booking));
+    } catch (error) {
+      console.error('Further Retouch photographer WhatsApp alert failed:', (error as Error).message);
+    }
+  }
   return NextResponse.json({ok:true,bundleRetention});
 }
