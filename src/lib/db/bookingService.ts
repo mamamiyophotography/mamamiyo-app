@@ -993,6 +993,14 @@ export async function checkAndSendGalleryReminders(db: any, now = new Date()) {
       const html = buildEmailHtml({title:'Gallery Download Deadline',paragraphs:body.split('\n\n'),details:[{label:'Session',value:booking.sessionLabel},{label:'Deadline',value:deadline}],businessName:settings.businessName});
       await sendEmail(booking.clientEmail,`Your Gallery expires in 3 days — ${booking.sessionLabel}`,body,undefined,html);
       await db.galleryInbox.updateMany({where:{galleryId:gallery.galleryId,expiryReminderSentAt:null},data:{expiryReminderSentAt:now}});
+      const galleryLink = gallery.clientUrl ? `\n${gallery.clientUrl}` : '';
+      const forwardMessage = [`Hi ${firstName}!`,`Just a friendly reminder that your private Gallery will expire on ${deadline}. Please download all your photographs before the deadline.${galleryLink}`,`If you need any help, please contact us via WhatsApp.`,settings.businessName].join('\n\n');
+      try {
+        const photographer = photographerContacts();
+        await sendWhatsApp(photographer.phone,[`📥 Gallery download reminder · ${booking.clientName}`,`Message to forward:`,forwardMessage].join('\n\n'));
+      } catch (error) {
+        console.error(`Gallery download WhatsApp reminder failed for ${booking.ref}:`,(error as Error).message);
+      }
       expirySent++;
     }
   }
