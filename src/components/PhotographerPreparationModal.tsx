@@ -52,12 +52,24 @@ export default function PhotographerPreparationModal({ booking, onClose }: { boo
       const margin = 80;
       const contentWidth = width - margin * 2;
       const infoHeight = 540;
-      const setupImageHeight = 1050;
       const setupImageGap = 28;
-      const setupHeights = setups.map((setup) => {
-        const photoCount = Math.min((setup.referencePhotoUrls || []).length, 3);
-        return photoCount ? 90 + photoCount * setupImageHeight + (photoCount - 1) * setupImageGap + 30 : 260;
-      });
+      const loadImage = async (url:string) => {
+        try {
+          const response=await fetch(url); if(!response.ok)return null;
+          const objectUrl=URL.createObjectURL(await response.blob()); const image=new Image(); image.src=objectUrl;
+          await new Promise<void>((resolve,reject)=>{image.onload=()=>resolve();image.onerror=()=>reject(new Error('Image failed to load'));});
+          return {image,objectUrl};
+        } catch { return null; }
+      };
+      const setupPhotos = await Promise.all(setups.map((setup) =>
+        Promise.all((setup.referencePhotoUrls || []).slice(0,3).map(loadImage))
+      ));
+      const setupImageHeights = setupPhotos.map((photos) => photos.map((item) =>
+        item ? Math.round(contentWidth * item.image.naturalHeight / item.image.naturalWidth) : 700
+      ));
+      const setupHeights = setupImageHeights.map((photoHeights) =>
+        photoHeights.length ? 90 + photoHeights.reduce((sum,value)=>sum+value,0) + (photoHeights.length-1)*setupImageGap + 30 : 260
+      );
       const height = Math.max(1200, 230 + infoHeight + setupHeights.reduce((sum, value) => sum + value, 0) + 130);
       const canvas = document.createElement('canvas');
       canvas.width = width;
@@ -75,15 +87,6 @@ export default function PhotographerPreparationModal({ booking, onClose }: { boo
         words.forEach((word)=>{const next=line?`${line} ${word}`:word;if(ctx.measureText(next).width>maxWidth&&line){lines.push(line);line=word;}else line=next;});
         if(line)lines.push(line); return lines;
       };
-      const loadImage = async (url:string) => {
-        try {
-          const response=await fetch(url); if(!response.ok)return null;
-          const objectUrl=URL.createObjectURL(await response.blob()); const image=new Image(); image.src=objectUrl;
-          await new Promise<void>((resolve,reject)=>{image.onload=()=>resolve();image.onerror=()=>reject(new Error('Image failed to load'));});
-          return {image,objectUrl};
-        } catch { return null; }
-      };
-
       ctx.fillStyle='#fffaf5'; ctx.fillRect(0,0,width,height);
       ctx.fillStyle='#3a302b'; ctx.fillRect(0,0,width,210);
       ctx.textAlign='center'; ctx.fillStyle='#d8b18d'; ctx.font='700 30px Arial'; ctx.fillText('MAMAMIYO PHOTOGRAPHY',width/2,70);
@@ -117,12 +120,14 @@ export default function PhotographerPreparationModal({ booking, onClose }: { boo
         if(setup.note){ctx.textAlign='right';ctx.fillStyle='#6b6152';ctx.font='25px Arial';ctx.fillText(setup.note.slice(0,72),width-margin,y+42);}
         const photos=(setup.referencePhotoUrls||[]).slice(0,3);
         if(!photos.length){ctx.textAlign='left';ctx.fillStyle='#8f877b';ctx.font='28px Arial';ctx.fillText('No setup photos uploaded',margin,y+110);y+=setupHeights[setupIndex];continue;}
-        const imageWidth=contentWidth; const imageHeight=setupImageHeight;
-        const loaded=await Promise.all(photos.map(loadImage));
+        const imageWidth=contentWidth; const loaded=setupPhotos[setupIndex];
+        let imageTop=y+70;
         loaded.forEach((item,index)=>{
-          const x=margin; const top=y+70+index*(imageHeight+setupImageGap);
+          const imageHeight=setupImageHeights[setupIndex][index];
+          const x=margin; const top=imageTop;
           ctx.fillStyle='#ffffff';ctx.fillRect(x,top,imageWidth,imageHeight);ctx.strokeStyle='#d8c9bc';ctx.lineWidth=3;ctx.strokeRect(x,top,imageWidth,imageHeight);
-          if(item){const scale=Math.min((imageWidth-24)/item.image.naturalWidth,(imageHeight-24)/item.image.naturalHeight);const w=item.image.naturalWidth*scale,h=item.image.naturalHeight*scale;ctx.drawImage(item.image,x+(imageWidth-w)/2,top+(imageHeight-h)/2,w,h);URL.revokeObjectURL(item.objectUrl);}
+          if(item){ctx.drawImage(item.image,x,top,imageWidth,imageHeight);URL.revokeObjectURL(item.objectUrl);}
+          imageTop+=imageHeight+setupImageGap;
         });
         y += setupHeights[setupIndex];
       }
