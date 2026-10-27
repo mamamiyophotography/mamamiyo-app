@@ -52,8 +52,13 @@ export default function PhotographerPreparationModal({ booking, onClose }: { boo
       const margin = 80;
       const contentWidth = width - margin * 2;
       const infoHeight = 540;
-      const setupHeight = 560;
-      const height = Math.max(1200, 230 + infoHeight + setups.length * setupHeight + 130);
+      const setupImageHeight = 1050;
+      const setupImageGap = 28;
+      const setupHeights = setups.map((setup) => {
+        const photoCount = Math.min((setup.referencePhotoUrls || []).length, 3);
+        return photoCount ? 90 + photoCount * setupImageHeight + (photoCount - 1) * setupImageGap + 30 : 260;
+      });
+      const height = Math.max(1200, 230 + infoHeight + setupHeights.reduce((sum, value) => sum + value, 0) + 130);
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
@@ -106,20 +111,20 @@ export default function PhotographerPreparationModal({ booking, onClose }: { boo
       wrap(details.comments,contentWidth-76).slice(0,2).forEach((line,index)=>ctx.fillText(line,margin+38,y+492+index*36));
 
       y += infoHeight;
-      for (const setup of setups) {
+      for (const [setupIndex, setup] of setups.entries()) {
         const outfit=setup.outfitSource==='mamamiyo'?'Mamamiyo Outfit':setup.outfitSource==='own'?"Client's Own Outfit":'Outfit Not Selected';
         ctx.textAlign='left'; ctx.fillStyle='#8c6d3f'; ctx.font='700 36px Arial'; ctx.fillText(`SETUP ${setup.slot}: ${outfit}`,margin,y+42);
         if(setup.note){ctx.textAlign='right';ctx.fillStyle='#6b6152';ctx.font='25px Arial';ctx.fillText(setup.note.slice(0,72),width-margin,y+42);}
         const photos=(setup.referencePhotoUrls||[]).slice(0,3);
-        if(!photos.length){ctx.textAlign='left';ctx.fillStyle='#8f877b';ctx.font='28px Arial';ctx.fillText('No setup photos uploaded',margin,y+110);y+=setupHeight;continue;}
-        const gap=24; const imageWidth=(contentWidth-gap*(photos.length-1))/photos.length; const imageHeight=450;
+        if(!photos.length){ctx.textAlign='left';ctx.fillStyle='#8f877b';ctx.font='28px Arial';ctx.fillText('No setup photos uploaded',margin,y+110);y+=setupHeights[setupIndex];continue;}
+        const imageWidth=contentWidth; const imageHeight=setupImageHeight;
         const loaded=await Promise.all(photos.map(loadImage));
         loaded.forEach((item,index)=>{
-          const x=margin+index*(imageWidth+gap); const top=y+70;
+          const x=margin; const top=y+70+index*(imageHeight+setupImageGap);
           ctx.fillStyle='#ffffff';ctx.fillRect(x,top,imageWidth,imageHeight);ctx.strokeStyle='#d8c9bc';ctx.lineWidth=3;ctx.strokeRect(x,top,imageWidth,imageHeight);
-          if(item){const scale=Math.min((imageWidth-16)/item.image.naturalWidth,(imageHeight-16)/item.image.naturalHeight);const w=item.image.naturalWidth*scale,h=item.image.naturalHeight*scale;ctx.drawImage(item.image,x+(imageWidth-w)/2,top+(imageHeight-h)/2,w,h);URL.revokeObjectURL(item.objectUrl);}
+          if(item){const scale=Math.min((imageWidth-24)/item.image.naturalWidth,(imageHeight-24)/item.image.naturalHeight);const w=item.image.naturalWidth*scale,h=item.image.naturalHeight*scale;ctx.drawImage(item.image,x+(imageWidth-w)/2,top+(imageHeight-h)/2,w,h);URL.revokeObjectURL(item.objectUrl);}
         });
-        y += setupHeight;
+        y += setupHeights[setupIndex];
       }
       ctx.textAlign='center';ctx.fillStyle='#8c6d3f';ctx.font='24px Arial';ctx.fillText(`Booking reference: ${booking.ref||'—'}`,width/2,height-55);
       if(!cancelled)setImageDataUrl(canvas.toDataURL('image/png'));
