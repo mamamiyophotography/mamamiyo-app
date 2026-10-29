@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { fmtDatePretty, fmtTime12 } from '@/lib/format';
-import { ADDONS, STATUS_LABELS } from '@/lib/constants';
+import { ADDONS, STATUS_LABELS, hasBookedPhysicalProduct } from '@/lib/constants';
 import BookingSummaryModal from '@/components/BookingSummaryModal';
 import PhotographerPreparationModal from '@/components/PhotographerPreparationModal';
 import EditBookingModal from '@/components/EditBookingModal';
@@ -15,7 +15,7 @@ type Booking = {
   downloadFeedback?: {galleryId:string;downloadType:'basic'|'further'|'all';downloadedAt:string}[];
   basicRetouchProgress?: Record<string, boolean>;
   furtherRetouchProgress?: Record<string, boolean>;
-  additionalOrders?: {id:string;galleryId:string;version:number;items:{name:string;quantity:number;amount:number;bonusRetouches:number}[];total:number;bonusRetouches:number;status:string;invoiceRef:string;createdAt:string;paidAt:string|null}[];
+  additionalOrders?: {id:string;galleryId:string;version:number;items:{id:string;name:string;quantity:number;amount:number;bonusRetouches:number}[];total:number;bonusRetouches:number;status:string;invoiceRef:string;createdAt:string;paidAt:string|null}[];
   gallerySelections?: {galleryId:string;clientUrl:string|null;version:number;submitted:boolean;locked:boolean;deliveredAt:string|null;emailSentAt:string|null}[];
   id: string; ref: string; sessionTypeId: string; sessionLabel: string; location: string;
   date: string; startTime: string; endTime: string; isWeekend: boolean; addOns: Record<string, number>;
@@ -520,6 +520,7 @@ export default function AdminBookingsPage() {
         const furtherProgress = b.furtherRetouchProgress || {};
         const furtherEmailSent=Boolean(furtherProgress.notification||furtherProgress.notification_email);
         const furtherWhatsappSent=Boolean(furtherProgress.notification||furtherProgress.notification_whatsapp);
+        const hasPhysicalProduct=hasBookedPhysicalProduct(b.addOns)||Boolean(b.additionalOrders?.some(order=>order.items.some(item=>item.id!=='extraRetouch'&&item.quantity>0)));
         const furtherDone = [Boolean(galleryState?.submitted && galleryState?.locked), Boolean(furtherProgress.pixelcake), Boolean(furtherProgress.photoshop), Boolean(galleryState?.deliveredAt), furtherEmailSent&&furtherWhatsappSent];
         const furtherCompletedCount = furtherDone.filter(Boolean).length;
         const furtherCurrentStep = furtherDone.findIndex(done => !done);
@@ -795,6 +796,7 @@ export default function AdminBookingsPage() {
                       <div className={`retouch-step${furtherDone[2]?' complete':''}${furtherCurrentStep===2?' current':''}`}><span className="retouch-step-number">{furtherDone[2]?'✓':'3'}</span><div><b>Photoshop detail retouch</b><p>Open Photoshop and complete the remaining detailed corrections.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'further','photoshop',!furtherDone[2])}>{furtherDone[2]?'Mark as not done':'Mark Photoshop Retouch Done'}</button></div></div></div>
                       <div className={`retouch-step${furtherDone[3]?' complete':''}${furtherCurrentStep===3?' current':''}`}><span className="retouch-step-number">{furtherDone[3]?'✓':'4'}</span><div><b>Upload Further Retouch to Gallery</b><p>{furtherDone[3]?'Further Retouch upload completed.':'Upload the completed photos through Photo Select Pro.'}</p>{galleryState&&!furtherDone[3]&&<div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'upload-further')} target="_blank" rel="noopener noreferrer">Upload Further Retouch</a></div>}</div></div>
                       <div className={`retouch-step${furtherDone[4]?' complete':''}${furtherCurrentStep===4?' current':''}`}><span className="retouch-step-number">{furtherDone[4]?'✓':'5'}</span><div><b>Notify client</b><p>Send the completed Gallery by Email and WhatsApp separately.</p>{furtherDone[3]&&!furtherDone[4]&&<div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy||furtherEmailSent||cooldownSeconds(`${b.id}:further:email`)>0} onClick={()=>notifyRetouchReady(b,'further','email')}>{furtherEmailSent?'Email sent ✓':cooldownSeconds(`${b.id}:further:email`)>0?`Wait ${cooldownSeconds(`${b.id}:further:email`)}s`:'Send Email'}</button><button className="btn btn-ghost" disabled={isBusy||cooldownSeconds(`${b.id}:further:whatsapp`)>0} onClick={()=>shareRetouchWhatsApp(b,galleryState!.clientUrl!,'further')}>{furtherWhatsappSent?'WhatsApp shared ✓ · Share again':cooldownSeconds(`${b.id}:further:whatsapp`)>0?`Wait ${cooldownSeconds(`${b.id}:further:whatsapp`)}s`:'Share WhatsApp Image + Gallery Link'}</button></div>}</div></div>
+                      {furtherEmailSent&&!hasPhysicalProduct&&b.status!=='completed'&&<div className="retouch-step current"><span className="retouch-step-number">✓</span><div><b>Finish this photoshoot</b><p>The confirmation email has been sent and this order contains only digital Further Retouch photos. No Product Delivery step is required.</p><div className="workflow-actions"><button className="btn btn-primary" disabled={isBusy} onClick={()=>{if(confirm('Confirm that this photoshoot is complete?'))runAction(b.id,'complete-retouch-only');}}>Confirm Photoshoot Complete</button></div></div></div>}
                     </div>
                   </>}
                 </details>

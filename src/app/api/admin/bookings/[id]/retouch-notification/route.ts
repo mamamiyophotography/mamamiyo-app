@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/client';
 import { buildEmailHtml, sendEmail } from '@/lib/email';
 import { sendWhatsAppImage } from '@/lib/whatsapp';
-import { hasBookedPhysicalProduct } from '@/lib/constants';
+import { bookingHasPhysicalProducts } from '@/lib/db/bookingService';
 import {finishNotification,reserveNotification} from '@/lib/notificationCooldown';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -44,8 +44,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let nextStatus = booking.status;
     if (isBasic) nextStatus = downloadOnlyBundle ? 'completed' : 'basic_retouch';
     else {
-      const additionalProductCount = await db.additionalOrder.count({where:{bookingId:id,status:{in:['pending','paid']}}});
-      nextStatus = hasBookedPhysicalProduct(booking.addOns) || additionalProductCount > 0 ? 'order_product' : 'completed';
+      // Digital-only retouch orders remain here until the photographer presses
+      // the explicit completion button. Only physical products enter delivery.
+      nextStatus = await bookingHasPhysicalProducts(db, booking) ? 'order_product' : 'further_retouch';
     }
     await db.bookingAuditLog.create({data:{bookingId:id,action:`${kind}_retouch_progress`,before:{},after:{step:`notification_${channel}`,completed:true}}});
     const sent=await db.notificationLog.findMany({where:{bookingId:id,channel:{in:[`retouch_${kind}_email`,`retouch_${kind}_whatsapp`]},status:'sent'},select:{channel:true}});

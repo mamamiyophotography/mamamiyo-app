@@ -899,9 +899,32 @@ const REVERSIBLE_POST_PROCESSING_STATUSES: Record<string, string> = {
 
 export async function bookingHasPhysicalProducts(db: any, booking: any): Promise<boolean> {
   if (hasBookedPhysicalProduct(booking.addOns)) return true;
-  return (await db.additionalOrder.count({
+  const orders = await db.additionalOrder.findMany({
     where: { bookingId: booking.id, status: { in: ['pending', 'paid'] } },
-  })) > 0;
+    select: { items: true },
+  });
+  return orders.some((order: {items: unknown}) =>
+    Array.isArray(order.items) && order.items.some((item: any) =>
+      item?.id !== 'extraRetouch' && Number(item?.quantity) > 0,
+    ),
+  );
+}
+
+/** Complete a digital-only retouch job after the customer email is sent.
+ * Physical product orders must continue through Order Product and Delivery. */
+export async function completeRetouchOnlyBooking(db: any, bookingId: string) {
+  const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+  if (!['further_retouch', 'order_product'].includes(booking.status)) {
+    throw new Error('This booking is not ready to be completed from Further Retouch.');
+  }
+  const emailWasSent = await db.notificationLog.count({
+    where: { bookingId, channel: 'retouch_further_email', status: 'sent' },
+  });
+  if (!emailWasSent) throw new Error('Send the Further Retouch confirmation email first.');
+  if (await bookingHasPhysicalProducts(db, booking)) {
+    throw new Error('This booking contains a physical product and must continue through Product Delivery.');
+  }
+  return db.booking.update({ where: { id: bookingId }, data: { status: 'completed', version: { increment: 1 } } });
 }
 
 export async function advanceStage(db: any, bookingId: string) {
