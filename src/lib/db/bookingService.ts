@@ -279,8 +279,7 @@ function toNotifyBooking(b: {
   };
 }
 
-export async function confirmDepositAndNotify(db: any, bookingId: string) {
-  const settings = await getSettings(db);
+export async function confirmDeposit(db: any, bookingId: string) {
   const booking = await confirmWithAnalytics(db, bookingId);
 
   if (booking.bundleParentId) {
@@ -290,6 +289,11 @@ export async function confirmDepositAndNotify(db: any, bookingId: string) {
     }
   }
 
+  return booking;
+}
+
+export async function notifyDepositConfirmation(db: any, booking: any) {
+  const settings = await getSettings(db);
   const pair = bookingConfirmedNotification(toNotifyBooking(booking), settings.businessName);
   const photographer = photographerContacts();
   const studioAddress = 'K-Lodge, 32 Lorong K Telok Kurau #01-01, Singapore 425641';
@@ -332,6 +336,11 @@ export async function confirmDepositAndNotify(db: any, bookingId: string) {
     { date: booking.date, clientName: booking.clientName, sessionLabel: booking.sessionLabel }
   );
   return booking;
+}
+
+export async function confirmDepositAndNotify(db: any, bookingId: string) {
+  const booking = await confirmDeposit(db, bookingId);
+  return notifyDepositConfirmation(db, booking);
 }
 
 export type UpdateBookingInput = {

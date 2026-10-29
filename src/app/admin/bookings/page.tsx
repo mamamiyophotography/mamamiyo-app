@@ -126,10 +126,13 @@ export default function AdminBookingsPage() {
       const data = await res.json();
       if (!res.ok) { setActionError({ id, message: data.error || 'Action failed' }); return null; }
       if (path === 'confirm-deposit') {
-        if (data.calendar?.synced) {
-          setActionSuccess({ id, message: 'Booking fee confirmed. Google Calendar event created.' });
-        } else if (data.calendar?.message) {
-          setActionError({ id, message: `Booking fee confirmed, but Google Calendar was not updated: ${data.calendar.message}` });
+        const warnings: string[] = [];
+        if (!data.calendar?.synced) warnings.push(`Google Calendar was not updated: ${data.calendar?.message || 'Please retry calendar sync.'}`);
+        if (data.notification?.sent === false) warnings.push(`Notification delivery was incomplete: ${data.notification.message || 'Please check the notification log.'}`);
+        if (warnings.length) {
+          setActionError({ id, message: `Booking fee confirmed.${data.calendar?.synced ? ' Google Calendar updated.' : ''} ${warnings.join(' ')}` });
+        } else {
+          setActionSuccess({ id, message: 'Booking fee confirmed. Google Calendar updated. Confirmation notification sent.' });
         }
       }
       await load();
