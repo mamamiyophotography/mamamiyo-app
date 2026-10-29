@@ -1132,11 +1132,11 @@ export async function updateClientSetupChoicesAndNotify(
   if (existing.clientEmail.trim().toLowerCase() !== email.trim().toLowerCase()) throw new Error('EMAIL_MISMATCH');
   if (!['pending', 'confirmed'].includes(existing.status)) throw new Error('This booking can no longer be changed online. Please contact Mamamiyo Photography.');
   if (!Array.isArray(setupSelections) || setupSelections.length < 1 || setupSelections.length > 3 || setupSelections.some((group, index) =>
-    group?.slot !== index + 1 || !Array.isArray(group.referencePhotoUrls) || group.referencePhotoUrls.length > 3 ||
+    group?.slot !== index + 1 || !Array.isArray(group.referencePhotoUrls) || group.referencePhotoUrls.length < 1 || group.referencePhotoUrls.length > 3 ||
     group.referencePhotoUrls.some(url => typeof url !== 'string' || url.length > 2000) ||
     (group.note !== undefined && (typeof group.note !== 'string' || group.note.length > 300)) ||
     ![undefined, null, 'mamamiyo', 'own'].includes(group.outfitSource)
-  )) throw new Error('Each Setup may contain up to 3 photos, an outfit choice and a short note.');
+  )) throw new Error('Please upload at least one reference photo for each Setup. Each Setup may contain up to 3 photos.');
   if (!Array.isArray(inspirationReferencePhotoUrls) || inspirationReferencePhotoUrls.length > 10 || inspirationReferencePhotoUrls.some(url => typeof url !== 'string' || url.length > 2000)) throw new Error('Inspirational Reference may contain up to 10 photos.');
 
   const referencePhotoUrls = setupSelections.flatMap(group => group.referencePhotoUrls);
@@ -1210,11 +1210,15 @@ export async function checkAndSendReminders(db: any, now = new Date()) {
         const pair = reminderNotification(toNotifyBooking(booking), threshold, settings.businessName);
         if(threshold.key==='3day'){
           const setupSelections=Array.isArray(booking.setupSelections)?booking.setupSelections:[];
-          const inspiration=Array.isArray(booking.inspirationReferencePhotoUrls)?booking.inspirationReferencePhotoUrls:[];
-          const hasSetupChoice=setupSelections.some((group:any)=>group?.outfitSource||group?.note?.trim()||(Array.isArray(group?.referencePhotoUrls)&&group.referencePhotoUrls.length>0))||inspiration.length>0;
-          if(!hasSetupChoice){
-            pair.client.emailSubject=`Action needed: Confirm your Setup — ${booking.sessionLabel}`;
-            pair.client.emailBody+=`\n\nYour Setup choice is still blank. Please confirm your preferred Setup before the photoshoot by replying to this email or contacting us on WhatsApp. You may send screenshots from the MamaMiyo Photography Portfolio.`;
+          const expectedSetupCount=Math.max(1,Number(booking.setupSelectionCount)||setupSelections.length||1);
+          const hasCompleteSetupPhotos=Array.from({length:expectedSetupCount},(_,index)=>setupSelections[index])
+            .every((group:any)=>Array.isArray(group?.referencePhotoUrls)&&group.referencePhotoUrls.length>0);
+          if(!hasCompleteSetupPhotos){
+            const setupUrl='https://book.mamamiyo-photography.com/lookup';
+            const actionText=`Please choose your Setup before the photoshoot. Open your booking below, select “Edit setup & upload photos”, and upload at least one reference photo for each Setup.\n\n${setupUrl}`;
+            pair.client.emailSubject=`Action needed: Choose your Setup — ${booking.sessionLabel}`;
+            pair.client.emailBody+=`\n\n${actionText}`;
+            pair.client.whatsappBody+=`\n\n${actionText}`;
           }
         }
         await dispatchNotification(pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone);

@@ -26,7 +26,10 @@ export function ClientSetupEditor({ booking, email, setupCount, onSaved }: { boo
   }
   function addInspiration(files:FileList|null){if(!files)return;setInspirationPending(current=>[...current,...Array.from(files).slice(0,Math.max(0,10-inspirationExisting.length-current.length)).map(file=>({file,preview:URL.createObjectURL(file)}))]);}
   async function save(){
-    setSaving(true);setError('');
+    setError('');
+    const missingSetup=Array.from({length:count},(_,i)=>existing[i].length+pending[i].length).findIndex(total=>total<1);
+    if(missingSetup>=0){setError(`Please upload at least one reference photo for Setup ${missingSetup+1}.`);return;}
+    setSaving(true);
     try{
       const setupSelections = await Promise.all(Array.from({ length: count }, async (_, i) => ({
         slot: i + 1,
@@ -52,10 +55,10 @@ export function ClientSetupEditor({ booking, email, setupCount, onSaved }: { boo
       <input value={notes[i]} maxLength={300} onChange={e=>setNotes(v=>v.map((x,n)=>n===i?e.target.value:x))} placeholder="Setup or outfit notes (optional)" style={{width:'100%',padding:'10px 12px',border:'1.5px solid var(--line)',borderRadius:9}}/>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:9}}>{existing[i].map(url=>thumb(url,()=>setExisting(v=>v.map((x,n)=>n===i?x.filter(item=>item!==url):x))))}{pending[i].map(item=>thumb(item.preview,()=>setPending(v=>v.map((x,n)=>n===i?x.filter(p=>p!==item):x))))}</div>
       {existing[i].length+pending[i].length<3&&<label className="btn btn-ghost" style={{display:'inline-block',marginTop:9,cursor:'pointer'}}>Upload setup photos<input type="file" accept="image/*" multiple hidden onChange={e=>{addFiles(i,e.target.files);e.currentTarget.value='';}}/></label>}
-      <div style={{fontSize:12,color:'var(--ink-soft)',marginTop:5}}>Up to 3 photos for this setup.</div>
+      <div style={{fontSize:12,color:existing[i].length+pending[i].length?'var(--ink-soft)':'var(--rust)',marginTop:5}}>At least 1 photo is required · up to 3 photos.</div>
     </div>)}
     <div style={{padding:'12px 0',borderTop:'1px solid var(--line)'}}><b>Inspirational reference photos</b><div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:9}}>{inspirationExisting.map(url=>thumb(url,()=>setInspirationExisting(v=>v.filter(item=>item!==url))))}{inspirationPending.map(item=>thumb(item.preview,()=>setInspirationPending(v=>v.filter(p=>p!==item))))}</div>{inspirationExisting.length+inspirationPending.length<10&&<label className="btn btn-ghost" style={{display:'inline-block',marginTop:9,cursor:'pointer'}}>Upload inspiration photos<input type="file" accept="image/*" multiple hidden onChange={e=>{addInspiration(e.target.files);e.currentTarget.value='';}}/></label>}<div style={{fontSize:12,color:'var(--ink-soft)',marginTop:5}}>Up to 10 photos.</div></div>
     {error&&<div className="error-text">{error}</div>}
-    <div style={{display:'flex',gap:8,marginTop:10}}><button className="btn btn-ghost" disabled={saving} onClick={()=>setEditing(false)}>Cancel</button><button className="btn btn-primary" disabled={saving} onClick={save}>{saving?'Uploading & saving…':'Save setup choices'}</button></div>
+    <div style={{display:'flex',gap:8,marginTop:10}}><button className="btn btn-ghost" disabled={saving} onClick={()=>setEditing(false)}>Cancel</button><button className="btn btn-primary" disabled={saving||Array.from({length:count},(_,i)=>existing[i].length+pending[i].length).some(total=>total<1)} onClick={save}>{saving?'Uploading & saving…':'Save setup choices'}</button></div>
   </div>;
 }
