@@ -1211,14 +1211,20 @@ export async function checkAndSendReminders(db: any, now = new Date()) {
         if(threshold.key==='3day'){
           const setupSelections=Array.isArray(booking.setupSelections)?booking.setupSelections:[];
           const expectedSetupCount=Math.max(1,Number(booking.setupSelectionCount)||setupSelections.length||1);
-          const hasCompleteSetupPhotos=Array.from({length:expectedSetupCount},(_,index)=>setupSelections[index])
-            .every((group:any)=>Array.isArray(group?.referencePhotoUrls)&&group.referencePhotoUrls.length>0);
-          if(!hasCompleteSetupPhotos){
-            const setupUrl='https://book.mamamiyo-photography.com/lookup';
-            const actionText=`Please choose your Setup before the photoshoot. Open your booking below, select “Edit setup & upload photos”, and upload at least one reference photo for each Setup.\n\n${setupUrl}`;
-            pair.client.emailSubject=`Action needed: Choose your Setup — ${booking.sessionLabel}`;
-            pair.client.emailBody+=`\n\n${actionText}`;
-            pair.client.whatsappBody+=`\n\n${actionText}`;
+          const missingSetupNumbers=Array.from({length:expectedSetupCount},(_,index)=>setupSelections[index])
+            .map((group:any,index:number)=>Array.isArray(group?.referencePhotoUrls)&&group.referencePhotoUrls.length>0?null:index+1)
+            .filter((slot:number|null):slot is number=>slot!==null);
+          if(missingSetupNumbers.length){
+            pair.photographer.whatsappBody=[
+              `⚠️ Chase client for Setup photos`,
+              `${booking.clientName} · ${booking.sessionLabel}`,
+              `Photoshoot: ${booking.date} at ${booking.startTime}`,
+              `Missing reference photos for Setup ${missingSetupNumbers.join(', ')}`,
+              `Client WhatsApp: ${booking.clientPhone}`,
+              `Please contact the client and ask them to upload at least one photo for each Setup.`,
+              `Booking Lookup: https://book.mamamiyo-photography.com/lookup`,
+              `Ref: ${booking.ref}`,
+            ].join('\n\n');
           }
         }
         await dispatchNotification(pair, booking.clientEmail, booking.clientPhone, photographer.email, photographer.phone);
