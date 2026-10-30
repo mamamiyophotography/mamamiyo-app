@@ -312,17 +312,7 @@ export default function AdminBookingsPage() {
       const root = await getDropboxRoot();
       if (!root) throw new Error('Dropbox Customer Photos folder access is unavailable.');
       const folderName = jobFolderName(booking);
-      const jobFolder = await root.getDirectoryHandle(folderName, { create: true });
-      const socialFolder = booking.photoSharingConsent === 'all'
-        ? '04 SOCIAL CANDIDATES'
-        : booking.photoSharingConsent === 'children_only'
-          ? '04 SOCIAL CANDIDATES — CHILDREN ONLY'
-          : booking.photoSharingConsent === 'private'
-            ? '04 DO NOT USE FOR SOCIAL MEDIA'
-            : '04 SHARING PERMISSION NOT SELECTED';
-      for (const name of ['01 BASIC EDIT', '02 CLEANED FOR GALLERY', '03 FURTHER RETOUCH', socialFolder, '05 CLIENT DELIVERY']) {
-        await jobFolder.getDirectoryHandle(name, { create: true });
-      }
+      await root.getDirectoryHandle(folderName, { create: true });
       return true;
     } catch (error) {
       if ((error as DOMException).name !== 'AbortError') {
@@ -399,7 +389,7 @@ export default function AdminBookingsPage() {
 
   function photoSelectionCodexUrl(booking: Booking) {
     const folderName = jobFolderName(booking);
-    return codexPhotoSelectionUrl({ ...booking, folderHint: folderName, dropboxFolderPath: `/Customer's Photos/${folderName}/01 BASIC EDIT` });
+    return codexPhotoSelectionUrl({ ...booking, folderHint: folderName, dropboxFolderPath: `/Customer's Photos/${folderName}` });
   }
 
   async function createEditingFolders(booking: Booking) {
@@ -412,7 +402,7 @@ export default function AdminBookingsPage() {
       await runAction(booking.id, 'basic-retouch-step', { step: 'folders', completed: true });
       setActionSuccess({
         id: booking.id,
-        message: `The Dropbox editing folders were created in Customer's Photos/${jobFolderName(booking)}. Export Lightroom photos into 01 BASIC EDIT.`,
+        message: `The Basic Edit folder was created at Customer's Photos/${jobFolderName(booking)}. No subfolders were created.`,
       });
     } finally {
       setBusyId(null);
@@ -779,7 +769,7 @@ export default function AdminBookingsPage() {
                   {['pending_balance','pending_basic_retouch','basic_retouch'].includes(b.status) && <>
                     <div className="retouch-progress-summary">Basic Retouch · {retouchCompletedCount} of 4 completed</div>
                     <div className="retouch-checklist">
-                      <div className={`retouch-step${retouchDone[0]?' complete':''}${retouchCurrentStep===0?' current':''}`}><span className="retouch-step-number">{retouchDone[0]?'✓':'1'}</span><div><b>Create editing folders</b><p>Currently stored in Dropbox. Google One may be used later.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={() => createEditingFolders(b)}>{retouchDone[0]?'Create folders again':'Create Editing Folders'}</button>{retouchDone[0]&&<button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'basic','folders',false)}>Reopen step</button>}</div></div></div>
+                      <div className={`retouch-step${retouchDone[0]?' complete':''}${retouchCurrentStep===0?' current':''}`}><span className="retouch-step-number">{retouchDone[0]?'✓':'1'}</span><div><b>Create Basic Edit folder</b><p>The first-level client folder in Dropbox is the Basic Edit folder. No subfolders are needed.</p><div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy} onClick={() => createEditingFolders(b)}>{retouchDone[0]?'Create folder again':'Create Basic Edit Folder'}</button>{retouchDone[0]&&<button className="btn btn-ghost" disabled={isBusy} onClick={()=>setRetouchStep(b,'basic','folders',false)}>Reopen step</button>}</div></div></div>
                       <div className={`retouch-step${retouchDone[1]?' complete':''}${retouchCurrentStep===1?' current':''}`}><span className="retouch-step-number">{retouchDone[1]?'✓':'2'}</span><div><b>Create &amp; upload photos to Gallery</b><p>{hasClientGallery?'Gallery connected successfully.':'Create the client Gallery after the edited photos are ready.'}</p>{!hasClientGallery&&<div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectCreateUrl(b)} target="_blank" rel="noopener noreferrer">Open Photo Select Pro · Upload Gallery</a></div>}</div></div>
                       <div className={`retouch-step${retouchDone[2]?' complete':''}${retouchCurrentStep===2?' current':''}`}><span className="retouch-step-number">{retouchDone[2]?'✓':'3'}</span><div><b>Notify client</b><p>{downloadOnlyBundle?'Send the Basic Retouch Gallery for viewing and download only. Do not ask the client to select photos; the 30-photo selection happens after Session 3.':'Send Email and WhatsApp separately. The booking moves to Awaiting Client Selection only after both messages succeed.'}</p>{hasClientGallery&&!retouchDone[2]&&<div className="workflow-actions"><button className="btn btn-ghost" disabled={isBusy||basicEmailSent||cooldownSeconds(`${b.id}:basic:email`)>0} onClick={()=>notifyRetouchReady(b,'basic','email')}>{basicEmailSent?'Email sent ✓':cooldownSeconds(`${b.id}:basic:email`)>0?`Wait ${cooldownSeconds(`${b.id}:basic:email`)}s`:'Send Email'}</button><button className="btn btn-ghost" disabled={isBusy||cooldownSeconds(`${b.id}:basic:whatsapp`)>0} onClick={()=>shareRetouchWhatsApp(b,galleryState!.clientUrl!,'basic')}>{basicWhatsappSent?'WhatsApp shared ✓ · Share again':cooldownSeconds(`${b.id}:basic:whatsapp`)>0?`Wait ${cooldownSeconds(`${b.id}:basic:whatsapp`)}s`:'Share WhatsApp Image + Gallery Link'}</button></div>}</div></div>
                       <div className={`retouch-step${retouchDone[3]?' complete':''}${retouchCurrentStep===3?' current':''}`}><span className="retouch-step-number">{retouchDone[3]?'✓':'4'}</span><div><b>Manage Gallery</b><p>{galleryState?.submitted&&!galleryState.locked?'The client has submitted a selection. Review and confirm it before starting Further Retouch.':'Add or remove Gallery photos, open the client view, or use additional Gallery controls.'}</p>{galleryState?.clientUrl&&<><div className="workflow-actions">{!downloadOnlyBundle&&galleryState.submitted&&!galleryState.locked&&<a className="btn btn-primary" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'get-selected')} target="_blank" rel="noopener noreferrer">Review Client Selection</a>}{!(galleryState.submitted||galleryState.locked||galleryState.deliveredAt)&&<button className="btn btn-ghost" type="button" onClick={()=>setManageGallery({bookingId:b.id,galleryId:galleryState.galleryId,addPhotosUrl:photoSelectGalleryActionUrl(b,galleryState.galleryId,'add-basic')})}>Manage Gallery</button>}<a className="btn btn-ghost" href={`/g/${galleryState.galleryId.slice(0,12)}`} target="_blank" rel="noopener noreferrer">Open Client Gallery</a></div>{(downloadOnlyBundle||galleryState.submitted||galleryState.locked||galleryState.deliveredAt)&&<details className="workflow-more compact"><summary>More Gallery options</summary><div className="workflow-actions"><a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'update-basic')} target="_blank" rel="noopener noreferrer">Update Basic Retouch</a>{!downloadOnlyBundle&&galleryState.locked&&<a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'unlock-selection')} target="_blank" rel="noopener noreferrer">Allow Client to Change Selection</a>}{!downloadOnlyBundle&&galleryState.locked&&<a className="btn btn-ghost" href={photoSelectGalleryActionUrl(b,galleryState.galleryId,'upload-further')} target="_blank" rel="noopener noreferrer">Upload Further Retouch</a>}{!galleryState.deliveredAt&&<button className="btn btn-ghost" type="button" onClick={()=>shareClientGallery(b.id,galleryState.galleryId,'basic')}>Create Basic Retouch WhatsApp Image</button>}{!downloadOnlyBundle&&galleryState.deliveredAt&&<button className="btn btn-ghost" type="button" onClick={()=>shareClientGallery(b.id,galleryState.galleryId,'further')}>Create Further Retouch WhatsApp Image</button>}</div></details>}</>}</div></div>

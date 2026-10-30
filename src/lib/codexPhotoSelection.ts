@@ -16,7 +16,7 @@ export function codexPhotoSelectionUrl(booking: PhotoSelectionBooking): string {
     `拍摄项目：${booking.sessionLabel}`,
     `客户文件夹名称提示：${booking.folderHint}`,
     booking.dropboxFolderPath ? `Dropbox 精确路径：${booking.dropboxFolderPath}` : '',
-    '优先使用上面的 Dropbox 精确路径；若不存在，再按日期、客户和拍摄项目核对实际 01 BASIC EDIT 或 02 BASIC EDIT。',
+    '这个一级客户文件夹本身就是 Basic Edit 文件夹。优先使用上面的 Dropbox 精确路径；若不存在，再按日期、客户和拍摄项目核对实际客户文件夹。',
     '严格沿用 skill 中现有的宽松初选、人工调整保护、合成配对、原图保护、缩略图缓存和简短最终汇报规则。',
   ].filter(Boolean).join('\n');
   return `codex://new?${new URLSearchParams({ prompt }).toString()}`;
